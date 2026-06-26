@@ -25,6 +25,13 @@ type Plan = {
   interval: string
 }
 
+type AttendanceRecord = {
+  id: string
+  checked_in_at: string
+  date: string
+  class: { name: string } | null
+}
+
 const beltColors: Record<string, string> = {
   white: 'bg-white text-black',
   blue: 'bg-blue-600 text-white',
@@ -44,6 +51,7 @@ export default function MemberDetailPage() {
 const [success, setSuccess] = useState(false)
   const [plans, setPlans] = useState<Plan[]>([])
   const [checkingOut, setCheckingOut] = useState(false)
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
 
   useEffect(() => {
     const init = async () => {
@@ -55,6 +63,14 @@ const [success, setSuccess] = useState(false)
       const { data: plansData } = await supabase
         .from('plans').select('*').eq('is_active', true)
       setPlans(plansData || [])
+
+      const { data: attendanceData } = await supabase
+        .from('attendance')
+        .select('id, checked_in_at, date, class:classes(name)')
+        .eq('member_id', id)
+        .order('checked_in_at', { ascending: false })
+        .limit(20)
+      setAttendance((attendanceData as any) || [])
       setLoading(false)
     }
     init()
@@ -209,7 +225,30 @@ const handleCheckout = async () => {
                 </option>
               ))}
             </select>
-          </div>
+          {/* Attendance History */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mt-6">
+          <h2 className="font-bold text-lg mb-4">Attendance History</h2>
+          {attendance.length === 0 ? (
+            <p className="text-white/30 text-sm text-center py-8">No attendance records yet</p>
+          ) : (
+            <div className="space-y-2">
+              {attendance.map(record => (
+                <div key={record.id} className="flex items-center justify-between px-4 py-3 bg-white/3 border border-white/10 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                      <span className="text-green-400 text-xs">✓</span>
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{record.class?.name || 'Open mat'}</p>
+                      <p className="text-white/40 text-xs">{new Date(record.checked_in_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                  </div>
+                  <span className="text-white/40 text-xs">{new Date(record.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div></div>
         </div>
       </div>
     </main>
