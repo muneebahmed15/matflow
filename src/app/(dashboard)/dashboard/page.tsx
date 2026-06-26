@@ -43,8 +43,9 @@ export default function DashboardPage() {
     { icon: TrendingUp, label: 'Active Trials', value: '0', color: 'text-green-500' },
   ]
 
-  const links = [
+ const links = [
     { title: 'Members', desc: 'View and manage all students', href: '/dashboard/members' },
+    { title: 'Attendance', desc: 'Check in members to classes', href: '/dashboard/attendance' },
     { title: 'Plans', desc: 'Create and manage membership plans', href: '/dashboard/plans' },
     { title: 'Classes', desc: 'Schedule and track classes', href: '/dashboard/classes' },
     { title: 'Settings', desc: 'Gym profile and billing', href: '/dashboard/settings' },
