@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 
 export async function POST(req: NextRequest) {
@@ -7,14 +7,14 @@ export async function POST(req: NextRequest) {
     const { name, description, price, interval, gym_id } = await req.json();
 
     // Create a Product in Stripe
-    const product = await stripe.products.create({
-      name,
+const product = await getStripe().products.create({
+        name,
       description: description || undefined,
     });
 
     // Create a Price in Stripe
-    const stripePrice = await stripe.prices.create({
-      product: product.id,
+const stripePrice = await getStripe().prices.create({
+        product: product.id,
       unit_amount: Math.round(price * 100), // Stripe uses cents
       currency: 'usd',
       recurring: {

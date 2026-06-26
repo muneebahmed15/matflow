@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 
 export async function POST(req: NextRequest) {
   try {
     const { member_id, plan_id } = await req.json();
 
-    // Get member details
     const { data: member, error: memberError } = await supabase
       .from('members')
       .select('*')
@@ -15,7 +14,6 @@ export async function POST(req: NextRequest) {
 
     if (memberError || !member) throw new Error('Member not found');
 
-    // Get plan details
     const { data: plan, error: planError } = await supabase
       .from('plans')
       .select('*')
@@ -25,8 +23,7 @@ export async function POST(req: NextRequest) {
     if (planError || !plan) throw new Error('Plan not found');
     if (!plan.stripe_price_id) throw new Error('Plan not connected to Stripe');
 
-    // Create Stripe Checkout Session
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [
