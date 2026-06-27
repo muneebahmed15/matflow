@@ -1,28 +1,26 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
-import { supabase } from '@/lib/supabase';
+import { getSupabase } from '@/lib/supabase';
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = getSupabase();
     const { name, description, price, interval, gym_id } = await req.json();
 
-    // Create a Product in Stripe
-const product = await getStripe().products.create({
-        name,
+    const product = await getStripe().products.create({
+      name,
       description: description || undefined,
     });
 
-    // Create a Price in Stripe
-const stripePrice = await getStripe().prices.create({
-        product: product.id,
-      unit_amount: Math.round(price * 100), // Stripe uses cents
+    const stripePrice = await getStripe().prices.create({
+      product: product.id,
+      unit_amount: Math.round(price * 100),
       currency: 'usd',
-      recurring: {
-        interval,
-      },
+      recurring: { interval },
     });
 
-    // Save plan to Supabase with stripe_price_id
     const { data, error } = await supabase.from('plans').insert({
       name,
       description,
@@ -33,7 +31,6 @@ const stripePrice = await getStripe().prices.create({
     }).select().single();
 
     if (error) throw error;
-
     return NextResponse.json({ success: true, plan: data });
 
   } catch (err: any) {
