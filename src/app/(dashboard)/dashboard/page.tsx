@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import Link from 'next/link'
 import { Users, Calendar, UserCheck, TrendingUp } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -35,7 +36,11 @@ export default function DashboardPage() {
     ] = await Promise.all([
       supabase.from('members').select('*', { count: 'exact', head: true }).eq('status', 'active'),
       supabase.from('classes').select('*', { count: 'exact', head: true }).eq('day_of_week', dayName).eq('is_active', true),
-      supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today),
+      supabase
+  .from('attendance')
+  .select('*', { count: 'exact', head: true })
+  .gte('checked_in_at', `${today}T00:00:00`)
+  .lte('checked_in_at', `${today}T23:59:59`),
       supabase.from('plans').select('*', { count: 'exact', head: true }).eq('is_active', true),
     ])
     setStats({
