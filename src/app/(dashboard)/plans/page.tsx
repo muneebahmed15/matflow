@@ -6,7 +6,7 @@ import { CreditCard, Plus } from 'lucide-react'
 
 interface Plan {
   id: string; name: string; description: string
-  price: number; interval: string; is_active: boolean; created_at: string
+  price_cents: number; interval: string; is_active: boolean; created_at: string
 }
 
 export default function PlansPage() {
@@ -126,7 +126,7 @@ export default function PlansPage() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-white font-bold">${plan.price ? Number(plan.price).toFixed(2) : (Number(plan.price_cents) / 100).toFixed(2)}<span className="text-white/30 font-normal text-xs"> / {plan.interval}</span></p>
+                <p className="text-white font-bold">${(Number(plan.price_cents) / 100).toFixed(2)}<span className="text-white/30 font-normal text-xs"> / {plan.interval}</span></p>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${plan.is_active ? 'bg-green-500/10 text-green-400' : 'bg-white/5 text-white/30'}`}>
                   {plan.is_active ? 'Active' : 'Inactive'}
                 </span>

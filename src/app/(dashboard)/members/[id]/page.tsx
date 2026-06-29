@@ -10,7 +10,7 @@ interface Member {
   email: string; phone: string; belt_rank: string; status: string
 }
 interface Plan {
-  id: string; name: string; stripe_price_id: string; price: number; interval: string
+  id: string; name: string; stripe_price_id: string; price_cents: number; interval: string
 }
 interface AttendanceRecord {
   id: string; checked_in_at: string
@@ -39,12 +39,20 @@ export default function MemberDetailPage() {
     const { data: gym } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
     if (gym) {
       setGymId(gym.id)
-      const { data: plansData } = await supabase.from('plans').select('id, name, stripe_price_id, price, interval').eq('gym_id', gym.id).eq('is_active', true)
+      const { data: plansData } = await supabase
+        .from('plans')
+        .select('id, name, stripe_price_id, price_cents, interval')
+        .eq('gym_id', gym.id)
       setPlans(plansData || [])
     }
     const { data: memberData } = await supabase.from('members').select('*').eq('id', id).single()
     if (memberData) setMember(memberData)
-    const { data: attendanceData } = await supabase.from('attendance').select('id, checked_in_at').eq('member_id', id).order('checked_in_at', { ascending: false }).limit(10)
+    const { data: attendanceData } = await supabase
+      .from('attendance')
+      .select('id, checked_in_at')
+      .eq('member_id', id)
+      .order('checked_in_at', { ascending: false })
+      .limit(10)
     setAttendance(attendanceData || [])
     const sigs = await getMemberSignatures(id)
     setSignatures(sigs as WaiverSig[])
@@ -58,7 +66,12 @@ export default function MemberDetailPage() {
       const res = await fetch('/api/stripe/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stripe_price_id: stripePriceId, member_id: member.id, gym_id: gymId, member_email: member.email }),
+        body: JSON.stringify({
+          stripe_price_id: stripePriceId,
+          member_id: member.id,
+          gym_id: gymId,
+          member_email: member.email,
+        }),
       })
       const { url, error } = await res.json()
       if (error) { alert(error); return }
@@ -90,9 +103,10 @@ export default function MemberDetailPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-2xl mx-auto space-y-6">
-      <button onClick={() => router.push('/members')} className="text-sm text-gray-400 hover:text-white flex items-center gap-1">← Back to Members</button>
+      <button onClick={() => router.push('/members')} className="text-sm text-gray-400 hover:text-white flex items-center gap-1">
+        ← Back to Members
+      </button>
 
-      {/* Header */}
       <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
         <div className="flex justify-between items-start mb-4">
           <div>
@@ -102,7 +116,6 @@ export default function MemberDetailPage() {
           <button onClick={handleDelete} className="text-red-500 text-sm hover:underline">Delete</button>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-1 bg-white/5 rounded-xl p-1">
           {tabs.map((tab) => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
@@ -113,18 +126,16 @@ export default function MemberDetailPage() {
         </div>
       </div>
 
-      {/* Info Tab */}
       {activeTab === 'info' && (
         <div className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-4">
-          {[{ label: 'Phone', value: member.phone || '—' }].map(({ label, value }) => (
-            <div key={label} className="flex justify-between border-b border-white/10 pb-3">
-              <span className="text-gray-400 text-sm">{label}</span>
-              <span className="text-white text-sm">{value}</span>
-            </div>
-          ))}
+          <div className="flex justify-between border-b border-white/10 pb-3">
+            <span className="text-gray-400 text-sm">Phone</span>
+            <span className="text-white text-sm">{member.phone || '—'}</span>
+          </div>
           <div className="flex justify-between border-b border-white/10 pb-3">
             <span className="text-gray-400 text-sm">Belt Rank</span>
-            <select value={member.belt_rank} onChange={(e) => handleEdit('belt_rank', e.target.value)} className="bg-transparent text-white text-sm capitalize cursor-pointer">
+            <select value={member.belt_rank} onChange={(e) => handleEdit('belt_rank', e.target.value)}
+              className="bg-transparent text-white text-sm capitalize cursor-pointer">
               {['white','yellow','orange','green','blue','purple','brown','black'].map(b => (
                 <option key={b} value={b} className="bg-gray-900">{b}</option>
               ))}
@@ -132,20 +143,19 @@ export default function MemberDetailPage() {
           </div>
           <div className="flex justify-between">
             <span className="text-gray-400 text-sm">Status</span>
-            <select value={member.status} onChange={(e) => handleEdit('status', e.target.value)} className="bg-transparent text-sm cursor-pointer">
+            <select value={member.status} onChange={(e) => handleEdit('status', e.target.value)}
+              className="bg-transparent text-sm cursor-pointer">
               <option value="active" className="bg-gray-900">active</option>
               <option value="inactive" className="bg-gray-900">inactive</option>
             </select>
           </div>
-
-          {/* Sign waiver link */}
-          <a href={`/waivers/${id}/sign-waiver`} className="block w-full text-center border border-white/10 text-gray-300 py-2 rounded-xl text-sm hover:bg-white/5 transition mt-2">
+          <a href={`/waivers/${id}/sign-waiver`}
+            className="block w-full text-center border border-white/10 text-gray-300 py-2 rounded-xl text-sm hover:bg-white/5 transition mt-2">
             ✍️ Sign Waiver for this Member
           </a>
         </div>
       )}
 
-      {/* Attendance Tab */}
       {activeTab === 'attendance' && (
         <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
           <h2 className="font-semibold text-white mb-4">Recent Attendance</h2>
@@ -155,8 +165,12 @@ export default function MemberDetailPage() {
             <div className="space-y-2">
               {attendance.map((a) => (
                 <div key={a.id} className="flex justify-between items-center bg-white/5 rounded-xl px-4 py-2.5">
-                  <span className="text-white text-sm">{new Date(a.checked_in_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-                  <span className="text-white/30 text-xs">{new Date(a.checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="text-white text-sm">
+                    {new Date(a.checked_in_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  </span>
+                  <span className="text-white/30 text-xs">
+                    {new Date(a.checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
               ))}
             </div>
@@ -164,7 +178,6 @@ export default function MemberDetailPage() {
         </div>
       )}
 
-      {/* Waivers Tab */}
       {activeTab === 'waivers' && (
         <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
           <h2 className="font-semibold text-white mb-4">Signed Waivers</h2>
@@ -186,8 +199,7 @@ export default function MemberDetailPage() {
         </div>
       )}
 
-      {/* Plans */}
-      {plans.length > 0 && activeTab === 'info' && (
+      {activeTab === 'info' && plans.length > 0 && (
         <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
           <h2 className="font-semibold text-white mb-4">Subscribe to Plan</h2>
           <div className="space-y-3">
@@ -195,15 +207,26 @@ export default function MemberDetailPage() {
               <div key={plan.id} className="flex justify-between items-center p-3 border border-white/10 rounded-xl">
                 <div>
                   <p className="text-sm font-medium text-white">{plan.name}</p>
-                  <p className="text-xs text-gray-400">${Number(plan.price).toFixed(2)} / {plan.interval}</p>
+                  <p className="text-xs text-gray-400">
+                    ${plan.price_cents ? (plan.price_cents / 100).toFixed(2) : '0.00'} / {plan.interval}
+                  </p>
                 </div>
-                <button onClick={() => handleSubscribe(plan.stripe_price_id)} disabled={subscribing}
+                <button
+                  onClick={() => handleSubscribe(plan.stripe_price_id)}
+                  disabled={subscribing || !plan.stripe_price_id}
                   className="bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-red-700 transition disabled:opacity-50">
                   {subscribing ? 'Loading...' : 'Subscribe'}
                 </button>
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {activeTab === 'info' && plans.length === 0 && (
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6 text-center">
+          <p className="text-gray-400 text-sm">No active plans yet.</p>
+          <a href="/plans" className="text-red-400 text-sm hover:underline mt-2 inline-block">Create a plan →</a>
         </div>
       )}
     </div>
