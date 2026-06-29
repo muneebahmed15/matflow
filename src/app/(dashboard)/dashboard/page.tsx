@@ -1,124 +1,91 @@
 'use client'
+
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import Link from 'next/link'
-import { Users, Calendar, UserCheck, TrendingUp } from 'lucide-react'
+import { Users, UserCheck, CreditCard, FileText } from 'lucide-react'
 
 export default function DashboardPage() {
-  const router = useRouter()
+  const [stats, setStats] = useState({ totalMembers: 0, activeMembers: 0, todayCheckIns: 0, activeSubscriptions: 0, activeWaivers: 0 })
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({
-    totalMembers: 0,
-    classesToday: 0,
-    checkInsToday: 0,
-    activePlans: 0,
-  })
+  const [gymName, setGymName] = useState('East Coast MMA')
 
   useEffect(() => {
-    const init = async () => {
+    const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      await fetchStats()
+      if (!user) return
+      const { data: gym } = await supabase.from('gyms').select('id, name').eq('owner_id', user.id).single()
+      if (!gym) return
+      if (gym.name) setGymName(gym.name)
+      const today = new Date().toISOString().split('T')[0]
+      const [
+        { count: totalMembers },
+        { count: activeMembers },
+        { count: todayCheckIns },
+        { count: activeSubscriptions },
+        { count: activeWaivers },
+      ] = await Promise.all([
+        supabase.from('members').select('*', { count: 'exact', head: true }).eq('gym_id', gym.id),
+        supabase.from('members').select('*', { count: 'exact', head: true }).eq('gym_id', gym.id).eq('status', 'active'),
+        supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('gym_id', gym.id).gte('checked_in_at', `${today}T00:00:00`).lte('checked_in_at', `${today}T23:59:59`),
+        supabase.from('subscriptions').select('*', { count: 'exact', head: true }).eq('gym_id', gym.id).eq('status', 'active'),
+        supabase.from('waivers').select('*', { count: 'exact', head: true }).eq('gym_id', gym.id).eq('is_active', true),
+      ])
+      setStats({ totalMembers: totalMembers ?? 0, activeMembers: activeMembers ?? 0, todayCheckIns: todayCheckIns ?? 0, activeSubscriptions: activeSubscriptions ?? 0, activeWaivers: activeWaivers ?? 0 })
       setLoading(false)
     }
-    init()
-  }, [router])
+    load()
+  }, [])
 
-  async function fetchStats() {
-    const today = new Date().toISOString().split('T')[0]
-    const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' })
-    const [
-      { count: totalMembers },
-      { count: classesToday },
-      { count: checkInsToday },
-      { count: activePlans },
-    ] = await Promise.all([
-      supabase.from('members').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-      supabase.from('classes').select('*', { count: 'exact', head: true }).eq('day_of_week', dayName).eq('is_active', true),
-      supabase
-  .from('attendance')
-  .select('*', { count: 'exact', head: true })
-  .gte('checked_in_at', `${today}T00:00:00`)
-  .lte('checked_in_at', `${today}T23:59:59`),
-      supabase.from('plans').select('*', { count: 'exact', head: true }).eq('is_active', true),
-    ])
-    setStats({
-      totalMembers: totalMembers || 0,
-      classesToday: classesToday || 0,
-      checkInsToday: checkInsToday || 0,
-      activePlans: activePlans || 0,
-    })
-  }
+  const statCards = [
+    { label: 'Total Members', value: stats.totalMembers, sub: `${stats.activeMembers} active`, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
+    { label: "Today's Check-Ins", value: stats.todayCheckIns, sub: 'checked in today', icon: UserCheck, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
+    { label: 'Active Subscriptions', value: stats.activeSubscriptions, sub: 'recurring billing', icon: CreditCard, color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' },
+    { label: 'Active Waivers', value: stats.activeWaivers, sub: 'available to sign', icon: FileText, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
+  ]
 
   if (loading) return (
-    <div className="flex items-center justify-center min-h-screen">
-      <p className="text-white/50">Loading...</p>
+    <div className="p-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {[...Array(4)].map((_, i) => <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5 animate-pulse h-28" />)}
     </div>
   )
 
-  const statCards = [
-    { icon: Users, label: 'Active Members', value: stats.totalMembers, color: 'text-red-500', bg: 'bg-red-500/10' },
-    { icon: UserCheck, label: 'Check-ins Today', value: stats.checkInsToday, color: 'text-green-500', bg: 'bg-green-500/10' },
-    { icon: Calendar, label: 'Classes Today', value: stats.classesToday, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { icon: TrendingUp, label: 'Active Plans', value: stats.activePlans, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
-  ]
-
   return (
-    <div className="p-8">
+    <div className="p-6 md:p-8 max-w-6xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-extrabold">Dashboard</h1>
-        <p className="text-white/50 mt-1">East Coast MMA</p>
+        <h1 className="text-3xl font-extrabold">{gymName}</h1>
+        <p className="text-white/40 text-sm mt-1">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {statCards.map(({ icon: Icon, label, value, color, bg }) => (
-          <div key={label} className="bg-white/5 border border-white/10 rounded-2xl p-5">
-            <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center mb-3`}>
-              <Icon className={color} size={20} />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {statCards.map(({ label, value, sub, icon: Icon, color, bg, border }) => (
+          <div key={label} className={`${bg} border ${border} rounded-2xl p-5`}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-white/50 text-xs font-medium uppercase tracking-wider">{label}</p>
+              <Icon size={16} className={color} />
             </div>
-            <p className="text-3xl font-extrabold">{value}</p>
-            <p className="text-white/50 text-sm mt-1">{label}</p>
+            <p className={`text-3xl font-extrabold ${color}`}>{value}</p>
+            <p className="text-white/30 text-xs mt-1">{sub}</p>
           </div>
         ))}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <h2 className="font-bold text-lg mb-1">Quick Actions</h2>
-          <p className="text-white/40 text-sm mb-4">Common tasks at a glance</p>
-          <div className="space-y-2">
-            <a href="/dashboard/attendance" className="flex items-center gap-3 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-xl transition text-sm">
-              <UserCheck size={16} className="text-green-400" /> Check in a member
-            </a>
-            <a href="/dashboard/members" className="flex items-center gap-3 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-xl transition text-sm">
-              <Users size={16} className="text-blue-400" /> Add a new member
-            </a>
-            <a href="/dashboard/plans" className="flex items-center gap-3 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-xl transition text-sm">
-              <TrendingUp size={16} className="text-yellow-400" /> Create a membership plan
-            </a>
-          </div>
-        </div>
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <h2 className="font-bold text-lg mb-1">Today</h2>
-          <p className="text-white/40 text-sm mb-4">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-white/50">Check-ins</span>
-              <span className="font-bold">{stats.checkInsToday}</span>
+        {[
+          { href: '/attendance/check-in', icon: UserCheck, iconColor: 'text-red-400', bg: 'bg-red-600/20', title: 'Check In a Member', sub: 'One-tap attendance tracking' },
+          { href: '/members/new', icon: Users, iconColor: 'text-blue-400', bg: 'bg-blue-600/20', title: 'Add New Member', sub: 'Register a new student' },
+          { href: '/waivers', icon: FileText, iconColor: 'text-purple-400', bg: 'bg-purple-600/20', title: 'Manage Waivers', sub: 'Digital e-signature waivers' },
+          { href: '/plans', icon: CreditCard, iconColor: 'text-green-400', bg: 'bg-green-600/20', title: 'Membership Plans', sub: 'Create and manage billing plans' },
+        ].map(({ href, icon: Icon, iconColor, bg, title, sub }) => (
+          <a key={href} href={href} className="bg-white/5 border border-white/10 hover:border-white/20 rounded-2xl p-5 transition">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 ${bg} rounded-xl flex items-center justify-center`}>
+                <Icon size={18} className={iconColor} />
+              </div>
+              <div>
+                <p className="font-semibold text-white">{title}</p>
+                <p className="text-white/40 text-sm">{sub}</p>
+              </div>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-white/50">Classes scheduled</span>
-              <span className="font-bold">{stats.classesToday}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-white/50">Active members</span>
-              <span className="font-bold">{stats.totalMembers}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-white/50">Active plans</span>
-              <span className="font-bold">{stats.activePlans}</span>
-            </div>
-          </div>
-        </div>
+          </a>
+        ))}
       </div>
     </div>
   )

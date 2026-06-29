@@ -1,0 +1,79 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+
+export default function SettingsPage() {
+  const [gymName, setGymName] = useState('')
+  const [slug, setSlug] = useState('')
+  const [gymId, setGymId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [userEmail, setUserEmail] = useState('')
+
+  useEffect(() => {
+    const load = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      setUserEmail(user.email || '')
+      const { data: gym } = await supabase.from('gyms').select('id, name, slug').eq('owner_id', user.id).single()
+      if (gym) { setGymId(gym.id); setGymName(gym.name || ''); setSlug(gym.slug || '') }
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const handleSave = async () => {
+    if (!gymId) return
+    setSaving(true)
+    const { error } = await supabase.from('gyms').update({ name: gymName, slug }).eq('id', gymId)
+    setSaving(false)
+    if (!error) { setSaved(true); setTimeout(() => setSaved(false), 3000) }
+    else alert(error.message)
+  }
+
+  const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+
+  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
+
+  return (
+    <div className="p-6 md:p-8 max-w-2xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-3xl font-extrabold">Settings</h1>
+        <p className="text-white/40 text-sm mt-1">Manage your gym account.</p>
+      </div>
+      <div className="space-y-6">
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
+          <h2 className="font-semibold text-white mb-4">Account</h2>
+          <div className="flex justify-between items-center py-3 border-b border-white/10">
+            <span className="text-gray-400 text-sm">Email</span>
+            <span className="text-white text-sm">{userEmail}</span>
+          </div>
+          <button onClick={async () => { await supabase.auth.signOut(); window.location.href = '/login' }}
+            className="mt-4 text-red-400 text-sm hover:underline">
+            Sign out
+          </button>
+        </div>
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
+          <h2 className="font-semibold text-white mb-4">Gym Settings</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Gym Name</label>
+              <input value={gymName} onChange={(e) => setGymName(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Gym Slug</label>
+              <input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} className={`${inputClass} font-mono`} />
+              <p className="text-white/20 text-xs mt-1">Lowercase letters, numbers, hyphens only.</p>
+            </div>
+            {saved && <p className="text-green-400 text-sm">✅ Settings saved!</p>}
+            <button onClick={handleSave} disabled={saving || !gymName} className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition">
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

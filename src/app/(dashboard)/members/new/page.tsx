@@ -7,74 +7,73 @@ import { useRouter } from 'next/navigation'
 export default function AddMemberPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    belt_rank: 'white',
-    status: 'active',
-  })
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
-  }
+  const [first_name, setFirstName] = useState('')
+  const [last_name, setLastName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [belt_rank, setBeltRank] = useState('white')
+  const [status, setStatus] = useState('active')
+  const [error, setError] = useState('')
 
   const handleSubmit = async () => {
+    if (!first_name || !last_name) { setError('First and last name are required.'); return }
     setLoading(true)
+    setError('')
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
     const { data: gymData } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
     if (!gymData) { setLoading(false); return }
-    const { error } = await supabase.from('members').insert({ ...form, gym_id: gymData.id })
+    const { error: err } = await supabase.from('members').insert({ first_name, last_name, email, phone, belt_rank, status, gym_id: gymData.id })
     setLoading(false)
-    if (error) { alert(error.message) } else { router.push('/members') }
+    if (err) { setError(err.message) } else { router.push('/members') }
   }
 
+  const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-red-500"
+  const labelClass = "block text-sm font-medium text-gray-300 mb-1"
+
   return (
-    <div className="max-w-lg mx-auto mt-10 p-6 bg-white rounded-xl shadow">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">Add Member</h1>
-      <div className="space-y-4">
+    <div className="p-6 md:p-8 max-w-xl mx-auto">
+      <button onClick={() => router.back()} className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1">← Back</button>
+      <h1 className="text-2xl font-bold mb-6">Add Member</h1>
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-            <input name="first_name" value={form.first_name} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            <label className={labelClass}>First Name</label>
+            <input value={first_name} onChange={(e) => setFirstName(e.target.value)} placeholder="John" className={inputClass} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-            <input name="last_name" value={form.last_name} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            <label className={labelClass}>Last Name</label>
+            <input value={last_name} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" className={inputClass} />
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input name="email" type="email" value={form.email} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          <label className={labelClass}>Email</label>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="john@example.com" className={inputClass} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-          <input name="phone" value={form.phone} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          <label className={labelClass}>Phone</label>
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 000-0000" className={inputClass} />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Belt Rank</label>
-          <select name="belt_rank" value={form.belt_rank} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-            <option value="white">White</option>
-            <option value="yellow">Yellow</option>
-            <option value="orange">Orange</option>
-            <option value="green">Green</option>
-            <option value="blue">Blue</option>
-            <option value="purple">Purple</option>
-            <option value="brown">Brown</option>
-            <option value="black">Black</option>
-          </select>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Belt Rank</label>
+            <select value={belt_rank} onChange={(e) => setBeltRank(e.target.value)} className={inputClass}>
+              {['white','yellow','orange','green','blue','purple','brown','black'].map(b => (
+                <option key={b} value={b} className="bg-gray-900 capitalize">{b}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Status</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass}>
+              <option value="active" className="bg-gray-900">Active</option>
+              <option value="inactive" className="bg-gray-900">Inactive</option>
+            </select>
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-          <select name="status" value={form.status} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
-        <button onClick={handleSubmit} disabled={loading || !form.first_name || !form.last_name} className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition">
-          {loading ? 'Saving...' : 'Add Member'}
+        {error && <p className="text-red-400 text-sm">{error}</p>}
+        <button onClick={handleSubmit} disabled={loading || !first_name || !last_name} className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
+          {loading ? 'Adding...' : 'Add Member'}
         </button>
       </div>
     </div>

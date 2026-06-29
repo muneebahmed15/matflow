@@ -1,26 +1,27 @@
-﻿'use client'
-
+'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { LayoutDashboard, Users, UserCheck, Calendar, CreditCard, Settings, LogOut, Menu, X, FileText } from 'lucide-react'
+import { LayoutDashboard, Users, UserCheck, Calendar, CreditCard, Settings, LogOut, Menu, X, FileText, Dumbbell } from 'lucide-react'
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Members', href: '/dashboard/members', icon: Users },
-  { label: 'Check-In', href: '/dashboard/attendance/check-in', icon: UserCheck },
-  { label: 'Attendance Log', href: '/dashboard/attendance/log', icon: Calendar },
-  { label: 'Classes', href: '/dashboard/classes', icon: Calendar },
-  { label: 'Waivers', href: '/dashboard/waivers', icon: FileText },
-  { label: 'Plans', href: '/dashboard/plans', icon: CreditCard },
-  { label: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { label: 'Members', href: '/members', icon: Users },
+  { label: 'Classes', href: '/classes', icon: Dumbbell },
+  { label: 'Check-In', href: '/attendance/check-in', icon: UserCheck },
+  { label: 'Attendance Log', href: '/attendance/log', icon: Calendar },
+  { label: 'Waivers', href: '/waivers', icon: FileText },
+  { label: 'Plans', href: '/plans', icon: CreditCard },
+  { label: 'Subscriptions', href: '/subscriptions', icon: CreditCard },
+  { label: 'Settings', href: '/settings', icon: Settings },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [user, setUser] = useState<any>(null)
+  const [gymName, setGymName] = useState('East Coast MMA')
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
@@ -28,6 +29,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUser(user)
+      const { data: gym } = await supabase.from('gyms').select('name').eq('owner_id', user.id).single()
+      if (gym?.name) setGymName(gym.name)
     }
     getUser()
   }, [router])
@@ -60,7 +63,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <X size={18} />
             </button>
           </div>
-          <p className="text-gray-500 text-xs mt-2 font-medium">East Coast MMA</p>
+          <p className="text-gray-500 text-xs mt-2 font-medium truncate">{gymName}</p>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {navItems.map(({ label, href, icon: Icon }) => {

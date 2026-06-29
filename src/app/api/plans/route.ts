@@ -1,39 +1,18 @@
 export const dynamic = 'force-dynamic';
-
 import { NextRequest, NextResponse } from 'next/server';
-import { getStripe } from '@/lib/stripe';
-import { getSupabase } from '@/lib/supabase';
+import { stripe } from '@/lib/stripe';
+import { createClient } from '@supabase/supabase-js';
 
-export async function POST(req: NextRequest) {
-  try {
-    const supabase = getSupabase();
-    const { name, description, price, interval, gym_id } = await req.json();
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
-    const product = await getStripe().products.create({
-      name,
-      description: description || undefined,
-    });
-
-    const stripePrice = await getStripe().prices.create({
-      product: product.id,
-      unit_amount: Math.round(price * 100),
-      currency: 'usd',
-      recurring: { interval },
-    });
-
-    const { data, error } = await supabase.from('plans').insert({
-      name,
-      description,
-      price,
-      interval,
-      gym_id: gym_id || null,
-      stripe_price_id: stripePrice.id,
-    }).select().single();
-
-    if (error) throw error;
-    return NextResponse.json({ success: true, plan: data });
-
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  }
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const gym_id = searchParams.get('gym_id');
+  if (!gym_id) return NextResponse.json({ error: 'gym_id required' }, { status: 400 });
+  const { data, error } = await supabaseAdmin.from('plans').select('*').eq('gym_id', gym_id).eq('is_active', true).order('created_at', { ascending: false });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ data });
 }

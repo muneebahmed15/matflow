@@ -3,83 +3,209 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParams, useRouter } from 'next/navigation'
+import { getMemberSignatures } from '@/lib/waivers'
 
 interface Member {
-  id: string
-  first_name: string
-  last_name: string
-  email: string
-  phone: string
-  belt_rank: string
-  status: string
+  id: string; first_name: string; last_name: string
+  email: string; phone: string; belt_rank: string; status: string
+}
+interface Plan {
+  id: string; name: string; stripe_price_id: string; price: number; interval: string
+}
+interface AttendanceRecord {
+  id: string; checked_in_at: string
+}
+interface WaiverSig {
+  id: string; signed_at: string; waivers: { title: string }
 }
 
 export default function MemberDetailPage() {
-  const { id } = useParams()
+  const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const [member, setMember] = useState<Member | null>(null)
+  const [plans, setPlans] = useState<Plan[]>([])
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
+  const [signatures, setSignatures] = useState<WaiverSig[]>([])
+  const [gymId, setGymId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [subscribing, setSubscribing] = useState(false)
+  const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'waivers'>('info')
 
-  useEffect(() => {
-    const fetchMember = async () => {
-      const { data } = await supabase
-        .from('members')
-        .select('*')
-        .eq('id', id)
-        .single()
+  useEffect(() => { fetchAll() }, [id])
 
-      if (data) setMember(data)
-      setLoading(false)
+  async function fetchAll() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: gym } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
+    if (gym) {
+      setGymId(gym.id)
+      const { data: plansData } = await supabase.from('plans').select('id, name, stripe_price_id, price, interval').eq('gym_id', gym.id).eq('is_active', true)
+      setPlans(plansData || [])
     }
+    const { data: memberData } = await supabase.from('members').select('*').eq('id', id).single()
+    if (memberData) setMember(memberData)
+    const { data: attendanceData } = await supabase.from('attendance').select('id, checked_in_at').eq('member_id', id).order('checked_in_at', { ascending: false }).limit(10)
+    setAttendance(attendanceData || [])
+    const sigs = await getMemberSignatures(id)
+    setSignatures(sigs as WaiverSig[])
+    setLoading(false)
+  }
 
-    fetchMember()
-  }, [id])
+  async function handleSubscribe(stripePriceId: string) {
+    if (!member || !gymId) return
+    setSubscribing(true)
+    try {
+      const res = await fetch('/api/stripe/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stripe_price_id: stripePriceId, member_id: member.id, gym_id: gymId, member_email: member.email }),
+      })
+      const { url, error } = await res.json()
+      if (error) { alert(error); return }
+      if (url) window.location.href = url
+    } catch { alert('Failed to start checkout') }
+    finally { setSubscribing(false) }
+  }
+
+  const handleEdit = async (field: string, value: string) => {
+    if (!member) return
+    const { error } = await supabase.from('members').update({ [field]: value }).eq('id', member.id)
+    if (!error) setMember({ ...member, [field]: value })
+  }
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this member?')) return
+    if (!confirm('Delete this member?')) return
     await supabase.from('members').delete().eq('id', id)
     router.push('/members')
   }
 
-  if (loading) return <div className="p-6 text-gray-400">Loading...</div>
-  if (!member) return <div className="p-6 text-gray-400">Member not found.</div>
+  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
+  if (!member) return <div className="p-8 text-gray-400">Member not found.</div>
+
+  const tabs = [
+    { key: 'info', label: 'Info' },
+    { key: 'attendance', label: `Attendance (${attendance.length})` },
+    { key: 'waivers', label: `Waivers (${signatures.length})` },
+  ]
 
   return (
-    <div className="max-w-lg mx-auto mt-10 p-6 bg-white rounded-xl shadow">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">{member.first_name} {member.last_name}</h1>
-        <button onClick={handleDelete} className="text-red-500 text-sm hover:underline">
-          Delete
-        </button>
-      </div>
+    <div className="p-6 md:p-8 max-w-2xl mx-auto space-y-6">
+      <button onClick={() => router.push('/members')} className="text-sm text-gray-400 hover:text-white flex items-center gap-1">← Back to Members</button>
 
-      <div className="space-y-3 text-sm text-gray-700">
-        <div className="flex justify-between border-b pb-2">
-          <span className="font-medium">Email</span>
-          <span>{member.email}</span>
+      {/* Header */}
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-white">{member.first_name} {member.last_name}</h1>
+            <p className="text-white/40 text-sm">{member.email}</p>
+          </div>
+          <button onClick={handleDelete} className="text-red-500 text-sm hover:underline">Delete</button>
         </div>
-        <div className="flex justify-between border-b pb-2">
-          <span className="font-medium">Phone</span>
-          <span>{member.phone}</span>
-        </div>
-        <div className="flex justify-between border-b pb-2">
-          <span className="font-medium">Belt Rank</span>
-          <span className="capitalize">{member.belt_rank}</span>
-        </div>
-        <div className="flex justify-between border-b pb-2">
-          <span className="font-medium">Status</span>
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${member.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-            {member.status}
-          </span>
+
+        {/* Tabs */}
+        <div className="flex gap-1 bg-white/5 rounded-xl p-1">
+          {tabs.map((tab) => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
+              className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition ${activeTab === tab.key ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white'}`}>
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      <button
-        onClick={() => router.push('/members')}
-        className="mt-6 w-full border border-gray-300 text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-50 transition"
-      >
-        ← Back to Members
-      </button>
+      {/* Info Tab */}
+      {activeTab === 'info' && (
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-4">
+          {[{ label: 'Phone', value: member.phone || '—' }].map(({ label, value }) => (
+            <div key={label} className="flex justify-between border-b border-white/10 pb-3">
+              <span className="text-gray-400 text-sm">{label}</span>
+              <span className="text-white text-sm">{value}</span>
+            </div>
+          ))}
+          <div className="flex justify-between border-b border-white/10 pb-3">
+            <span className="text-gray-400 text-sm">Belt Rank</span>
+            <select value={member.belt_rank} onChange={(e) => handleEdit('belt_rank', e.target.value)} className="bg-transparent text-white text-sm capitalize cursor-pointer">
+              {['white','yellow','orange','green','blue','purple','brown','black'].map(b => (
+                <option key={b} value={b} className="bg-gray-900">{b}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400 text-sm">Status</span>
+            <select value={member.status} onChange={(e) => handleEdit('status', e.target.value)} className="bg-transparent text-sm cursor-pointer">
+              <option value="active" className="bg-gray-900">active</option>
+              <option value="inactive" className="bg-gray-900">inactive</option>
+            </select>
+          </div>
+
+          {/* Sign waiver link */}
+          <a href={`/waivers/${id}/sign-waiver`} className="block w-full text-center border border-white/10 text-gray-300 py-2 rounded-xl text-sm hover:bg-white/5 transition mt-2">
+            ✍️ Sign Waiver for this Member
+          </a>
+        </div>
+      )}
+
+      {/* Attendance Tab */}
+      {activeTab === 'attendance' && (
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
+          <h2 className="font-semibold text-white mb-4">Recent Attendance</h2>
+          {attendance.length === 0 ? (
+            <p className="text-white/30 text-sm text-center py-8">No attendance records yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {attendance.map((a) => (
+                <div key={a.id} className="flex justify-between items-center bg-white/5 rounded-xl px-4 py-2.5">
+                  <span className="text-white text-sm">{new Date(a.checked_in_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                  <span className="text-white/30 text-xs">{new Date(a.checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Waivers Tab */}
+      {activeTab === 'waivers' && (
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
+          <h2 className="font-semibold text-white mb-4">Signed Waivers</h2>
+          {signatures.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-white/30 text-sm mb-3">No waivers signed yet.</p>
+              <a href={`/waivers/${id}/sign-waiver`} className="text-red-400 text-sm hover:underline">Sign a waiver →</a>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {signatures.map((sig) => (
+                <div key={sig.id} className="flex justify-between items-center bg-white/5 rounded-xl px-4 py-2.5">
+                  <span className="text-white text-sm">{sig.waivers?.title}</span>
+                  <span className="text-white/30 text-xs">{new Date(sig.signed_at).toLocaleDateString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Plans */}
+      {plans.length > 0 && activeTab === 'info' && (
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
+          <h2 className="font-semibold text-white mb-4">Subscribe to Plan</h2>
+          <div className="space-y-3">
+            {plans.map((plan) => (
+              <div key={plan.id} className="flex justify-between items-center p-3 border border-white/10 rounded-xl">
+                <div>
+                  <p className="text-sm font-medium text-white">{plan.name}</p>
+                  <p className="text-xs text-gray-400">${Number(plan.price).toFixed(2)} / {plan.interval}</p>
+                </div>
+                <button onClick={() => handleSubscribe(plan.stripe_price_id)} disabled={subscribing}
+                  className="bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-red-700 transition disabled:opacity-50">
+                  {subscribing ? 'Loading...' : 'Subscribe'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
