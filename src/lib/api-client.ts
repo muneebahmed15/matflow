@@ -65,3 +65,66 @@ export async function fetchTodayCheckIns(gymId: string): Promise<AttendanceLogEn
   const today = new Date().toISOString().split('T')[0];
   return fetchAttendanceLog(gymId, today);
 }
+
+async function postStripeAction<T>(
+  path: string,
+  body: Record<string, unknown>
+): Promise<T> {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const payload = (await res.json()) as T & { error?: string };
+  if (!res.ok) {
+    throw new Error(payload.error ?? 'Request failed');
+  }
+  return payload;
+}
+
+export async function cancelStripeSubscription(input: {
+  subscriptionId: string;
+  stripeSubscriptionId: string;
+  reason?: string;
+  cancelImmediately?: boolean;
+}): Promise<void> {
+  await postStripeAction('/api/stripe/cancel-subscription', {
+    subscription_id: input.subscriptionId,
+    stripe_subscription_id: input.stripeSubscriptionId,
+    reason: input.reason,
+    cancel_immediately: input.cancelImmediately ?? false,
+  });
+}
+
+export async function pauseStripeSubscription(input: {
+  subscriptionId: string;
+  stripeSubscriptionId: string;
+  action: 'pause' | 'resume';
+  reason?: string;
+}): Promise<void> {
+  await postStripeAction('/api/stripe/pause-subscription', {
+    subscription_id: input.subscriptionId,
+    stripe_subscription_id: input.stripeSubscriptionId,
+    action: input.action,
+    reason: input.reason,
+  });
+}
+
+export async function refundStripeSubscription(input: {
+  subscriptionId: string;
+  stripeSubscriptionId: string;
+  memberId?: string;
+  amountCents?: number;
+  reason?: string;
+}): Promise<{ refundId: string; amountCents: number }> {
+  const result = await postStripeAction<{
+    refund: { refundId: string; amountCents: number };
+  }>('/api/stripe/refund', {
+    subscription_id: input.subscriptionId,
+    stripe_subscription_id: input.stripeSubscriptionId,
+    member_id: input.memberId,
+    amount_cents: input.amountCents,
+    reason: input.reason,
+  });
+  return result.refund;
+}

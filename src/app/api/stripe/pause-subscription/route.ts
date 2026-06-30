@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
-import { getAdminClient } from '@/lib/supabase/admin';
 import {
   assertSubscriptionInGym,
   isErrorResponse,
   requireStaffAuth,
 } from '@/lib/auth/api';
+import { isServiceError } from '@/services/errors';
+import { setSubscriptionPause } from '@/services/stripe-subscriptions';
 
 export async function POST(req: NextRequest) {
   const auth = await requireStaffAuth({ adminOnly: true });
@@ -20,44 +20,28 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (action !== 'pause' && action !== 'resume') {
+    return NextResponse.json({ error: 'action must be pause or resume' }, { status: 400 });
+  }
+
   const scopeError = await assertSubscriptionInGym(auth, subscription_id);
   if (scopeError) return scopeError;
 
   try {
-    const admin = getAdminClient();
-
-    if (action === 'pause') {
-      await stripe.subscriptions.update(stripe_subscription_id, {
-        pause_collection: { behavior: 'void' },
-      });
-      await admin
-        .from('subscriptions')
-        .update({
-          status: 'paused',
-          paused_at: new Date().toISOString(),
-          pause_reason: reason || null,
-        })
-        .eq('id', subscription_id)
-        .eq('gym_id', auth.gymId);
-    } else {
-      await stripe.subscriptions.update(stripe_subscription_id, {
-        pause_collection: '',
-      });
-      await admin
-        .from('subscriptions')
-        .update({
-          status: 'active',
-          paused_at: null,
-          pause_reason: null,
-        })
-        .eq('id', subscription_id)
-        .eq('gym_id', auth.gymId);
-    }
-
+    await setSubscriptionPause({
+      gymId: auth.gymId,
+      subscriptionId: subscription_id,
+      stripeSubscriptionId: stripe_subscription_id,
+      reason,
+      action,
+    });
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Pause subscription error';
     console.error('Pause subscription error:', message);
+    if (isServiceError(err)) {
+      return NextResponse.json({ error: message }, { status: err.status });
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

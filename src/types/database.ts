@@ -132,6 +132,10 @@ export type Database = {
           stripe_customer_id: string | null;
           status: string;
           current_period_end: string | null;
+          cancellation_reason: string | null;
+          cancelled_at: string | null;
+          paused_at: string | null;
+          pause_reason: string | null;
           created_at: string;
         };
         Insert: {
@@ -143,6 +147,10 @@ export type Database = {
           stripe_customer_id?: string | null;
           status?: string;
           current_period_end?: string | null;
+          cancellation_reason?: string | null;
+          cancelled_at?: string | null;
+          paused_at?: string | null;
+          pause_reason?: string | null;
           created_at?: string;
         };
         Update: Partial<Database['public']['Tables']['subscriptions']['Insert']>;
@@ -282,6 +290,50 @@ export type Database = {
           promoted_at?: string;
         };
         Update: Partial<Database['public']['Tables']['belt_promotions']['Insert']>;
+      };
+      stripe_webhook_events: {
+        Row: {
+          id: string;
+          event_type: string;
+          status: 'processing' | 'processed' | 'failed';
+          error_message: string | null;
+          created_at: string;
+          processed_at: string | null;
+        };
+        Insert: {
+          id: string;
+          event_type: string;
+          status?: 'processing' | 'processed' | 'failed';
+          error_message?: string | null;
+          created_at?: string;
+          processed_at?: string | null;
+        };
+        Update: Partial<Database['public']['Tables']['stripe_webhook_events']['Insert']>;
+      };
+      refunds: {
+        Row: {
+          id: string;
+          gym_id: string;
+          member_id: string | null;
+          subscription_id: string | null;
+          stripe_refund_id: string | null;
+          amount_cents: number | null;
+          reason: string | null;
+          issued_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          gym_id: string;
+          member_id?: string | null;
+          subscription_id?: string | null;
+          stripe_refund_id?: string | null;
+          amount_cents?: number | null;
+          reason?: string | null;
+          issued_by?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['refunds']['Insert']>;
       };
     };
     Views: Record<string, never>;

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
-import { getAdminClient } from '@/lib/supabase/admin';
 import {
   assertSubscriptionInGym,
   isErrorResponse,
   requireStaffAuth,
 } from '@/lib/auth/api';
+import { isServiceError } from '@/services/errors';
+import { cancelSubscription } from '@/services/stripe-subscriptions';
 
 export async function POST(req: NextRequest) {
   const auth = await requireStaffAuth({ adminOnly: true });
@@ -25,29 +25,20 @@ export async function POST(req: NextRequest) {
   if (scopeError) return scopeError;
 
   try {
-    if (cancel_immediately) {
-      await stripe.subscriptions.cancel(stripe_subscription_id);
-    } else {
-      await stripe.subscriptions.update(stripe_subscription_id, {
-        cancel_at_period_end: true,
-      });
-    }
-
-    const admin = getAdminClient();
-    await admin
-      .from('subscriptions')
-      .update({
-        status: cancel_immediately ? 'cancelled' : 'active',
-        cancellation_reason: reason || null,
-        cancelled_at: new Date().toISOString(),
-      })
-      .eq('id', subscription_id)
-      .eq('gym_id', auth.gymId);
-
+    await cancelSubscription({
+      gymId: auth.gymId,
+      subscriptionId: subscription_id,
+      stripeSubscriptionId: stripe_subscription_id,
+      reason,
+      cancelImmediately: Boolean(cancel_immediately),
+    });
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Cancel subscription error';
     console.error('Cancel subscription error:', message);
+    if (isServiceError(err)) {
+      return NextResponse.json({ error: message }, { status: err.status });
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

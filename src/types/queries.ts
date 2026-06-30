@@ -4,7 +4,15 @@ type SubscriptionRow = Database['public']['Tables']['subscriptions']['Row'];
 
 export type SubscriptionWithRelations = Pick<
   SubscriptionRow,
-  'id' | 'status' | 'current_period_end' | 'stripe_subscription_id'
+  | 'id'
+  | 'member_id'
+  | 'status'
+  | 'current_period_end'
+  | 'stripe_subscription_id'
+  | 'cancellation_reason'
+  | 'cancelled_at'
+  | 'paused_at'
+  | 'pause_reason'
 > & {
   members: {
     first_name: string;
