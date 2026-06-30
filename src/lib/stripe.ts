@@ -1,14 +1,12 @@
 import Stripe from 'stripe';
+import { getServerEnv } from '@/lib/env';
 
 let stripeClient: Stripe | null = null;
 
 export function getStripe(): Stripe {
   if (!stripeClient) {
-    const key = process.env.STRIPE_SECRET_KEY;
-    if (!key) {
-      throw new Error('Missing STRIPE_SECRET_KEY');
-    }
-    stripeClient = new Stripe(key, {
+    const { STRIPE_SECRET_KEY } = getServerEnv();
+    stripeClient = new Stripe(STRIPE_SECRET_KEY, {
       apiVersion: '2026-06-24.dahlia',
     });
   }

@@ -1,12 +1,44 @@
-import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { applyRateLimit } from '@/lib/rate-limit';
+import { createServerClient } from '@supabase/ssr';
 
-export async function updateSession(request: NextRequest) {
+export async function handleProxy(request: NextRequest) {
+  const rateLimited = applyRateLimit(request);
+  if (rateLimited) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(
+            Math.max(1, Math.ceil((rateLimited.resetAt - Date.now()) / 1000))
+          ),
+        },
+      }
+    );
+  }
+
+  return updateSession(request);
+}
+
+async function updateSession(request: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl ?? 'http://127.0.0.1:54321',
+    supabaseAnonKey ?? 'missing-anon-key',
     {
       cookies: {
         getAll() {
@@ -33,10 +65,6 @@ export async function updateSession(request: NextRequest) {
 
   const portalPublic = pathname === '/portal/login' || pathname === '/portal/signup';
   const authPublic = pathname === '/login' || pathname === '/signup';
-  const isPortal = pathname.startsWith('/portal');
-  const isKiosk = pathname.startsWith('/kiosk');
-  const isApi = pathname.startsWith('/api');
-  const isMarketing = pathname === '/';
 
   const dashboardPrefixes = [
     '/dashboard',
@@ -54,6 +82,7 @@ export async function updateSession(request: NextRequest) {
   const isDashboard = dashboardPrefixes.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
+  const isPortal = pathname.startsWith('/portal');
 
   if (!user && isPortal && !portalPublic) {
     const url = request.nextUrl.clone();
@@ -78,12 +107,6 @@ export async function updateSession(request: NextRequest) {
     url.pathname = '/portal';
     return NextResponse.redirect(url);
   }
-
-  // Allow unauthenticated access to marketing, kiosk, auth pages, and API routes
-  // (API routes enforce their own authorization).
-  void isKiosk;
-  void isApi;
-  void isMarketing;
 
   return supabaseResponse;
 }

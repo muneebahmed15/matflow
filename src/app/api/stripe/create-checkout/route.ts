@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
+import { getPublicEnv } from '@/lib/env';
 import { getAdminClient } from '@/lib/supabase/admin';
 import {
   isErrorResponse,
@@ -29,11 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid plan for this gym' }, { status: 400 });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (!appUrl) {
-    return NextResponse.json({ error: 'App URL not configured' }, { status: 500 });
-  }
-
+  const { NEXT_PUBLIC_APP_URL } = getPublicEnv();
   const successPath =
     access.kind === 'member'
       ? '/portal/subscription?success=true'
@@ -49,8 +46,8 @@ export async function POST(req: NextRequest) {
       payment_method_types: ['card'],
       line_items: [{ price: stripe_price_id, quantity: 1 }],
       customer_email: member_email,
-      success_url: `${appUrl}${successPath}`,
-      cancel_url: `${appUrl}${cancelPath}`,
+      success_url: `${NEXT_PUBLIC_APP_URL}${successPath}`,
+      cancel_url: `${NEXT_PUBLIC_APP_URL}${cancelPath}`,
       metadata: { member_id, gym_id },
     });
     return NextResponse.json({ url: session.url });
