@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       recurring: { interval },
     });
     const { error } = await supabaseAdmin.from('plans').insert({
-      gym_id, name, description, price: price_cents / 100, interval,
+      gym_id, name, description, price: price_cents / 100, price_cents, interval,
       stripe_product_id: product.id, stripe_price_id: price.id, is_active: true,
     });
     if (error) throw error;
