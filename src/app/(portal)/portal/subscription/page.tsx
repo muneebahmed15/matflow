@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { CreditCard } from 'lucide-react'
 import type { PortalSubscription } from '@/types/queries'
+import { redirectTo } from '@/lib/navigation'
 
 interface Plan {
   id: string
@@ -60,7 +61,7 @@ export default function PortalSubscriptionPage() {
       body: JSON.stringify({ stripe_price_id: stripePriceId, member_id: member.id, gym_id: member.gym_id, member_email: member.email }),
     })
     const { url } = await res.json()
-    if (url) window.location.href = url
+    if (url) redirectTo(url)
     setSubscribing(false)
   }
 

@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { getWaivers, type Waiver } from '@/lib/waivers'
 import { toggleWaiverStatusAction } from '@/app/(dashboard)/actions'
+import Link from 'next/link'
 import { FileText, Plus, ToggleLeft, ToggleRight } from 'lucide-react'
 
 export default function WaiversPage() {
@@ -41,18 +41,18 @@ export default function WaiversPage() {
           <h1 className="text-3xl font-extrabold">Waivers</h1>
           <p className="text-white/40 text-sm mt-1">Manage digital liability waivers.</p>
         </div>
-        <a href="/waivers/new" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+        <Link href="/waivers/new" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
           <Plus size={16} /> New Waiver
-        </a>
+        </Link>
       </div>
 
       {waivers.length === 0 ? (
         <div className="bg-white/5 border border-white/10 rounded-2xl p-16 text-center">
           <FileText size={40} className="text-white/20 mx-auto mb-4" />
           <p className="text-white/40 font-medium">No waivers yet</p>
-          <a href="/waivers/new" className="mt-4 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+          <Link href="/waivers/new" className="mt-4 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
             <Plus size={16} /> Create Waiver
-          </a>
+          </Link>
         </div>
       ) : (
         <div className="space-y-3">

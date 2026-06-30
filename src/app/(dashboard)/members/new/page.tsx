@@ -14,7 +14,6 @@ interface Family {
 export default function AddMemberPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [gymId, setGymId] = useState<string | null>(null)
   const [first_name, setFirstName] = useState('')
   const [last_name, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -34,7 +33,6 @@ export default function AddMemberPage() {
     const load = async () => {
       const info = await getCurrentStaffInfo()
       if (!info.gymId) return
-      setGymId(info.gymId)
       const { data } = await supabase.from('families').select('id, family_name').eq('gym_id', info.gymId).order('family_name')
       setFamilies(data || [])
     }

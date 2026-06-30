@@ -8,6 +8,7 @@ import { getMemberSignatures } from '@/lib/waivers'
 import { useAppUi } from '@/components/ui/AppUiProvider'
 import PageLoader from '@/components/PageLoader'
 import ErrorState from '@/components/ErrorState'
+import { redirectTo } from '@/lib/navigation'
 
 interface Member {
   id: string; first_name: string; last_name: string
@@ -36,30 +37,30 @@ export default function MemberDetailPage() {
   const [subscribing, setSubscribing] = useState(false)
   const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'waivers'>('info')
 
-  useEffect(() => { fetchAll() }, [id])
-
-  async function fetchAll() {
-    const info = await getCurrentStaffInfo()
-    if (!info.gymId) return
-    setGymId(info.gymId)
-    const { data: plansData } = await supabase
-      .from('plans')
-      .select('id, name, stripe_price_id, price_cents, interval')
-      .eq('gym_id', info.gymId)
-    setPlans(plansData || [])
-    const { data: memberData } = await supabase.from('members').select('*').eq('id', id).eq('gym_id', info.gymId).single()
-    if (memberData) setMember(memberData)
-    const { data: attendanceData } = await supabase
-      .from('attendance')
-      .select('id, checked_in_at')
-      .eq('member_id', id)
-      .order('checked_in_at', { ascending: false })
-      .limit(10)
-    setAttendance(attendanceData || [])
-    const sigs = await getMemberSignatures(id)
-    setSignatures(sigs as WaiverSig[])
-    setLoading(false)
-  }
+  useEffect(() => {
+    void (async () => {
+      const info = await getCurrentStaffInfo()
+      if (!info.gymId) return
+      setGymId(info.gymId)
+      const { data: plansData } = await supabase
+        .from('plans')
+        .select('id, name, stripe_price_id, price_cents, interval')
+        .eq('gym_id', info.gymId)
+      setPlans(plansData || [])
+      const { data: memberData } = await supabase.from('members').select('*').eq('id', id).eq('gym_id', info.gymId).single()
+      if (memberData) setMember(memberData)
+      const { data: attendanceData } = await supabase
+        .from('attendance')
+        .select('id, checked_in_at')
+        .eq('member_id', id)
+        .order('checked_in_at', { ascending: false })
+        .limit(10)
+      setAttendance(attendanceData || [])
+      const sigs = await getMemberSignatures(id)
+      setSignatures(sigs as WaiverSig[])
+      setLoading(false)
+    })()
+  }, [id])
 
   async function handleSubscribe(stripePriceId: string) {
     if (!member || !gymId) return
@@ -77,7 +78,7 @@ export default function MemberDetailPage() {
       })
       const { url, error } = await res.json()
       if (error) { showError(error); return }
-      if (url) window.location.href = url
+      if (url) redirectTo(url)
     } catch { showError('Failed to start checkout') }
     finally { setSubscribing(false) }
   }

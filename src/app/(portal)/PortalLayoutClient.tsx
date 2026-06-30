@@ -9,18 +9,18 @@ import Logo from '@/components/Logo'
 import { AppUiProvider } from '@/components/ui/AppUiProvider'
 import PageLoader from '@/components/PageLoader'
 
+const PUBLIC_PORTAL_ROUTES = ['/portal/login', '/portal/signup']
+
 export default function PortalLayoutClient({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const publicRoutes = ['/portal/login', '/portal/signup']
-
   useEffect(() => {
     const check = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user && !publicRoutes.includes(pathname)) {
+      if (!user && !PUBLIC_PORTAL_ROUTES.includes(pathname)) {
         router.push('/portal/login')
         return
       }
@@ -35,7 +35,7 @@ export default function PortalLayoutClient({ children }: { children: React.React
     router.push('/portal/login')
   }
 
-  if (publicRoutes.includes(pathname)) {
+  if (PUBLIC_PORTAL_ROUTES.includes(pathname)) {
     return <AppUiProvider>{children}</AppUiProvider>
   }
 

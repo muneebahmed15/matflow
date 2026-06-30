@@ -2,10 +2,11 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { UserCheck, Search } from 'lucide-react'
+import { filterMembersByName } from '@/lib/filter-members'
 
 interface Member {
   id: string
@@ -19,7 +20,6 @@ export default function KioskCheckInPage() {
   const [gym, setGym] = useState<{ id: string; name: string; kiosk_enabled: boolean } | null>(null)
   const [search, setSearch] = useState('')
   const [members, setMembers] = useState<Member[]>([])
-  const [filtered, setFiltered] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [checkedInName, setCheckedInName] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -32,17 +32,16 @@ export default function KioskCheckInPage() {
       if (gymData.kiosk_enabled) {
         const { data } = await supabase.from('members').select('id, first_name, last_name, email').eq('gym_id', gymData.id).eq('status', 'active').order('first_name')
         setMembers(data || [])
-        setFiltered(data || [])
       }
       setLoading(false)
     }
     load()
   }, [gymSlug])
 
-  useEffect(() => {
-    const q = search.toLowerCase()
-    setFiltered(members.filter(m => `${m.first_name} ${m.last_name}`.toLowerCase().includes(q)))
-  }, [search, members])
+  const filtered = useMemo(
+    () => filterMembersByName(members, search),
+    [members, search]
+  )
 
   const handleCheckIn = async (member: Member) => {
     if (!gym) return

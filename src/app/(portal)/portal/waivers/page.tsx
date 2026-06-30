@@ -7,7 +7,7 @@ import type { MemberSignatureSummary } from '@/types/queries'
 import WaiverSignatureBox from '@/components/WaiverSignatureBox'
 import { FileText } from 'lucide-react'
 
-interface SignedWaiver extends MemberSignatureSummary {}
+type SignedWaiver = MemberSignatureSummary
 
 export default function PortalWaiversPage() {
   const [waivers, setWaivers] = useState<Waiver[]>([])

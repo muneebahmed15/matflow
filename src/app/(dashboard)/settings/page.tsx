@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
+import { useRouter } from 'next/navigation'
 import { useAppUi } from '@/components/ui/AppUiProvider'
 import PageLoader from '@/components/PageLoader'
 
 export default function SettingsPage() {
+  const router = useRouter()
   const { error: showError } = useAppUi()
   const [gymName, setGymName] = useState('')
   const [slug, setSlug] = useState('')
@@ -68,7 +70,7 @@ export default function SettingsPage() {
             <span className="text-gray-400 text-sm">Email</span>
             <span className="text-white text-sm">{userEmail}</span>
           </div>
-          <button onClick={async () => { await supabase.auth.signOut(); window.location.href = '/login' }}
+          <button onClick={async () => { await supabase.auth.signOut(); router.push('/login') }}
             className="mt-4 text-blue-400 text-sm hover:underline">
             Sign out
           </button>

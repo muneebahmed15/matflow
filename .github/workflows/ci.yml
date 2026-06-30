@@ -7,7 +7,7 @@ on:
     branches: [master, main]
 
 jobs:
-  build:
+  ci:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -19,7 +19,8 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role-key
       STRIPE_SECRET_KEY: sk_test_placeholder
       STRIPE_WEBHOOK_SECRET: whsec_placeholder
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      CI: true
 
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +39,12 @@ jobs:
 
       - name: Lint
         run: npm run lint
-        continue-on-error: true
 
       - name: Build
         run: npm run build
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E smoke tests
+        run: npm run test:e2e

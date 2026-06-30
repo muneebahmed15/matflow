@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { UserCheck, FileText, CreditCard, Award } from 'lucide-react'
+import { UserCheck, FileText, CreditCard } from 'lucide-react'
 
 interface MemberData {
   id: string

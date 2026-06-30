@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { CreditCard, CheckCircle, XCircle } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import type { SubscriptionWithRelations } from '@/types/queries'
 import SubscriptionActions from '@/components/SubscriptionActions'
 
@@ -40,8 +41,31 @@ function SubscriptionsContent() {
   }, [])
 
   useEffect(() => {
-    loadSubscriptions()
-  }, [loadSubscriptions])
+    const load = async () => {
+      const info = await getCurrentStaffInfo()
+      if (!info.gymId) return
+      const { data } = await supabase
+        .from('subscriptions')
+        .select(`
+        id,
+        member_id,
+        status,
+        current_period_end,
+        stripe_subscription_id,
+        cancellation_reason,
+        cancelled_at,
+        paused_at,
+        pause_reason,
+        members(first_name, last_name, email),
+        plans(name, price, interval)
+      `)
+        .eq('gym_id', info.gymId)
+        .order('created_at', { ascending: false })
+      setSubscriptions((data as SubscriptionWithRelations[] | null) ?? [])
+      setLoading(false)
+    }
+    load()
+  }, [])
 
   const statusColor = (s: string) => {
     if (s === 'active') return 'bg-green-500/10 text-green-400 border-green-500/20'
@@ -78,7 +102,7 @@ function SubscriptionsContent() {
           <CreditCard size={40} className="text-white/20 mx-auto mb-4" />
           <p className="text-white/40 font-medium">No subscriptions yet</p>
           <p className="text-white/20 text-sm mt-1">Subscribe a member from their profile page.</p>
-          <a href="/members" className="mt-6 inline-block text-blue-400 text-sm hover:underline">Go to Members →</a>
+          <Link href="/members" className="mt-6 inline-block text-blue-400 text-sm hover:underline">Go to Members →</Link>
         </div>
       ) : (
         <div className="space-y-3">

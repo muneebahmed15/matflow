@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import Link from 'next/link'
 import { Users, Plus, Search } from 'lucide-react'
 import { ListSkeleton } from '@/components/LoadingSkeleton'
+import { filterMembersByQuery } from '@/lib/filter-members'
 
 interface Member {
   id: string
@@ -18,29 +19,23 @@ interface Member {
 
 export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([])
-  const [filtered, setFiltered] = useState<Member[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchMembers = async () => {
+    void (async () => {
       const info = await getCurrentStaffInfo()
       if (!info.gymId) return
       const { data } = await supabase.from('members').select('*').eq('gym_id', info.gymId).order('first_name')
-      if (data) { setMembers(data); setFiltered(data) }
+      if (data) setMembers(data)
       setLoading(false)
-    }
-    fetchMembers()
+    })()
   }, [])
 
-  useEffect(() => {
-    const q = search.toLowerCase()
-    setFiltered(members.filter(m =>
-      m.first_name.toLowerCase().includes(q) ||
-      m.last_name.toLowerCase().includes(q) ||
-      m.email.toLowerCase().includes(q)
-    ))
-  }, [search, members])
+  const filtered = useMemo(
+    () => filterMembersByQuery(members, search),
+    [members, search]
+  )
 
   const beltColor: Record<string, string> = {
     white: 'bg-white/10 text-white', yellow: 'bg-yellow-500/20 text-yellow-400',

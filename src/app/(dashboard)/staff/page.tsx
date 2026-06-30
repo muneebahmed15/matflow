@@ -46,7 +46,18 @@ export default function StaffPage() {
   }
 
   useEffect(() => {
-    loadStaff()
+    const load = async () => {
+      const info = await getCurrentStaffInfo()
+      if (!info.gymId) return
+      const { data } = await supabase
+        .from('staff_roles')
+        .select('*')
+        .eq('gym_id', info.gymId)
+        .order('created_at')
+      setStaff(data || [])
+      setLoading(false)
+    }
+    load()
   }, [])
 
   const handleInvite = async () => {

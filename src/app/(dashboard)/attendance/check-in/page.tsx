@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { fetchTodayCheckedInMemberIds, postCheckIn } from '@/lib/api-client'
 import { useAppUi } from '@/components/ui/AppUiProvider'
+import { filterMembersByQuery } from '@/lib/filter-members'
 
 type Member = {
   id: string
@@ -19,7 +20,6 @@ export default function CheckInPage() {
   const [gymId, setGymId] = useState<string | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [search, setSearch] = useState('')
-  const [filtered, setFiltered] = useState<Member[]>([])
   const [checkedIn, setCheckedIn] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState<string | null>(null)
 
@@ -36,7 +36,6 @@ export default function CheckInPage() {
         .order('first_name')
 
       setMembers(memberData || [])
-      setFiltered(memberData || [])
 
       try {
         const ids = await fetchTodayCheckedInMemberIds(info.gymId)
@@ -49,17 +48,10 @@ export default function CheckInPage() {
     load()
   }, [])
 
-  useEffect(() => {
-    const q = search.toLowerCase()
-    setFiltered(
-      members.filter(
-        (m) =>
-          m.first_name.toLowerCase().includes(q) ||
-          m.last_name.toLowerCase().includes(q) ||
-          m.email.toLowerCase().includes(q)
-      )
-    )
-  }, [search, members])
+  const filtered = useMemo(
+    () => filterMembersByQuery(members, search),
+    [members, search]
+  )
 
   const handleCheckIn = async (member: Member) => {
     if (!gymId) return
