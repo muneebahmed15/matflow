@@ -61,7 +61,7 @@ describe('staff service', () => {
 
   it('invites a new staff member via admin generateLink', async () => {
     mockFrom
-      .mockReturnValueOnce(chain({ data: { name: 'East Coast MMA' } }))
+      .mockReturnValueOnce(chain({ data: { name: 'Test Gym' } }))
       .mockReturnValueOnce(chain({ data: null }))
       .mockReturnValueOnce(chain({ data: { id: 'role-1' } }));
 

@@ -1,9 +1,12 @@
 import { getAdminClient } from '@/lib/supabase/admin';
 import type { Database } from '@/types/database';
 import { ServiceError } from '@/services/errors';
+import { sendMemberNotification } from '@/services/notifications';
 
 type MemberRow = Database['public']['Tables']['members']['Row'];
 type FamilyRow = Database['public']['Tables']['families']['Row'];
+
+export type MemberDetail = MemberRow;
 
 export type MemberSummary = Pick<
   MemberRow,
@@ -90,5 +93,53 @@ export async function createMember(input: CreateMemberInput): Promise<MemberRow>
     .single();
 
   if (error) throw new ServiceError(500, error.message);
+
+  try {
+    await sendMemberNotification({
+      gymId: input.gymId,
+      memberId: data.id,
+      type: 'welcome',
+    });
+  } catch {
+    // Email is best-effort; member creation must succeed.
+  }
+
   return data;
+}
+
+export async function getMember(gymId: string, memberId: string): Promise<MemberDetail> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('members')
+    .select('*')
+    .eq('id', memberId)
+    .eq('gym_id', gymId)
+    .single();
+
+  if (error || !data) throw new ServiceError(404, 'Member not found');
+  return data;
+}
+
+export async function updateMember(
+  gymId: string,
+  memberId: string,
+  fields: Partial<Pick<MemberRow, 'first_name' | 'last_name' | 'email' | 'phone' | 'belt_rank' | 'status'>>
+): Promise<MemberDetail> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('members')
+    .update(fields)
+    .eq('id', memberId)
+    .eq('gym_id', gymId)
+    .select('*')
+    .single();
+
+  if (error) throw new ServiceError(500, error.message);
+  return data;
+}
+
+export async function deleteMember(gymId: string, memberId: string): Promise<void> {
+  const admin = getAdminClient();
+  const { error } = await admin.from('members').delete().eq('id', memberId).eq('gym_id', gymId);
+  if (error) throw new ServiceError(500, error.message);
 }

@@ -29,7 +29,7 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
   const router = useRouter()
   const pathname = usePathname()
   const [user, setUser] = useState<User | null>(null)
-  const [gymName, setGymName] = useState('East Coast MMA')
+  const [gymName, setGymName] = useState('My Gym')
   const [role, setRole] = useState<StaffRole>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [checked, setChecked] = useState(false)

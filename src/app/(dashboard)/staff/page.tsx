@@ -1,11 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { getCurrentStaffInfo } from '@/lib/permissions'
 import { ShieldCheck, Plus, Trash2 } from 'lucide-react'
 import {
   inviteStaffAction,
+  listStaffAction,
   removeStaffAction,
   updateStaffRoleAction,
 } from '@/app/(dashboard)/actions'
@@ -22,7 +21,7 @@ interface Staff {
 }
 
 export default function StaffPage() {
-  const { confirm, error: showError } = useAppUi()
+  const { confirm, error: showError, success } = useAppUi()
   const [staff, setStaff] = useState<Staff[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -31,51 +30,40 @@ export default function StaffPage() {
   const [role, setRole] = useState<StaffRole>('coach')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-
-  const loadStaff = async () => {
-    const info = await getCurrentStaffInfo()
-    if (!info.gymId) return
-    const { data } = await supabase
-      .from('staff_roles')
-      .select('*')
-      .eq('gym_id', info.gymId)
-      .order('created_at')
-    setStaff(data || [])
-    setLoading(false)
-  }
 
   useEffect(() => {
-    const load = async () => {
-      const info = await getCurrentStaffInfo()
-      if (!info.gymId) return
-      const { data } = await supabase
-        .from('staff_roles')
-        .select('*')
-        .eq('gym_id', info.gymId)
-        .order('created_at')
-      setStaff(data || [])
+    void (async () => {
+      const result = await listStaffAction()
+      if (result.ok) {
+        setStaff(result.data ?? [])
+      } else {
+        showError(result.error)
+      }
       setLoading(false)
-    }
-    load()
-  }, [])
+    })()
+  }, [showError])
+
+  const reloadStaff = async () => {
+    const result = await listStaffAction()
+    if (result.ok) setStaff(result.data ?? [])
+  }
 
   const handleInvite = async () => {
     if (!email || !fullName) { setError('Please fill in all fields.'); return }
     setSubmitting(true)
     setError('')
-    setSuccess('')
 
     const result = await inviteStaffAction({ email, fullName, role })
     setSubmitting(false)
 
     if (!result.ok) {
       setError(result.error)
+      showError(result.error)
       return
     }
 
-    setSuccess(`Invite sent to ${email}. They'll receive an email with next steps.`)
-    await loadStaff()
+    success(`Invite sent to ${email}`)
+    await reloadStaff()
     setEmail('')
     setFullName('')
     setRole('coach')
@@ -95,6 +83,7 @@ export default function StaffPage() {
       showError(result.error)
       return
     }
+    success('Staff member removed')
     setStaff(prev => prev.filter(s => s.id !== id))
   }
 
@@ -104,6 +93,7 @@ export default function StaffPage() {
       showError(result.error)
       return
     }
+    success('Role updated')
     setStaff(prev => prev.map(s => s.id === id ? { ...s, role: newRole } : s))
   }
 
@@ -132,7 +122,7 @@ export default function StaffPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="josh@eastcoastmma.com" className={inputClass} />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="coach@yourgym.com" className={inputClass} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Role</label>
@@ -143,7 +133,6 @@ export default function StaffPage() {
             <p className="text-white/20 text-xs mt-1">Coaches can&apos;t see billing, plans, subscriptions, or staff settings.</p>
           </div>
           {error && <p className="text-red-400 text-sm">{error}</p>}
-          {success && <p className="text-green-400 text-sm">{success}</p>}
           <div className="flex gap-3">
             <button onClick={handleInvite} disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
               {submitting ? 'Sending invite...' : 'Send Invite'}

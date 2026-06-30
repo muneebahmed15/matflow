@@ -1,6 +1,30 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { createServerClient } from '@supabase/ssr';
+import { ADMIN_ONLY_ROUTES } from '@/lib/permissions';
+
+async function resolveStaffRole(
+  supabase: ReturnType<typeof createServerClient>,
+  userId: string
+): Promise<'admin' | 'coach' | null> {
+  const { data: staffRole } = await supabase
+    .from('staff_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (staffRole?.role === 'admin' || staffRole?.role === 'coach') {
+    return staffRole.role;
+  }
+
+  const { data: gym } = await supabase
+    .from('gyms')
+    .select('id')
+    .eq('owner_id', userId)
+    .maybeSingle();
+
+  return gym ? 'admin' : null;
+}
 
 export async function handleProxy(request: NextRequest) {
   const rateLimited = applyRateLimit(request);
@@ -106,6 +130,20 @@ async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/portal';
     return NextResponse.redirect(url);
+  }
+
+  if (user && isDashboard) {
+    const role = await resolveStaffRole(supabase, user.id);
+    if (
+      role === 'coach' &&
+      ADMIN_ONLY_ROUTES.some(
+        (route) => pathname === route || pathname.startsWith(`${route}/`)
+      )
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/dashboard';
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

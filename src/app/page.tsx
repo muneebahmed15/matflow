@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Shield, Users, Calendar, Award } from 'lucide-react'
+import Logo from '@/components/Logo'
 
 export default function HomePage() {
   return (
@@ -7,7 +8,10 @@ export default function HomePage() {
 
       {/* Navbar */}
       <nav className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-        <span className="text-xl font-bold tracking-tight">East Coast MMA</span>
+        <div className="flex items-center gap-2">
+          <Logo size={28} />
+          <span className="text-xl font-bold tracking-tight">MatsFlow</span>
+        </div>
         <Link
           href="/signup"
           className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"

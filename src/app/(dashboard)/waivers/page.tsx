@@ -1,38 +1,40 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getCurrentStaffInfo } from '@/lib/permissions'
-import { getWaivers, type Waiver } from '@/lib/waivers'
-import { toggleWaiverStatusAction } from '@/app/(dashboard)/actions'
+import { listWaiversAction, toggleWaiverStatusAction } from '@/app/(dashboard)/actions'
+import type { Waiver } from '@/services/waivers'
 import Link from 'next/link'
 import { FileText, Plus, ToggleLeft, ToggleRight } from 'lucide-react'
+import { useAppUi } from '@/components/ui/AppUiProvider'
+import PageLoader from '@/components/PageLoader'
 
 export default function WaiversPage() {
+  const { error: showError } = useAppUi()
   const [waivers, setWaivers] = useState<Waiver[]>([])
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState<string | null>(null)
 
   useEffect(() => {
-    const load = async () => {
-      const info = await getCurrentStaffInfo()
-      if (!info.gymId) return
-      const data = await getWaivers(info.gymId)
-      setWaivers(data)
+    void (async () => {
+      const result = await listWaiversAction()
+      if (result.ok && result.data) setWaivers(result.data)
+      else if (!result.ok) showError(result.error)
       setLoading(false)
-    }
-    load()
-  }, [])
+    })()
+  }, [showError])
 
   const handleToggle = async (waiver: Waiver) => {
     setToggling(waiver.id)
     const result = await toggleWaiverStatusAction(waiver.id, !waiver.is_active)
     if (result.ok) {
       setWaivers((prev) => prev.map((w) => w.id === waiver.id ? { ...w, is_active: !w.is_active } : w))
+    } else {
+      showError(result.error)
     }
     setToggling(null)
   }
 
-  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
+  if (loading) return <PageLoader />
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">
@@ -74,7 +76,7 @@ export default function WaiversPage() {
                 <button onClick={() => handleToggle(waiver)} disabled={toggling === waiver.id} className="text-white/40 hover:text-white transition disabled:opacity-50">
                   {waiver.is_active ? <ToggleRight size={22} className="text-green-400" /> : <ToggleLeft size={22} />}
                 </button>
-                <a href={`/waivers/${waiver.id}`} className="text-sm text-blue-400 hover:underline">View</a>
+                <Link href={`/waivers/${waiver.id}`} className="text-sm text-blue-400 hover:underline">View</Link>
               </div>
             </div>
           ))}

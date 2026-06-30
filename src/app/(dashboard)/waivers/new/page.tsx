@@ -8,7 +8,7 @@ const DEFAULT_BODY = `I, the undersigned, acknowledge and agree to the following
 
 1. ASSUMPTION OF RISK: I understand that martial arts training involves physical contact and the risk of injury. I voluntarily assume all risks associated with participation.
 
-2. RELEASE OF LIABILITY: I release East Coast MMA, its owners, coaches, and staff from any and all liability for injuries sustained during training.
+2. RELEASE OF LIABILITY: I release [Your Gym Name], its owners, coaches, and staff from any and all liability for injuries sustained during training.
 
 3. MEDICAL AUTHORIZATION: I confirm that I am in good physical health and have no medical conditions that would prevent safe participation.
 

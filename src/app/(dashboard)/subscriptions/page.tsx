@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import type { SubscriptionWithRelations } from '@/types/queries'
 import SubscriptionActions from '@/components/SubscriptionActions'
+import PageLoader from '@/components/PageLoader'
 
 function SubscriptionsContent() {
   const searchParams = useSearchParams()
@@ -75,7 +76,7 @@ function SubscriptionsContent() {
     return 'bg-white/5 text-white/40 border-white/10'
   }
 
-  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
+  if (loading) return <PageLoader />
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">

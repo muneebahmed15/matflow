@@ -70,6 +70,16 @@ describe('stripe webhook idempotency', () => {
     );
   });
 
+  it('retries a previously failed event', async () => {
+    mockFrom
+      .mockReturnValueOnce(chain({ data: { id: 'evt_4', status: 'failed' } }))
+      .mockReturnValueOnce(chain({ error: null }));
+
+    await expect(claimStripeWebhookEvent('evt_4', 'invoice.payment_failed')).resolves.toBe(
+      'retry'
+    );
+  });
+
   it('marks event processed', async () => {
     mockFrom.mockReturnValueOnce(chain({ data: { id: 'evt_3' }, error: null }));
     await expect(markStripeWebhookProcessed('evt_3')).resolves.toBeUndefined();

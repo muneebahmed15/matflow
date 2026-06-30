@@ -1,36 +1,39 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { getCurrentStaffInfo } from '@/lib/permissions'
 import Link from 'next/link'
 import { Users, Plus, Search } from 'lucide-react'
 import { ListSkeleton } from '@/components/LoadingSkeleton'
 import { filterMembersByQuery } from '@/lib/filter-members'
+import { listMembersAction } from '@/app/(dashboard)/actions'
+import { useAppUi } from '@/components/ui/AppUiProvider'
 
 interface Member {
   id: string
   first_name: string
   last_name: string
-  email: string
+  email: string | null
   belt_rank: string
   status: string
 }
 
 export default function MembersPage() {
+  const { error: showError } = useAppUi()
   const [members, setMembers] = useState<Member[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     void (async () => {
-      const info = await getCurrentStaffInfo()
-      if (!info.gymId) return
-      const { data } = await supabase.from('members').select('*').eq('gym_id', info.gymId).order('first_name')
-      if (data) setMembers(data)
+      const result = await listMembersAction()
+      if (result.ok && result.data) {
+        setMembers(result.data as Member[])
+      } else if (!result.ok) {
+        showError(result.error)
+      }
       setLoading(false)
     })()
-  }, [])
+  }, [showError])
 
   const filtered = useMemo(
     () => filterMembersByQuery(members, search),

@@ -2,8 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { getWaiverById, getSignaturesForWaiver, toggleWaiverStatus, type Waiver } from '@/lib/waivers'
 import { ToggleLeft, ToggleRight } from 'lucide-react'
+import {
+  getWaiverAction,
+  getWaiverSignaturesAction,
+  toggleWaiverStatusAction,
+} from '@/app/(dashboard)/actions'
+import type { Waiver } from '@/services/waivers'
+import { useAppUi } from '@/components/ui/AppUiProvider'
+import PageLoader from '@/components/PageLoader'
 
 type Signature = {
   id: string; signed_name: string; signed_at: string
@@ -13,30 +20,38 @@ type Signature = {
 export default function WaiverDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { error: showError } = useAppUi()
   const [waiver, setWaiver] = useState<Waiver | null>(null)
   const [signatures, setSignatures] = useState<Signature[]>([])
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState(false)
 
   useEffect(() => {
-    const load = async () => {
-      const [w, sigs] = await Promise.all([getWaiverById(id), getSignaturesForWaiver(id)])
-      setWaiver(w)
-      setSignatures(sigs as Signature[])
+    void (async () => {
+      const [waiverResult, sigResult] = await Promise.all([
+        getWaiverAction(id),
+        getWaiverSignaturesAction(id),
+      ])
+      if (waiverResult.ok && waiverResult.data) setWaiver(waiverResult.data)
+      else if (!waiverResult.ok) showError(waiverResult.error)
+      if (sigResult.ok && sigResult.data) setSignatures(sigResult.data as Signature[])
       setLoading(false)
-    }
-    load()
-  }, [id])
+    })()
+  }, [id, showError])
 
   const handleToggle = async () => {
     if (!waiver) return
     setToggling(true)
-    await toggleWaiverStatus(waiver.id, !waiver.is_active)
-    setWaiver({ ...waiver, is_active: !waiver.is_active })
+    const result = await toggleWaiverStatusAction(waiver.id, !waiver.is_active)
+    if (result.ok) {
+      setWaiver({ ...waiver, is_active: !waiver.is_active })
+    } else {
+      showError(result.error)
+    }
     setToggling(false)
   }
 
-  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
+  if (loading) return <PageLoader />
   if (!waiver) return <div className="p-8 text-gray-400">Waiver not found.</div>
 
   return (

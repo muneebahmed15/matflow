@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import { getCurrentStaffInfo } from '@/lib/permissions'
 import { useRouter } from 'next/navigation'
-import { createMemberAction } from '@/app/(dashboard)/actions'
+import { createMemberAction, listFamiliesAction } from '@/app/(dashboard)/actions'
+import { useAppUi } from '@/components/ui/AppUiProvider'
 
 interface Family {
   id: string
@@ -13,6 +12,7 @@ interface Family {
 
 export default function AddMemberPage() {
   const router = useRouter()
+  const { success, error: showError } = useAppUi()
   const [loading, setLoading] = useState(false)
   const [first_name, setFirstName] = useState('')
   const [last_name, setLastName] = useState('')
@@ -30,13 +30,10 @@ export default function AddMemberPage() {
   const [newFamilyEmail, setNewFamilyEmail] = useState('')
 
   useEffect(() => {
-    const load = async () => {
-      const info = await getCurrentStaffInfo()
-      if (!info.gymId) return
-      const { data } = await supabase.from('families').select('id, family_name').eq('gym_id', info.gymId).order('family_name')
-      setFamilies(data || [])
-    }
-    load()
+    void (async () => {
+      const result = await listFamiliesAction()
+      if (result.ok) setFamilies(result.data ?? [])
+    })()
   }, [])
 
   const handleSubmit = async () => {
@@ -63,8 +60,10 @@ export default function AddMemberPage() {
     setLoading(false)
     if (!result.ok) {
       setError(result.error)
+      showError(result.error)
       return
     }
+    success('Member added successfully')
     router.push('/members')
   }
 

@@ -8,7 +8,11 @@ SQL migrations for MatsFlow live in `migrations/`.
 2. Run migrations **in order**:
    - `migrations/20250630170000_initial_schema_and_rls.sql`
    - `migrations/20250630200000_indexes_and_constraints.sql`
-3. Run backfill: `scripts/backfill_auth_user_id.sql`
+   - `migrations/20250630210000_stripe_webhook_events.sql`
+   - `migrations/20250630220000_coach_admin_rls_split.sql`
+3. Run backfills:
+   - `scripts/backfill_auth_user_id.sql`
+   - `scripts/backfill_owner_staff_roles.sql` (existing gyms before owner staff_roles)
 
 ## Apply with Supabase CLI
 
@@ -16,6 +20,7 @@ SQL migrations for MatsFlow live in `migrations/`.
 supabase link --project-ref YOUR_PROJECT_REF
 supabase db push
 psql $DATABASE_URL -f supabase/scripts/backfill_auth_user_id.sql
+psql $DATABASE_URL -f supabase/scripts/backfill_owner_staff_roles.sql
 ```
 
 ## Generate TypeScript types
@@ -41,5 +46,6 @@ npm run test:rls
 ## Notes
 
 - Row Level Security is **required** for production — browser Supabase calls rely on RLS policies.
-- Service role is used only in authenticated API routes and Stripe webhooks.
+- Coaches can **read** plans but cannot **write** billing/admin tables after the coach/admin split migration.
+- Service role is used only in authenticated API routes, server actions, and Stripe webhooks.
 - Local development: `supabase start` then use keys from `supabase status`.

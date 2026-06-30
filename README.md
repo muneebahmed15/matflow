@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MatsFlow
 
-## Getting Started
+Martial arts gym management — members, classes, belts, attendance, waivers, billing, and a member portal. Built with Next.js 16, Supabase, and Stripe.
 
-First, run the development server:
+## Requirements
+
+- Node.js 20+
+- Supabase project (Auth + Postgres)
+- Stripe account (test mode for development)
+- Resend account (required in production for staff invites and member emails)
+
+## Setup
+
+```bash
+npm install
+cp .env.example .env.local
+# Fill in Supabase and Stripe keys (see .env.example)
+```
+
+Apply database migrations (see `supabase/README.md`), then:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key (browser) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Server-only service role |
+| `STRIPE_SECRET_KEY` | Yes | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | Yes | Stripe webhook signing secret |
+| `NEXT_PUBLIC_APP_URL` | Yes | App URL for redirects (e.g. `http://localhost:3000`) |
+| `RESEND_API_KEY` | Prod | Resend API key for transactional email |
+| `RESEND_FROM_EMAIL` | Prod | Verified sender (e.g. `MatsFlow <onboarding@yourdomain.com>`) |
 
-## Learn More
+Optional: `SUPABASE_TEST_*` vars for RLS integration tests (`npm run test:rls`).
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Development server |
+| `npm run build` | Production build |
+| `npm test` | Unit tests (Vitest) |
+| `npm run test:rls` | RLS integration tests (needs test Supabase project) |
+| `npm run test:e2e` | Playwright smoke tests (build first) |
+| `npm run lint` | ESLint |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Architecture
 
-## Deploy on Vercel
+- **Dashboard** — staff/admin UI with coach RBAC (coaches cannot access billing, leads, staff, or settings)
+- **Member portal** — `/portal/*` for members to view attendance, waivers, subscriptions
+- **Kiosk** — `/kiosk/[gymSlug]` self check-in when enabled in settings
+- **Services** — `src/services/` business logic (server-only, uses service role)
+- **Server actions** — `src/app/(dashboard)/actions.ts` for dashboard mutations and reads
+- **API routes** — Stripe webhooks, attendance, email, gym onboard
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Stripe webhooks
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. In Stripe Dashboard → Developers → Webhooks, add endpoint: `https://your-domain/api/stripe/webhook`
+2. Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
+3. Copy signing secret to `STRIPE_WEBHOOK_SECRET`
+
+## Roles
+
+| Role | Access |
+|------|--------|
+| **Admin** | Full dashboard including plans, subscriptions, leads, staff, settings |
+| **Coach** | Members, classes, check-in, belts, waivers |
+| **Member** | Portal only (own data via RLS) |
+
+## Deploy
+
+Build with all required env vars set. Run migrations on your Supabase project before first deploy. Configure Stripe webhook URL to your production domain.

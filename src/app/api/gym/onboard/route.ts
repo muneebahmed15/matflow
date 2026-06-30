@@ -77,5 +77,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const ownerName =
+    (typeof user.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()) ||
+    user.email?.split('@')[0] ||
+    'Owner';
+
+  const { error: staffError } = await admin.from('staff_roles').insert({
+    gym_id: gym.id,
+    user_id: user.id,
+    role: 'admin',
+    full_name: ownerName,
+  });
+
+  if (staffError) {
+    console.error('Staff role onboard error:', staffError.message);
+    await admin.from('gyms').delete().eq('id', gym.id);
+    return NextResponse.json({ error: staffError.message }, { status: 500 });
+  }
+
   return NextResponse.json({ gym });
 }

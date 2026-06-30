@@ -2,55 +2,50 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { getCurrentStaffInfo } from '@/lib/permissions'
 import { useRouter } from 'next/navigation'
 import { useAppUi } from '@/components/ui/AppUiProvider'
 import PageLoader from '@/components/PageLoader'
+import { getGymSettingsAction, updateGymSettingsAction } from '@/app/(dashboard)/actions'
 
 export default function SettingsPage() {
   const router = useRouter()
-  const { error: showError } = useAppUi()
+  const { error: showError, success } = useAppUi()
   const [gymName, setGymName] = useState('')
   const [slug, setSlug] = useState('')
   const [kioskEnabled, setKioskEnabled] = useState(false)
-  const [gymId, setGymId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
   const [userEmail, setUserEmail] = useState('')
 
   useEffect(() => {
-    const load = async () => {
-      const info = await getCurrentStaffInfo()
-      if (!info.gymId) return
-      setGymId(info.gymId)
+    void (async () => {
+      const result = await getGymSettingsAction()
+      if (result.ok && result.data) {
+        setGymName(result.data.name || '')
+        setSlug(result.data.slug || '')
+        setKioskEnabled(Boolean(result.data.kiosk_enabled))
+      } else if (!result.ok) {
+        showError(result.error)
+      }
       const { data: { user } } = await supabase.auth.getUser()
       setUserEmail(user?.email || '')
-      const { data: gym } = await supabase
-        .from('gyms')
-        .select('id, name, slug, kiosk_enabled')
-        .eq('id', info.gymId)
-        .single()
-      if (gym) {
-        setGymName(gym.name || '')
-        setSlug(gym.slug || '')
-        setKioskEnabled(Boolean(gym.kiosk_enabled))
-      }
       setLoading(false)
-    }
-    load()
-  }, [])
+    })()
+  }, [showError])
 
   const handleSave = async () => {
-    if (!gymId) return
     setSaving(true)
-    const { error } = await supabase
-      .from('gyms')
-      .update({ name: gymName, slug, kiosk_enabled: kioskEnabled })
-      .eq('id', gymId)
+    const result = await updateGymSettingsAction({
+      name: gymName,
+      slug,
+      kioskEnabled,
+    })
     setSaving(false)
-    if (!error) { setSaved(true); setTimeout(() => setSaved(false), 3000) }
-    else showError(error.message)
+    if (!result.ok) {
+      showError(result.error)
+      return
+    }
+    success('Settings saved')
   }
 
   const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -102,7 +97,6 @@ export default function SettingsPage() {
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition ${kioskEnabled ? 'translate-x-5' : ''}`} />
               </button>
             </label>
-            {saved && <p className="text-green-400 text-sm">✅ Settings saved!</p>}
             <button onClick={handleSave} disabled={saving || !gymName} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition">
               {saving ? 'Saving...' : 'Save Changes'}
             </button>

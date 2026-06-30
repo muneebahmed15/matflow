@@ -9,7 +9,7 @@ import { StatsSkeleton } from '@/components/LoadingSkeleton'
 export default function DashboardPage() {
   const [stats, setStats] = useState({ totalMembers: 0, activeMembers: 0, todayCheckIns: 0, activeSubscriptions: 0, activeWaivers: 0 })
   const [loading, setLoading] = useState(true)
-  const [gymName, setGymName] = useState('East Coast MMA')
+  const [gymName, setGymName] = useState('My Gym')
 
   useEffect(() => {
     const load = async () => {

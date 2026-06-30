@@ -8,6 +8,7 @@ import {
   pauseStripeSubscription,
   refundStripeSubscription,
 } from '@/lib/api-client'
+import { useAppUi } from '@/components/ui/AppUiProvider'
 
 type Props = {
   subscription: SubscriptionWithRelations
@@ -17,6 +18,7 @@ type Props = {
 type ModalKind = 'cancel' | 'pause' | 'refund' | null
 
 export default function SubscriptionActions({ subscription, onUpdated }: Props) {
+  const { success, error: showError } = useAppUi()
   const [modal, setModal] = useState<ModalKind>(null)
   const [reason, setReason] = useState('')
   const [cancelImmediately, setCancelImmediately] = useState(false)
@@ -47,8 +49,11 @@ export default function SubscriptionActions({ subscription, onUpdated }: Props) 
       await action()
       closeModal()
       onUpdated()
+      success('Subscription updated')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Action failed')
+      const message = err instanceof Error ? err.message : 'Action failed'
+      setError(message)
+      showError(message)
     } finally {
       setBusy(false)
     }

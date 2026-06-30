@@ -4,11 +4,16 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { useParams, useRouter } from 'next/navigation'
-import { getMemberSignatures } from '@/lib/waivers'
 import { useAppUi } from '@/components/ui/AppUiProvider'
 import PageLoader from '@/components/PageLoader'
 import ErrorState from '@/components/ErrorState'
 import { redirectTo } from '@/lib/navigation'
+import {
+  deleteMemberAction,
+  getMemberAction,
+  getMemberWaiverSignaturesAction,
+  updateMemberAction,
+} from '@/app/(dashboard)/actions'
 
 interface Member {
   id: string; first_name: string; last_name: string
@@ -47,8 +52,8 @@ export default function MemberDetailPage() {
         .select('id, name, stripe_price_id, price_cents, interval')
         .eq('gym_id', info.gymId)
       setPlans(plansData || [])
-      const { data: memberData } = await supabase.from('members').select('*').eq('id', id).eq('gym_id', info.gymId).single()
-      if (memberData) setMember(memberData)
+      const memberResult = await getMemberAction(id)
+      if (memberResult.ok && memberResult.data) setMember(memberResult.data as Member)
       const { data: attendanceData } = await supabase
         .from('attendance')
         .select('id, checked_in_at')
@@ -56,8 +61,8 @@ export default function MemberDetailPage() {
         .order('checked_in_at', { ascending: false })
         .limit(10)
       setAttendance(attendanceData || [])
-      const sigs = await getMemberSignatures(id)
-      setSignatures(sigs as WaiverSig[])
+      const sigResult = await getMemberWaiverSignaturesAction(id)
+      if (sigResult.ok) setSignatures(sigResult.data as WaiverSig[])
       setLoading(false)
     })()
   }, [id])
@@ -85,8 +90,9 @@ export default function MemberDetailPage() {
 
   const handleEdit = async (field: string, value: string) => {
     if (!member) return
-    const { error } = await supabase.from('members').update({ [field]: value }).eq('id', member.id)
-    if (!error) setMember({ ...member, [field]: value })
+    const result = await updateMemberAction(member.id, { [field]: value })
+    if (result.ok) setMember({ ...member, [field]: value })
+    else showError(result.error)
   }
 
   const handleDelete = async () => {
@@ -97,7 +103,11 @@ export default function MemberDetailPage() {
       destructive: true,
     })
     if (!ok) return
-    await supabase.from('members').delete().eq('id', id)
+    const result = await deleteMemberAction(id)
+    if (!result.ok) {
+      showError(result.error)
+      return
+    }
     router.push('/members')
   }
 
