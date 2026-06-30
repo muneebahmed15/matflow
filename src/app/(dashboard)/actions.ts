@@ -8,6 +8,9 @@ import { createLead, convertLeadToMember, updateLeadStatus } from '@/services/le
 import { createClass, deleteClass } from '@/services/classes';
 import { promoteMember } from '@/services/belts';
 import { createWaiver, toggleWaiverStatus } from '@/services/waivers';
+import { inviteStaffMember, removeStaffMember, updateStaffRole } from '@/services/staff';
+import { checkRateLimit } from '@/lib/rate-limit';
+import type { StaffRole } from '@/lib/auth/staff';
 
 export type ActionResult<T = void> =
   | { ok: true; data?: T }
@@ -144,6 +147,56 @@ export async function toggleWaiverStatusAction(
     const auth = await requireStaffSession();
     await toggleWaiverStatus(auth.gymId, waiverId, isActive);
     revalidatePath('/waivers');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function inviteStaffAction(input: {
+  email: string;
+  fullName: string;
+  role: StaffRole;
+}): Promise<ActionResult<{ staffRoleId: string }>> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const limit = checkRateLimit(`staff-invite:${auth.user.id}`, 20, 60 * 60 * 1000);
+    if (!limit.allowed) {
+      return { ok: false, error: 'Too many invites. Try again later.' };
+    }
+
+    const result = await inviteStaffMember({
+      gymId: auth.gymId,
+      email: input.email,
+      fullName: input.fullName,
+      role: input.role,
+    });
+    revalidatePath('/staff');
+    return { ok: true, data: { staffRoleId: result.staffRoleId } };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function removeStaffAction(staffRoleId: string): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    await removeStaffMember(auth.gymId, staffRoleId, auth.user.id);
+    revalidatePath('/staff');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function updateStaffRoleAction(
+  staffRoleId: string,
+  role: StaffRole
+): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    await updateStaffRole(auth.gymId, staffRoleId, role);
+    revalidatePath('/staff');
     return { ok: true };
   } catch (error) {
     return toActionError(error);

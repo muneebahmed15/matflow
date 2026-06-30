@@ -4,6 +4,12 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { ShieldCheck, Plus, Trash2 } from 'lucide-react'
+import {
+  inviteStaffAction,
+  removeStaffAction,
+  updateStaffRoleAction,
+} from '@/app/(dashboard)/actions'
+import type { StaffRole } from '@/lib/auth/staff'
 
 interface Staff {
   id: string
@@ -15,79 +21,69 @@ interface Staff {
 
 export default function StaffPage() {
   const [staff, setStaff] = useState<Staff[]>([])
-  const [gymId, setGymId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
-  const [role, setRole] = useState('coach')
+  const [role, setRole] = useState<StaffRole>('coach')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  const loadStaff = async () => {
+    const info = await getCurrentStaffInfo()
+    if (!info.gymId) return
+    const { data } = await supabase
+      .from('staff_roles')
+      .select('*')
+      .eq('gym_id', info.gymId)
+      .order('created_at')
+    setStaff(data || [])
+    setLoading(false)
+  }
+
   useEffect(() => {
-    const load = async () => {
-      const info = await getCurrentStaffInfo()
-      if (!info.gymId) return
-      setGymId(info.gymId)
-      const { data } = await supabase.from('staff_roles').select('*').eq('gym_id', info.gymId).order('created_at')
-      setStaff(data || [])
-      setLoading(false)
-    }
-    load()
+    loadStaff()
   }, [])
 
   const handleInvite = async () => {
-    if (!email || !fullName || !gymId) { setError('Please fill in all fields.'); return }
+    if (!email || !fullName) { setError('Please fill in all fields.'); return }
     setSubmitting(true)
     setError('')
     setSuccess('')
 
-    // Create auth user via signup (they'll need to confirm email)
-    const tempPassword = Math.random().toString(36).slice(-10) + 'A1!'
-    const { data: authData, error: authErr } = await supabase.auth.signUp({
-      email,
-      password: tempPassword,
-    })
+    const result = await inviteStaffAction({ email, fullName, role })
+    setSubmitting(false)
 
-    if (authErr) {
-      setError(authErr.message)
-      setSubmitting(false)
+    if (!result.ok) {
+      setError(result.error)
       return
     }
 
-    if (authData.user) {
-      const { error: roleErr } = await supabase.from('staff_roles').insert({
-        user_id: authData.user.id,
-        gym_id: gymId,
-        role,
-        full_name: fullName,
-      })
-      if (roleErr) {
-        setError(roleErr.message)
-        setSubmitting(false)
-        return
-      }
-    }
-
-    setSuccess(`Invite sent to ${email}. They'll receive a confirmation email and can set their password.`)
-    const { data: updated } = await supabase.from('staff_roles').select('*').eq('gym_id', gymId).order('created_at')
-    setStaff(updated || [])
+    setSuccess(`Invite sent to ${email}. They'll receive an email with next steps.`)
+    await loadStaff()
     setEmail('')
     setFullName('')
     setRole('coach')
     setShowForm(false)
-    setSubmitting(false)
   }
 
   const handleRemove = async (id: string) => {
     if (!confirm('Remove this staff member? They will lose access immediately.')) return
-    await supabase.from('staff_roles').delete().eq('id', id)
+    const result = await removeStaffAction(id)
+    if (!result.ok) {
+      alert(result.error)
+      return
+    }
     setStaff(prev => prev.filter(s => s.id !== id))
   }
 
-  const handleRoleChange = async (id: string, newRole: string) => {
-    await supabase.from('staff_roles').update({ role: newRole }).eq('id', id)
+  const handleRoleChange = async (id: string, newRole: StaffRole) => {
+    const result = await updateStaffRoleAction(id, newRole)
+    if (!result.ok) {
+      alert(result.error)
+      return
+    }
     setStaff(prev => prev.map(s => s.id === id ? { ...s, role: newRole } : s))
   }
 
@@ -100,7 +96,7 @@ export default function StaffPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-extrabold">Staff</h1>
-          <p className="text-white/40 text-sm mt-1">Manage admin and coach access to your gym.</p>
+          <p className="text-white/40 text-sm mt-1">Invite coaches and admins via secure email invites.</p>
         </div>
         <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
           <Plus size={16} /> Invite Staff
@@ -120,11 +116,11 @@ export default function StaffPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Role</label>
-            <select value={role} onChange={(e) => setRole(e.target.value)} className={inputClass}>
+            <select value={role} onChange={(e) => setRole(e.target.value as StaffRole)} className={inputClass}>
               <option value="coach" className="bg-gray-900">Coach (limited access)</option>
               <option value="admin" className="bg-gray-900">Admin (full access)</option>
             </select>
-            <p className="text-white/20 text-xs mt-1">Coaches can't see billing, plans, subscriptions, or staff settings.</p>
+            <p className="text-white/20 text-xs mt-1">Coaches can&apos;t see billing, plans, subscriptions, or staff settings.</p>
           </div>
           {error && <p className="text-red-400 text-sm">{error}</p>}
           {success && <p className="text-green-400 text-sm">{success}</p>}
@@ -157,7 +153,11 @@ export default function StaffPage() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <select value={s.role} onChange={(e) => handleRoleChange(s.id, e.target.value)} className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white">
+                <select
+                  value={s.role}
+                  onChange={(e) => handleRoleChange(s.id, e.target.value as StaffRole)}
+                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white"
+                >
                   <option value="coach" className="bg-gray-900">Coach</option>
                   <option value="admin" className="bg-gray-900">Admin</option>
                 </select>
