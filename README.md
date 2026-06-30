@@ -74,6 +74,37 @@ Optional: `SUPABASE_TEST_*` vars for RLS integration tests (`npm run test:rls`).
 | **Coach** | Members, classes, check-in, belts, waivers |
 | **Member** | Portal only (own data via RLS) |
 
-## Deploy
+## Deploy on Vercel
 
-Build with all required env vars set. Run migrations on your Supabase project before first deploy. Configure Stripe webhook URL to your production domain.
+### Option A — Vercel Dashboard (recommended)
+
+1. Import the GitHub repo at [vercel.com/new](https://vercel.com/new).
+2. Framework preset: **Next.js** (auto-detected; `vercel.json` is included).
+3. Add environment variables (Production + Preview):
+
+| Variable | Notes |
+|----------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server only — mark sensitive |
+| `STRIPE_SECRET_KEY` | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | From Stripe webhook endpoint |
+| `NEXT_PUBLIC_APP_URL` | Production URL, e.g. `https://your-app.vercel.app` |
+| `RESEND_API_KEY` | Required for staff invites / member email in prod |
+| `RESEND_FROM_EMAIL` | Verified sender, e.g. `MatsFlow <onboarding@yourdomain.com>` |
+
+4. Deploy. After first deploy, set Stripe webhook URL to `https://YOUR_DOMAIN/api/stripe/webhook`.
+
+### Option B — GitHub Actions
+
+Add these repository secrets, then pushes to `main`/`master` deploy via `.github/workflows/vercel.yml`:
+
+- `VERCEL_TOKEN` — from [Vercel account tokens](https://vercel.com/account/tokens)
+- `VERCEL_ORG_ID` — `vercel link` or project settings
+- `VERCEL_PROJECT_ID` — project settings
+
+Pull requests get preview deployments; pushes to `main`/`master` deploy to production.
+
+### General
+
+Build with all required env vars set. Run Supabase migrations before first deploy. Configure Stripe webhook URL to your production domain.

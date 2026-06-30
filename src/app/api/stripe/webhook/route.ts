@@ -10,6 +10,9 @@ import {
 } from '@/services/stripe-webhook';
 import Stripe from 'stripe';
 
+export const maxDuration = 30;
+export const runtime = 'nodejs';
+
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const sig = req.headers.get('stripe-signature');

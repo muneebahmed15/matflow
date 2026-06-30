@@ -38,4 +38,5 @@
 - Phase 3 (initial): Stripe subscription UI, webhook idempotency ledger
 - Phase 4 (initial): Staff invites via Supabase Admin + Resend
 - Phase 5 (initial): AppUi toasts/confirm, error boundaries
-- Phase 6: Playwright E2E, blocking CI lint
+### Phase 6
+- Playwright E2E smoke tests, blocking CI lint, `vercel.json` + GitHub deploy workflow
