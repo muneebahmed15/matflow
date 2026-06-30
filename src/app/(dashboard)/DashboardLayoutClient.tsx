@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo, canAccessRoute, type StaffRole } from '@/lib/permissions'
 import { LayoutDashboard, Users, UserCheck, Calendar, CreditCard, Settings, LogOut, Menu, X, FileText, Dumbbell, Award, UserPlus, ShieldCheck } from 'lucide-react'
 import Logo from '@/components/Logo'
+import { AppUiProvider } from '@/components/ui/AppUiProvider'
+import PageLoader from '@/components/PageLoader'
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, adminOnly: false },
@@ -81,12 +83,13 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
   if (!checked) {
     return (
       <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-        <p className="text-white/40">Loading...</p>
+        <PageLoader />
       </div>
     )
   }
 
   return (
+    <AppUiProvider>
     <div className="min-h-screen bg-[#0A0A0A] text-white flex">
       {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       <aside className={`fixed top-0 left-0 h-full w-64 bg-[#111111] border-r border-[#1F1F1F] z-30 flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:z-auto`}>
@@ -137,5 +140,6 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>
+    </AppUiProvider>
   )
 }

@@ -5,6 +5,9 @@ import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { useParams, useRouter } from 'next/navigation'
 import { getMemberSignatures } from '@/lib/waivers'
+import { useAppUi } from '@/components/ui/AppUiProvider'
+import PageLoader from '@/components/PageLoader'
+import ErrorState from '@/components/ErrorState'
 
 interface Member {
   id: string; first_name: string; last_name: string
@@ -23,6 +26,7 @@ interface WaiverSig {
 export default function MemberDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { confirm, error: showError } = useAppUi()
   const [member, setMember] = useState<Member | null>(null)
   const [plans, setPlans] = useState<Plan[]>([])
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
@@ -72,9 +76,9 @@ export default function MemberDetailPage() {
         }),
       })
       const { url, error } = await res.json()
-      if (error) { alert(error); return }
+      if (error) { showError(error); return }
       if (url) window.location.href = url
-    } catch { alert('Failed to start checkout') }
+    } catch { showError('Failed to start checkout') }
     finally { setSubscribing(false) }
   }
 
@@ -85,13 +89,19 @@ export default function MemberDetailPage() {
   }
 
   const handleDelete = async () => {
-    if (!confirm('Delete this member?')) return
+    const ok = await confirm({
+      title: 'Delete member',
+      message: 'This permanently removes the member and their records.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     await supabase.from('members').delete().eq('id', id)
     router.push('/members')
   }
 
-  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
-  if (!member) return <div className="p-8 text-gray-400">Member not found.</div>
+  if (loading) return <PageLoader />
+  if (!member) return <ErrorState message="Member not found." />
 
   const tabs = [
     { key: 'info', label: 'Info' },

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { fetchTodayCheckedInMemberIds, postCheckIn } from '@/lib/api-client'
+import { useAppUi } from '@/components/ui/AppUiProvider'
 
 type Member = {
   id: string
@@ -14,13 +15,13 @@ type Member = {
 }
 
 export default function CheckInPage() {
+  const { success, error: showError } = useAppUi()
   const [gymId, setGymId] = useState<string | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [search, setSearch] = useState('')
   const [filtered, setFiltered] = useState<Member[]>([])
   const [checkedIn, setCheckedIn] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -60,11 +61,6 @@ export default function CheckInPage() {
     )
   }, [search, members])
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
-  }
-
   const handleCheckIn = async (member: Member) => {
     if (!gymId) return
     setLoading(member.id)
@@ -72,13 +68,13 @@ export default function CheckInPage() {
     try {
       await postCheckIn({ gymId, memberId: member.id })
       setCheckedIn((prev) => new Set([...prev, member.id]))
-      showToast(`✅ ${member.first_name} ${member.last_name} checked in!`, 'success')
+      success(`${member.first_name} ${member.last_name} checked in!`)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Check-in failed'
       if (message.includes('already checked in')) {
         setCheckedIn((prev) => new Set([...prev, member.id]))
       }
-      showToast(`⚠️ ${message}`, 'error')
+      showError(message)
     } finally {
       setLoading(null)
     }
@@ -88,16 +84,6 @@ export default function CheckInPage() {
     <div className="p-8 max-w-2xl mx-auto">
       <h1 className="text-3xl font-extrabold mb-1">Check-In</h1>
       <p className="text-white/50 text-sm mb-6">Search for a member and tap to check them in.</p>
-
-      {toast && (
-        <div className={`mb-4 px-4 py-3 rounded-xl text-sm font-medium border ${
-          toast.type === 'success'
-            ? 'bg-green-500/10 text-green-400 border-green-500/30'
-            : 'bg-red-500/10 text-red-400 border-red-500/30'
-        }`}>
-          {toast.message}
-        </div>
-      )}
 
       <input
         type="text"

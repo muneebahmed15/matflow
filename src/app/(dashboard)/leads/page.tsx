@@ -9,6 +9,8 @@ import {
   createLeadAction,
   updateLeadStatusAction,
 } from '@/app/(dashboard)/actions'
+import { useAppUi } from '@/components/ui/AppUiProvider'
+import { ListSkeleton } from '@/components/LoadingSkeleton'
 
 interface Lead {
   id: string
@@ -40,6 +42,7 @@ const statusLabels: Record<string, string> = {
 }
 
 export default function LeadsPage() {
+  const { confirm, error: showError, success } = useAppUi()
   const [leads, setLeads] = useState<Lead[]>([])
   const [gymId, setGymId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -98,19 +101,29 @@ export default function LeadsPage() {
   }
 
   const handleConvert = async (lead: Lead) => {
-    if (!confirm(`Convert ${lead.first_name} ${lead.last_name} to a full member?`)) return
+    const ok = await confirm({
+      title: 'Convert lead to member',
+      message: `Create a full member profile for ${lead.first_name} ${lead.last_name}?`,
+      confirmLabel: 'Convert',
+    })
+    if (!ok) return
     const result = await convertLeadAction(lead.id)
     if (!result.ok) {
-      alert(result.error)
+      showError(result.error)
       return
     }
+    success(`${lead.first_name} ${lead.last_name} converted to member.`)
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'converted' } : l))
   }
 
   const filteredLeads = filter === 'all' ? leads : leads.filter(l => l.status === filter)
   const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 
-  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
+  if (loading) return (
+    <div className="p-6 md:p-8 max-w-4xl mx-auto">
+      <ListSkeleton count={5} />
+    </div>
+  )
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">

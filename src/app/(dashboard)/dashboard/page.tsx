@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { Users, UserCheck, CreditCard, FileText } from 'lucide-react'
+import { StatsSkeleton } from '@/components/LoadingSkeleton'
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({ totalMembers: 0, activeMembers: 0, todayCheckIns: 0, activeSubscriptions: 0, activeWaivers: 0 })
@@ -45,8 +46,8 @@ export default function DashboardPage() {
   ]
 
   if (loading) return (
-    <div className="p-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {[...Array(4)].map((_, i) => <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5 animate-pulse h-28" />)}
+    <div className="p-8">
+      <StatsSkeleton />
     </div>
   )
 

@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import Link from 'next/link'
 import { Users, Plus, Search } from 'lucide-react'
+import { ListSkeleton } from '@/components/LoadingSkeleton'
 
 interface Member {
   id: string
@@ -48,7 +49,11 @@ export default function MembersPage() {
     brown: 'bg-amber-700/20 text-amber-600', black: 'bg-white/5 text-white/60',
   }
 
-  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
+  if (loading) return (
+    <div className="p-6 md:p-8 max-w-5xl mx-auto">
+      <ListSkeleton count={6} />
+    </div>
+  )
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">

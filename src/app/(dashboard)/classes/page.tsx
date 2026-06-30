@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { Dumbbell, Plus } from 'lucide-react'
 import { createClassAction, deleteClassAction } from '@/app/(dashboard)/actions'
+import { useAppUi } from '@/components/ui/AppUiProvider'
+import PageLoader from '@/components/PageLoader'
 
 interface Class {
   id: string; name: string; instructor: string
@@ -14,6 +16,7 @@ interface Class {
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
 
 export default function ClassesPage() {
+  const { confirm, error: showError } = useAppUi()
   const [classes, setClasses] = useState<Class[]>([])
   const [loading, setLoading] = useState(true)
   const [gymId, setGymId] = useState<string | null>(null)
@@ -64,16 +67,24 @@ export default function ClassesPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this class?')) return
+    const ok = await confirm({
+      title: 'Delete class',
+      message: 'This removes the class from your schedule.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     const result = await deleteClassAction(id)
     if (result.ok) {
       setClasses(prev => prev.filter(c => c.id !== id))
+    } else {
+      showError(result.error)
     }
   }
 
   const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500"
 
-  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
+  if (loading) return <PageLoader />
 
   const grouped = DAYS.reduce((acc, day) => {
     acc[day] = classes.filter(c => c.day_of_week === day)

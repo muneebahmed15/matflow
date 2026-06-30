@@ -6,6 +6,8 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { LogOut } from 'lucide-react'
 import Logo from '@/components/Logo'
+import { AppUiProvider } from '@/components/ui/AppUiProvider'
+import PageLoader from '@/components/PageLoader'
 
 export default function PortalLayoutClient({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -34,16 +36,19 @@ export default function PortalLayoutClient({ children }: { children: React.React
   }
 
   if (publicRoutes.includes(pathname)) {
-    return <>{children}</>
+    return <AppUiProvider>{children}</AppUiProvider>
   }
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-      <p className="text-white/40">Loading...</p>
-    </div>
-  )
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+        <PageLoader />
+      </div>
+    )
+  }
 
   return (
+    <AppUiProvider>
     <div className="min-h-screen bg-[#0A0A0A] text-white">
       <header className="border-b border-white/10 bg-[#111] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -62,5 +67,6 @@ export default function PortalLayoutClient({ children }: { children: React.React
         {children}
       </main>
     </div>
+    </AppUiProvider>
   )
 }

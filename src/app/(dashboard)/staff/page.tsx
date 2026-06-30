@@ -10,6 +10,8 @@ import {
   updateStaffRoleAction,
 } from '@/app/(dashboard)/actions'
 import type { StaffRole } from '@/lib/auth/staff'
+import { useAppUi } from '@/components/ui/AppUiProvider'
+import PageLoader from '@/components/PageLoader'
 
 interface Staff {
   id: string
@@ -20,6 +22,7 @@ interface Staff {
 }
 
 export default function StaffPage() {
+  const { confirm, error: showError } = useAppUi()
   const [staff, setStaff] = useState<Staff[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -69,10 +72,16 @@ export default function StaffPage() {
   }
 
   const handleRemove = async (id: string) => {
-    if (!confirm('Remove this staff member? They will lose access immediately.')) return
+    const ok = await confirm({
+      title: 'Remove staff member',
+      message: 'They will lose access immediately.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    })
+    if (!ok) return
     const result = await removeStaffAction(id)
     if (!result.ok) {
-      alert(result.error)
+      showError(result.error)
       return
     }
     setStaff(prev => prev.filter(s => s.id !== id))
@@ -81,7 +90,7 @@ export default function StaffPage() {
   const handleRoleChange = async (id: string, newRole: StaffRole) => {
     const result = await updateStaffRoleAction(id, newRole)
     if (!result.ok) {
-      alert(result.error)
+      showError(result.error)
       return
     }
     setStaff(prev => prev.map(s => s.id === id ? { ...s, role: newRole } : s))
@@ -89,7 +98,7 @@ export default function StaffPage() {
 
   const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 
-  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
+  if (loading) return <PageLoader />
 
   return (
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
