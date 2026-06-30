@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { Users, Plus, Search } from 'lucide-react'
@@ -16,7 +16,6 @@ interface Member {
 
 export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([])
-  const [filtered, setFiltered] = useState<Member[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -27,19 +26,19 @@ export default function MembersPage() {
       const { data: gymData } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
       if (!gymData) return
       const { data } = await supabase.from('members').select('*').eq('gym_id', gymData.id).order('first_name')
-      if (data) { setMembers(data); setFiltered(data) }
+      if (data) setMembers(data)
       setLoading(false)
     }
     fetchMembers()
   }, [])
 
-  useEffect(() => {
+  const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    setFiltered(members.filter(m =>
+    return members.filter(m =>
       m.first_name.toLowerCase().includes(q) ||
       m.last_name.toLowerCase().includes(q) ||
       m.email.toLowerCase().includes(q)
-    ))
+    )
   }, [search, members])
 
   const beltColor: Record<string, string> = {

@@ -19,8 +19,9 @@ export async function POST(req: NextRequest) {
       metadata: { member_id, gym_id },
     });
     return NextResponse.json({ url: session.url });
-  } catch (err: any) {
-    console.error('Checkout error:', err.message);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Checkout error'
+    console.error('Checkout error:', message)
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

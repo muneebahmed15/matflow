@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 type Member = {
@@ -15,7 +15,6 @@ export default function CheckInPage() {
   const [gymId, setGymId] = useState<string | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [search, setSearch] = useState('')
-  const [filtered, setFiltered] = useState<Member[]>([])
   const [checkedIn, setCheckedIn] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
@@ -41,7 +40,6 @@ export default function CheckInPage() {
         .order('first_name')
 
       setMembers(memberData || [])
-      setFiltered(memberData || [])
 
       const today = new Date().toISOString().split('T')[0]
       const { data: todayAttendance } = await supabase
@@ -58,15 +56,13 @@ export default function CheckInPage() {
     load()
   }, [])
 
-  useEffect(() => {
+  const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    setFiltered(
-      members.filter(
-        (m) =>
-          m.first_name.toLowerCase().includes(q) ||
-          m.last_name.toLowerCase().includes(q) ||
-          m.email.toLowerCase().includes(q)
-      )
+    return members.filter(
+      (m) =>
+        m.first_name.toLowerCase().includes(q) ||
+        m.last_name.toLowerCase().includes(q) ||
+        m.email.toLowerCase().includes(q)
     )
   }, [search, members])
 

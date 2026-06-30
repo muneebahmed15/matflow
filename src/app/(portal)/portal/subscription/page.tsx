@@ -1,8 +1,17 @@
 'use client'
 
+import { redirectTo } from '@/lib/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { CreditCard } from 'lucide-react'
+
+interface PortalMember {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+  gym_id: string
+}
 
 interface Subscription {
   id: string
@@ -22,7 +31,7 @@ interface Plan {
 export default function PortalSubscriptionPage() {
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [plans, setPlans] = useState<Plan[]>([])
-  const [member, setMember] = useState<any>(null)
+  const [member, setMember] = useState<PortalMember | null>(null)
   const [loading, setLoading] = useState(true)
   const [subscribing, setSubscribing] = useState(false)
 
@@ -39,7 +48,7 @@ export default function PortalSubscriptionPage() {
         .eq('member_id', memberData.id)
         .eq('status', 'active')
         .single()
-      setSubscription(sub as any)
+      setSubscription(sub as Subscription | null)
       if (!sub) {
         const { data: plansData } = await supabase.from('plans').select('id, name, stripe_price_id, price_cents, interval').eq('gym_id', memberData.gym_id).eq('is_active', true)
         setPlans(plansData || [])
@@ -58,7 +67,7 @@ export default function PortalSubscriptionPage() {
       body: JSON.stringify({ stripe_price_id: stripePriceId, member_id: member.id, gym_id: member.gym_id, member_email: member.email }),
     })
     const { url } = await res.json()
-    if (url) window.location.href = url
+    if (url) redirectTo(url)
     setSubscribing(false)
   }
 

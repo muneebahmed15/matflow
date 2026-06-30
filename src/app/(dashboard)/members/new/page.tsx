@@ -118,12 +118,12 @@ export default function AddMemberPage() {
           <label className={labelClass}>Family Billing</label>
           <p className="text-white/20 text-xs mb-3">Link this member to a family for shared billing (e.g. parent + kids).</p>
           <div className="flex gap-2 mb-3">
-            {[
+            {([
               { val: 'none', label: 'No family' },
               { val: 'existing', label: 'Existing family' },
               { val: 'new', label: 'New family' },
-            ].map(opt => (
-              <button key={opt.val} onClick={() => setFamilyOption(opt.val as any)}
+            ] as const).map(opt => (
+              <button key={opt.val} onClick={() => setFamilyOption(opt.val)}
                 className={`flex-1 text-xs font-medium py-2 rounded-lg border transition ${familyOption === opt.val ? 'bg-blue-600/15 border-blue-600/30 text-white' : 'bg-white/5 border-white/10 text-white/40'}`}>
                 {opt.label}
               </button>

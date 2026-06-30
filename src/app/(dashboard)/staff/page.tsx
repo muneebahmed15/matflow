@@ -124,7 +124,7 @@ export default function StaffPage() {
               <option value="coach" className="bg-gray-900">Coach (limited access)</option>
               <option value="admin" className="bg-gray-900">Admin (full access)</option>
             </select>
-            <p className="text-white/20 text-xs mt-1">Coaches can't see billing, plans, subscriptions, or staff settings.</p>
+            <p className="text-white/20 text-xs mt-1">Coaches can&apos;t see billing, plans, subscriptions, or staff settings.</p>
           </div>
           {error && <p className="text-red-400 text-sm">{error}</p>}
           {success && <p className="text-green-400 text-sm">{success}</p>}

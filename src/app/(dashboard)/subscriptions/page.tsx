@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState, Suspense } from 'react'
 import { supabase } from '@/lib/supabase'
 import { CreditCard, CheckCircle, XCircle } from 'lucide-react'
@@ -30,7 +31,7 @@ function SubscriptionsContent() {
         .select('id, status, current_period_end, stripe_subscription_id, members(first_name, last_name, email), plans(name, price, interval)')
         .eq('gym_id', gym.id)
         .order('created_at', { ascending: false })
-      setSubscriptions((data as any) || [])
+      setSubscriptions((data ?? []) as unknown as Subscription[])
       setLoading(false)
     }
     load()
@@ -70,7 +71,7 @@ function SubscriptionsContent() {
           <CreditCard size={40} className="text-white/20 mx-auto mb-4" />
           <p className="text-white/40 font-medium">No subscriptions yet</p>
           <p className="text-white/20 text-sm mt-1">Subscribe a member from their profile page.</p>
-          <a href="/members" className="mt-6 inline-block text-blue-400 text-sm hover:underline">Go to Members →</a>
+          <Link href="/members" className="mt-6 inline-block text-blue-400 text-sm hover:underline">Go to Members →</Link>
         </div>
       ) : (
         <div className="space-y-3">

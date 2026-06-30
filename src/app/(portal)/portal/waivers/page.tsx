@@ -43,8 +43,8 @@ export default function PortalWaiversPage() {
         const s = await hasSignedWaiver(active[0].id, member.id)
         setAlreadySigned(s)
         if (s) {
-          const match = sigs.find((sig: any) => sig.waiver_id === active[0].id)
-          setSignedAt((match as any)?.signed_at)
+          const match = sigs.find((sig) => sig.waiver_id === active[0].id)
+          setSignedAt(match?.signed_at)
         }
       }
       setLoading(false)
@@ -59,8 +59,8 @@ export default function PortalWaiversPage() {
     const s = await hasSignedWaiver(waiver.id, memberId)
     setAlreadySigned(s)
     if (s) {
-      const match = signed.find((sig: any) => sig.waiver_id === waiver.id)
-      setSignedAt((match as any)?.signed_at)
+      const match = signed.find((sig) => sig.waiver_id === waiver.id)
+      setSignedAt(match?.signed_at)
     } else {
       setSignedAt(undefined)
     }

@@ -74,7 +74,7 @@ export default function WaiverDetailPage() {
                   <p className="text-white/30 text-xs">{sig.members.email}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-white text-xs italic">"{sig.signed_name}"</p>
+                  <p className="text-white text-xs italic">&ldquo;{sig.signed_name}&rdquo;</p>
                   <p className="text-white/20 text-xs">{new Date(sig.signed_at).toLocaleDateString()}</p>
                 </div>
               </div>

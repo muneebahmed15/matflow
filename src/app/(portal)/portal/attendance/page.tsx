@@ -12,7 +12,6 @@ interface AttendanceRecord {
 export default function PortalAttendancePage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([])
   const [loading, setLoading] = useState(true)
-  const [memberId, setMemberId] = useState<string | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -20,7 +19,6 @@ export default function PortalAttendancePage() {
       if (!user) return
       const { data: member } = await supabase.from('members').select('id').eq('email', user.email).single()
       if (!member) return
-      setMemberId(member.id)
       const { data } = await supabase.from('attendance').select('id, checked_in_at').eq('member_id', member.id).order('checked_in_at', { ascending: false })
       setRecords(data || [])
       setLoading(false)

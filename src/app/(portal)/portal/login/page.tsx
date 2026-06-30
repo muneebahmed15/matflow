@@ -1,20 +1,25 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
 
-export default function PortalLoginPage() {
+function PortalLoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const nextPath = searchParams.get('next') || '/portal'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const handleLogin = async () => {
-    if (!email || !password) { setError('Please enter email and password.'); return }
+    if (!email || !password) {
+      setError('Please enter email and password.')
+      return
+    }
     setLoading(true)
     setError('')
     const { error: err } = await supabase.auth.signInWithPassword({ email, password })
@@ -23,7 +28,6 @@ export default function PortalLoginPage() {
       setLoading(false)
       return
     }
-    // Check if they have a member profile
     const { data: member } = await supabase.from('members').select('id').eq('email', email).single()
     if (!member) {
       setError('No member profile found for this email. Contact your gym admin.')
@@ -31,17 +35,18 @@ export default function PortalLoginPage() {
       setLoading(false)
       return
     }
-    router.push('/portal')
+    router.push(nextPath.startsWith('/') ? nextPath : '/portal')
   }
 
-  const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+  const inputClass =
+    'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center px-6">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-2 mb-8">
           <Logo size={32} />
-          <span className="font-bold text-xl">MatsFlow</span>
+          <span className="font-bold text-xl">MatFlow</span>
         </div>
 
         <div className="bg-[#111] border border-white/10 rounded-2xl p-8">
@@ -89,16 +94,28 @@ export default function PortalLoginPage() {
 
           <div className="mt-6 pt-6 border-t border-white/10 text-center">
             <p className="text-white/30 text-sm">
-              Don't have an account?{' '}
-              <Link href="/portal/signup" className="text-blue-400 hover:underline">Create one</Link>
+              Don&apos;t have an account?{' '}
+              <Link href="/portal/signup" className="text-blue-400 hover:underline">
+                Create one
+              </Link>
             </p>
             <p className="text-white/20 text-xs mt-3">
               Are you a gym admin?{' '}
-              <Link href="/login" className="text-white/40 hover:underline">Admin login →</Link>
+              <Link href="/login" className="text-white/40 hover:underline">
+                Admin login →
+              </Link>
             </p>
           </div>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function PortalLoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0A0A0A]" />}>
+      <PortalLoginForm />
+    </Suspense>
   )
 }

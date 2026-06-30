@@ -45,7 +45,7 @@ export default function AttendanceLogPage() {
         .lte('checked_in_at', `${date}T23:59:59`)
         .order('checked_in_at', { ascending: false })
 
-      setRecords((data as any) || [])
+      setRecords((data ?? []) as unknown as AttendanceRecord[])
       setLoading(false)
     }
     load()

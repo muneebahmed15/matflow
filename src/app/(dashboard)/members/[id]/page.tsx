@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParams, useRouter } from 'next/navigation'
 import { getMemberSignatures } from '@/lib/waivers'
+import { redirectTo } from '@/lib/navigation'
 
 interface Member {
   id: string; first_name: string; last_name: string
@@ -31,33 +32,40 @@ export default function MemberDetailPage() {
   const [subscribing, setSubscribing] = useState(false)
   const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'waivers'>('info')
 
-  useEffect(() => { fetchAll() }, [id])
+  useEffect(() => {
+    let cancelled = false
 
-  async function fetchAll() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data: gym } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
-    if (gym) {
-      setGymId(gym.id)
-      const { data: plansData } = await supabase
-        .from('plans')
-        .select('id, name, stripe_price_id, price_cents, interval')
-        .eq('gym_id', gym.id)
-      setPlans(plansData || [])
+    async function loadMember() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+      const { data: gym } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
+      if (gym && !cancelled) {
+        setGymId(gym.id)
+        const { data: plansData } = await supabase
+          .from('plans')
+          .select('id, name, stripe_price_id, price_cents, interval')
+          .eq('gym_id', gym.id)
+        if (!cancelled) setPlans(plansData || [])
+      }
+      const { data: memberData } = await supabase.from('members').select('*').eq('id', id).single()
+      if (memberData && !cancelled) setMember(memberData)
+      const { data: attendanceData } = await supabase
+        .from('attendance')
+        .select('id, checked_in_at')
+        .eq('member_id', id)
+        .order('checked_in_at', { ascending: false })
+        .limit(10)
+      if (!cancelled) setAttendance(attendanceData || [])
+      const sigs = await getMemberSignatures(id)
+      if (!cancelled) {
+        setSignatures(sigs as WaiverSig[])
+        setLoading(false)
+      }
     }
-    const { data: memberData } = await supabase.from('members').select('*').eq('id', id).single()
-    if (memberData) setMember(memberData)
-    const { data: attendanceData } = await supabase
-      .from('attendance')
-      .select('id, checked_in_at')
-      .eq('member_id', id)
-      .order('checked_in_at', { ascending: false })
-      .limit(10)
-    setAttendance(attendanceData || [])
-    const sigs = await getMemberSignatures(id)
-    setSignatures(sigs as WaiverSig[])
-    setLoading(false)
-  }
+
+    void loadMember()
+    return () => { cancelled = true }
+  }, [id])
 
   async function handleSubscribe(stripePriceId: string) {
     if (!member || !gymId) return
@@ -75,7 +83,7 @@ export default function MemberDetailPage() {
       })
       const { url, error } = await res.json()
       if (error) { alert(error); return }
-      if (url) window.location.href = url
+      if (url) redirectTo(url)
     } catch { alert('Failed to start checkout') }
     finally { setSubscribing(false) }
   }
@@ -95,7 +103,7 @@ export default function MemberDetailPage() {
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
   if (!member) return <div className="p-8 text-gray-400">Member not found.</div>
 
-  const tabs = [
+  const tabs: { key: 'info' | 'attendance' | 'waivers'; label: string }[] = [
     { key: 'info', label: 'Info' },
     { key: 'attendance', label: `Attendance (${attendance.length})` },
     { key: 'waivers', label: `Waivers (${signatures.length})` },
@@ -118,7 +126,7 @@ export default function MemberDetailPage() {
 
         <div className="flex gap-1 bg-white/5 rounded-xl p-1">
           {tabs.map((tab) => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition ${activeTab === tab.key ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white'}`}>
               {tab.label}
             </button>
