@@ -40,6 +40,15 @@ export default function PortalSignupPage() {
       return
     }
 
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await supabase
+        .from('members')
+        .update({ auth_user_id: user.id })
+        .eq('id', member.id)
+        .eq('email', email)
+    }
+
     setSuccess(true)
     setLoading(false)
   }

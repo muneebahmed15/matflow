@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { getCurrentStaffInfo } from '@/lib/permissions'
 import { useParams, useRouter } from 'next/navigation'
 import { getMemberSignatures } from '@/lib/waivers'
 
@@ -34,18 +35,15 @@ export default function MemberDetailPage() {
   useEffect(() => { fetchAll() }, [id])
 
   async function fetchAll() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data: gym } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
-    if (gym) {
-      setGymId(gym.id)
-      const { data: plansData } = await supabase
-        .from('plans')
-        .select('id, name, stripe_price_id, price_cents, interval')
-        .eq('gym_id', gym.id)
-      setPlans(plansData || [])
-    }
-    const { data: memberData } = await supabase.from('members').select('*').eq('id', id).single()
+    const info = await getCurrentStaffInfo()
+    if (!info.gymId) return
+    setGymId(info.gymId)
+    const { data: plansData } = await supabase
+      .from('plans')
+      .select('id, name, stripe_price_id, price_cents, interval')
+      .eq('gym_id', info.gymId)
+    setPlans(plansData || [])
+    const { data: memberData } = await supabase.from('members').select('*').eq('id', id).eq('gym_id', info.gymId).single()
     if (memberData) setMember(memberData)
     const { data: attendanceData } = await supabase
       .from('attendance')

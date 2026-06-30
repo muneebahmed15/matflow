@@ -38,8 +38,17 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
       if (!user) { router.push('/login'); return }
       setUser(user)
 
-      const staffInfo = await getCurrentStaffInfo()
-      if (!staffInfo.role) { router.push('/login'); return }
+      let staffInfo = await getCurrentStaffInfo()
+      if (!staffInfo.role) {
+        const res = await fetch('/api/gym/onboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        })
+        if (!res.ok) { router.push('/login'); return }
+        staffInfo = await getCurrentStaffInfo()
+        if (!staffInfo.role) { router.push('/login'); return }
+      }
       setRole(staffInfo.role)
 
       if (staffInfo.gymId) {

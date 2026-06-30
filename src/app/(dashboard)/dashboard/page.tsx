@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { getCurrentStaffInfo } from '@/lib/permissions'
 import { Users, UserCheck, CreditCard, FileText } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -11,9 +12,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: gym } = await supabase.from('gyms').select('id, name').eq('owner_id', user.id).single()
+      const info = await getCurrentStaffInfo()
+      if (!info.gymId) return
+      const { data: gym } = await supabase.from('gyms').select('id, name').eq('id', info.gymId).single()
       if (!gym) return
       if (gym.name) setGymName(gym.name)
       const today = new Date().toISOString().split('T')[0]

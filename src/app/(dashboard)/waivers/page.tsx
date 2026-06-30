@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { getCurrentStaffInfo } from '@/lib/permissions'
 import { getWaivers, toggleWaiverStatus, type Waiver } from '@/lib/waivers'
 import { FileText, Plus, ToggleLeft, ToggleRight } from 'lucide-react'
 
@@ -12,11 +13,9 @@ export default function WaiversPage() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: gym } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
-      if (!gym) return
-      const data = await getWaivers(gym.id)
+      const info = await getCurrentStaffInfo()
+      if (!info.gymId) return
+      const data = await getWaivers(info.gymId)
       setWaivers(data)
       setLoading(false)
     }

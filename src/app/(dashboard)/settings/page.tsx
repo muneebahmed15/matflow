@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { getCurrentStaffInfo } from '@/lib/permissions'
 
 export default function SettingsPage() {
   const [gymName, setGymName] = useState('')
   const [slug, setSlug] = useState('')
+  const [kioskEnabled, setKioskEnabled] = useState(false)
   const [gymId, setGymId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -14,11 +16,21 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const load = async () => {
+      const info = await getCurrentStaffInfo()
+      if (!info.gymId) return
+      setGymId(info.gymId)
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      setUserEmail(user.email || '')
-      const { data: gym } = await supabase.from('gyms').select('id, name, slug').eq('owner_id', user.id).single()
-      if (gym) { setGymId(gym.id); setGymName(gym.name || ''); setSlug(gym.slug || '') }
+      setUserEmail(user?.email || '')
+      const { data: gym } = await supabase
+        .from('gyms')
+        .select('id, name, slug, kiosk_enabled')
+        .eq('id', info.gymId)
+        .single()
+      if (gym) {
+        setGymName(gym.name || '')
+        setSlug(gym.slug || '')
+        setKioskEnabled(Boolean(gym.kiosk_enabled))
+      }
       setLoading(false)
     }
     load()
@@ -27,7 +39,10 @@ export default function SettingsPage() {
   const handleSave = async () => {
     if (!gymId) return
     setSaving(true)
-    const { error } = await supabase.from('gyms').update({ name: gymName, slug }).eq('id', gymId)
+    const { error } = await supabase
+      .from('gyms')
+      .update({ name: gymName, slug, kiosk_enabled: kioskEnabled })
+      .eq('id', gymId)
     setSaving(false)
     if (!error) { setSaved(true); setTimeout(() => setSaved(false), 3000) }
     else alert(error.message)
@@ -65,8 +80,23 @@ export default function SettingsPage() {
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Gym Slug</label>
               <input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} className={`${inputClass} font-mono`} />
-              <p className="text-white/20 text-xs mt-1">Lowercase letters, numbers, hyphens only.</p>
+              <p className="text-white/20 text-xs mt-1">Lowercase letters, numbers, hyphens only. Kiosk URL: /kiosk/{slug || 'your-slug'}</p>
             </div>
+            <label className="flex items-center justify-between gap-4 py-2">
+              <div>
+                <p className="text-sm font-medium text-gray-300">Kiosk check-in</p>
+                <p className="text-white/30 text-xs">Allow members to self check-in at /kiosk/{slug || 'your-slug'}</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={kioskEnabled}
+                onClick={() => setKioskEnabled((v) => !v)}
+                className={`relative w-11 h-6 rounded-full transition ${kioskEnabled ? 'bg-blue-600' : 'bg-white/10'}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition ${kioskEnabled ? 'translate-x-5' : ''}`} />
+              </button>
+            </label>
             {saved && <p className="text-green-400 text-sm">✅ Settings saved!</p>}
             <button onClick={handleSave} disabled={saving || !gymName} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition">
               {saving ? 'Saving...' : 'Save Changes'}

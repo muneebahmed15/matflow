@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { getCurrentStaffInfo } from '@/lib/permissions'
 import { Award, Plus } from 'lucide-react'
 
 interface Member {
@@ -48,14 +49,12 @@ export default function BeltsPage() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: gym } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
-      if (!gym) return
-      setGymId(gym.id)
+      const info = await getCurrentStaffInfo()
+      if (!info.gymId) return
+      setGymId(info.gymId)
       const [{ data: membersData }, { data: promoData }] = await Promise.all([
-        supabase.from('members').select('id, first_name, last_name, belt_rank, email').eq('gym_id', gym.id).order('first_name'),
-        supabase.from('belt_promotions').select('*, members(first_name, last_name)').eq('gym_id', gym.id).order('promoted_at', { ascending: false }).limit(20),
+        supabase.from('members').select('id, first_name, last_name, belt_rank, email').eq('gym_id', info.gymId).order('first_name'),
+        supabase.from('belt_promotions').select('*, members(first_name, last_name)').eq('gym_id', info.gymId).order('promoted_at', { ascending: false }).limit(20),
       ])
       setMembers(membersData || [])
       setPromotions(promoData || [])

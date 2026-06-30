@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createWaiver } from '@/lib/waivers';
-import { supabase } from '@/lib/supabase';
+import { getCurrentStaffInfo } from '@/lib/permissions';
 
 const DEFAULT_BODY = `I, the undersigned, acknowledge and agree to the following:
 
@@ -32,15 +32,9 @@ export default function NewWaiverPage() {
     setLoading(true);
     setError('');
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-      const { data: gym } = await supabase
-        .from('gyms')
-        .select('id')
-        .eq('owner_id', user.id)
-        .single();
-      if (!gym) throw new Error('Gym not found');
-      await createWaiver(gym.id, title.trim(), body.trim());
+      const info = await getCurrentStaffInfo();
+      if (!info.gymId) throw new Error('Gym not found');
+      await createWaiver(info.gymId, title.trim(), body.trim());
       router.push('/waivers');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create waiver.');

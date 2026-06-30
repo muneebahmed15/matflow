@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { getCurrentStaffInfo } from '@/lib/permissions'
 
 interface Member {
   id: string
@@ -26,22 +27,14 @@ export default function AttendancePage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data: gymData } = await supabase
-        .from('gyms')
-        .select('id')
-        .eq('owner_id', user.id)
-        .single()
-
-      if (!gymData) return
-      setGymId(gymData.id)
+      const info = await getCurrentStaffInfo()
+      if (!info.gymId) return
+      setGymId(info.gymId)
 
       const { data: memberData } = await supabase
         .from('members')
         .select('id, first_name, last_name')
-        .eq('gym_id', gymData.id)
+        .eq('gym_id', info.gymId)
         .order('first_name')
 
       if (memberData) setMembers(memberData)
@@ -49,7 +42,7 @@ export default function AttendancePage() {
       const { data: classData } = await supabase
         .from('classes')
         .select('id, name')
-        .eq('gym_id', gymData.id)
+        .eq('gym_id', info.gymId)
         .eq('is_active', true)
         .order('name')
 

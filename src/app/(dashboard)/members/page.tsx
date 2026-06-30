@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { getCurrentStaffInfo } from '@/lib/permissions'
 import Link from 'next/link'
 import { Users, Plus, Search } from 'lucide-react'
 
@@ -22,11 +23,9 @@ export default function MembersPage() {
 
   useEffect(() => {
     const fetchMembers = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: gymData } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
-      if (!gymData) return
-      const { data } = await supabase.from('members').select('*').eq('gym_id', gymData.id).order('first_name')
+      const info = await getCurrentStaffInfo()
+      if (!info.gymId) return
+      const { data } = await supabase.from('members').select('*').eq('gym_id', info.gymId).order('first_name')
       if (data) { setMembers(data); setFiltered(data) }
       setLoading(false)
     }

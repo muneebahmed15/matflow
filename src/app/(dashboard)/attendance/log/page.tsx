@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { getCurrentStaffInfo } from '@/lib/permissions'
 
 type AttendanceRecord = {
   id: string
@@ -21,14 +22,8 @@ export default function AttendanceLogPage() {
 
   useEffect(() => {
     const loadGym = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: gym } = await supabase
-        .from('gyms')
-        .select('id')
-        .eq('owner_id', user.id)
-        .single()
-      if (gym) setGymId(gym.id)
+      const info = await getCurrentStaffInfo()
+      if (info.gymId) setGymId(info.gymId)
     }
     loadGym()
   }, [])

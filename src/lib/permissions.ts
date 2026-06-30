@@ -52,3 +52,9 @@ export function canAccessRoute(role: StaffRole, path: string): boolean {
   }
   return false
 }
+
+/** Returns gym id for the current staff member, or null if unauthenticated / no gym. */
+export async function getStaffGymId(): Promise<string | null> {
+  const info = await getCurrentStaffInfo()
+  return info.gymId
+}

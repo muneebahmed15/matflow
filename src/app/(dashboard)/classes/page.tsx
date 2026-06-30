@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { getCurrentStaffInfo } from '@/lib/permissions'
 import { Dumbbell, Plus } from 'lucide-react'
 
 interface Class {
@@ -27,12 +28,10 @@ export default function ClassesPage() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: gym } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
-      if (!gym) return
-      setGymId(gym.id)
-      const { data } = await supabase.from('classes').select('*').eq('gym_id', gym.id).order('day_of_week').order('start_time')
+      const info = await getCurrentStaffInfo()
+      if (!info.gymId) return
+      setGymId(info.gymId)
+      const { data } = await supabase.from('classes').select('*').eq('gym_id', info.gymId).order('day_of_week').order('start_time')
       setClasses(data || [])
       setLoading(false)
     }

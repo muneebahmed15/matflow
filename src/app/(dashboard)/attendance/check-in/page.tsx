@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { getCurrentStaffInfo } from '@/lib/permissions'
 
 type Member = {
   id: string
@@ -22,22 +23,14 @@ export default function CheckInPage() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data: gym } = await supabase
-        .from('gyms')
-        .select('id')
-        .eq('owner_id', user.id)
-        .single()
-
-      if (!gym) return
-      setGymId(gym.id)
+      const info = await getCurrentStaffInfo()
+      if (!info.gymId) return
+      setGymId(info.gymId)
 
       const { data: memberData } = await supabase
         .from('members')
         .select('id, first_name, last_name, email, phone')
-        .eq('gym_id', gym.id)
+        .eq('gym_id', info.gymId)
         .order('first_name')
 
       setMembers(memberData || [])
@@ -47,7 +40,7 @@ export default function CheckInPage() {
       const { data: todayAttendance } = await supabase
         .from('attendance')
         .select('member_id')
-        .eq('gym_id', gym.id)
+        .eq('gym_id', info.gymId)
         .gte('checked_in_at', `${today}T00:00:00`)
         .lte('checked_in_at', `${today}T23:59:59`)
 

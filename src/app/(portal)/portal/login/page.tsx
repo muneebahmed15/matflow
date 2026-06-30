@@ -31,6 +31,13 @@ export default function PortalLoginPage() {
       setLoading(false)
       return
     }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await supabase
+        .from('members')
+        .update({ auth_user_id: user.id })
+        .eq('id', member.id)
+    }
     router.push('/portal')
   }
 
