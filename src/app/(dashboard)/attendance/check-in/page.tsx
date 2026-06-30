@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
+import { fetchTodayCheckedInMemberIds, postCheckIn } from '@/lib/api-client'
 
 type Member = {
   id: string
@@ -36,16 +37,12 @@ export default function CheckInPage() {
       setMembers(memberData || [])
       setFiltered(memberData || [])
 
-      const today = new Date().toISOString().split('T')[0]
-      const { data: todayAttendance } = await supabase
-        .from('attendance')
-        .select('member_id')
-        .eq('gym_id', info.gymId)
-        .gte('checked_in_at', `${today}T00:00:00`)
-        .lte('checked_in_at', `${today}T23:59:59`)
-
-      const ids = new Set<string>((todayAttendance || []).map((a) => a.member_id))
-      setCheckedIn(ids)
+      try {
+        const ids = await fetchTodayCheckedInMemberIds(info.gymId)
+        setCheckedIn(ids)
+      } catch {
+        setCheckedIn(new Set())
+      }
     }
 
     load()
@@ -72,34 +69,18 @@ export default function CheckInPage() {
     if (!gymId) return
     setLoading(member.id)
 
-    const today = new Date().toISOString().split('T')[0]
-    const { data: existing } = await supabase
-      .from('attendance')
-      .select('id')
-      .eq('gym_id', gymId)
-      .eq('member_id', member.id)
-      .gte('checked_in_at', `${today}T00:00:00`)
-      .lte('checked_in_at', `${today}T23:59:59`)
-      .maybeSingle()
-
-    if (existing) {
-      showToast(`⚠️ ${member.first_name} already checked in today`, 'error')
-      setCheckedIn((prev) => new Set([...prev, member.id]))
-      setLoading(null)
-      return
-    }
-
-    const { error } = await supabase
-      .from('attendance')
-      .insert({ member_id: member.id, gym_id: gymId, checked_in_by: (await supabase.auth.getUser()).data.user?.id })
-
-    setLoading(null)
-
-    if (error) {
-      showToast(`⚠️ ${error.message}`, 'error')
-    } else {
+    try {
+      await postCheckIn({ gymId, memberId: member.id })
       setCheckedIn((prev) => new Set([...prev, member.id]))
       showToast(`✅ ${member.first_name} ${member.last_name} checked in!`, 'success')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Check-in failed'
+      if (message.includes('already checked in')) {
+        setCheckedIn((prev) => new Set([...prev, member.id]))
+      }
+      showToast(`⚠️ ${message}`, 'error')
+    } finally {
+      setLoading(null)
     }
   }
 

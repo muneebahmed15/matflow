@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { Dumbbell, Plus } from 'lucide-react'
+import { createClassAction, deleteClassAction } from '@/app/(dashboard)/actions'
 
 interface Class {
   id: string; name: string; instructor: string
@@ -42,11 +43,19 @@ export default function ClassesPage() {
     if (!name || !instructor) { setError('Name and instructor are required.'); return }
     setSubmitting(true)
     setError('')
-    const { error: err } = await supabase.from('classes').insert({
-      gym_id: gymId, name, instructor, day_of_week: day,
-      start_time: startTime, end_time: endTime, capacity: parseInt(capacity)
+    const result = await createClassAction({
+      name,
+      instructor,
+      dayOfWeek: day,
+      startTime,
+      endTime,
+      capacity: parseInt(capacity, 10),
     })
-    if (err) { setError(err.message); setSubmitting(false); return }
+    if (!result.ok) {
+      setError(result.error)
+      setSubmitting(false)
+      return
+    }
     const { data } = await supabase.from('classes').select('*').eq('gym_id', gymId).order('day_of_week').order('start_time')
     setClasses(data || [])
     setName(''); setInstructor(''); setDay('Monday'); setStartTime('09:00'); setEndTime('10:00'); setCapacity('20')
@@ -56,8 +65,10 @@ export default function ClassesPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this class?')) return
-    await supabase.from('classes').delete().eq('id', id)
-    setClasses(prev => prev.filter(c => c.id !== id))
+    const result = await deleteClassAction(id)
+    if (result.ok) {
+      setClasses(prev => prev.filter(c => c.id !== id))
+    }
   }
 
   const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500"

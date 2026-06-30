@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { useRouter } from 'next/navigation'
+import { createMemberAction } from '@/app/(dashboard)/actions'
 
 interface Family {
   id: string
@@ -48,25 +49,25 @@ export default function AddMemberPage() {
     setLoading(true)
     setError('')
 
-    let familyId: string | null = null
-
-    if (familyOption === 'new') {
-      const { data: newFamily, error: famErr } = await supabase.from('families').insert({
-        gym_id: gymId,
-        family_name: newFamilyName,
-        primary_email: newFamilyEmail || email,
-      }).select().single()
-      if (famErr) { setError(famErr.message); setLoading(false); return }
-      familyId = newFamily.id
-    } else if (familyOption === 'existing') {
-      familyId = selectedFamilyId
-    }
-
-    const { error: err } = await supabase.from('members').insert({
-      first_name, last_name, email, phone, belt_rank, status, gym_id: gymId, family_id: familyId
+    const result = await createMemberAction({
+      firstName: first_name,
+      lastName: last_name,
+      email,
+      phone,
+      beltRank: belt_rank,
+      status,
+      familyOption,
+      existingFamilyId: familyOption === 'existing' ? selectedFamilyId : undefined,
+      newFamilyName: familyOption === 'new' ? newFamilyName : undefined,
+      newFamilyEmail: familyOption === 'new' ? newFamilyEmail : undefined,
     })
+
     setLoading(false)
-    if (err) { setError(err.message) } else { router.push('/members') }
+    if (!result.ok) {
+      setError(result.error)
+      return
+    }
+    router.push('/members')
   }
 
   const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -123,7 +124,7 @@ export default function AddMemberPage() {
               { val: 'existing', label: 'Existing family' },
               { val: 'new', label: 'New family' },
             ].map(opt => (
-              <button key={opt.val} onClick={() => setFamilyOption(opt.val as any)}
+              <button key={opt.val} onClick={() => setFamilyOption(opt.val as 'none' | 'existing' | 'new')}
                 className={`flex-1 text-xs font-medium py-2 rounded-lg border transition ${familyOption === opt.val ? 'bg-blue-600/15 border-blue-600/30 text-white' : 'bg-white/5 border-white/10 text-white/40'}`}>
                 {opt.label}
               </button>

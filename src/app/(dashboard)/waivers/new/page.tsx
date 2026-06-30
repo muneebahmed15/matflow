@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createWaiver } from '@/lib/waivers';
-import { getCurrentStaffInfo } from '@/lib/permissions';
+import { createWaiverAction } from '@/app/(dashboard)/actions';
 
 const DEFAULT_BODY = `I, the undersigned, acknowledge and agree to the following:
 
@@ -31,16 +30,13 @@ export default function NewWaiverPage() {
     }
     setLoading(true);
     setError('');
-    try {
-      const info = await getCurrentStaffInfo();
-      if (!info.gymId) throw new Error('Gym not found');
-      await createWaiver(info.gymId, title.trim(), body.trim());
-      router.push('/waivers');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to create waiver.');
-    } finally {
+    const result = await createWaiverAction({ title: title.trim(), body: body.trim() });
+    if (!result.ok) {
+      setError(result.error);
       setLoading(false);
+      return;
     }
+    router.push('/waivers');
   };
 
   return (

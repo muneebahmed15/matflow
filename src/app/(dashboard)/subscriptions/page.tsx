@@ -5,19 +5,13 @@ import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { CreditCard, CheckCircle, XCircle } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
-
-type Subscription = {
-  id: string; status: string; current_period_end: string | null
-  stripe_subscription_id: string | null
-  members: { first_name: string; last_name: string; email: string } | null
-  plans: { name: string; price: number; interval: string } | null
-}
+import type { SubscriptionWithRelations } from '@/types/queries'
 
 function SubscriptionsContent() {
   const searchParams = useSearchParams()
   const success = searchParams.get('success')
   const cancelled = searchParams.get('cancelled')
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
+  const [subscriptions, setSubscriptions] = useState<SubscriptionWithRelations[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -29,7 +23,7 @@ function SubscriptionsContent() {
         .select('id, status, current_period_end, stripe_subscription_id, members(first_name, last_name, email), plans(name, price, interval)')
         .eq('gym_id', info.gymId)
         .order('created_at', { ascending: false })
-      setSubscriptions((data as any) || [])
+      setSubscriptions((data as SubscriptionWithRelations[] | null) ?? [])
       setLoading(false)
     }
     load()

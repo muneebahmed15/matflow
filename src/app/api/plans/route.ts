@@ -1,8 +1,9 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminClient } from '@/lib/supabase/admin';
+import { listActivePlans } from '@/services/plans';
 import { isErrorResponse, requireStaffAuth } from '@/lib/auth/api';
+import { isServiceError } from '@/services/errors';
 
 export async function GET(req: NextRequest) {
   const auth = await requireStaffAuth();
@@ -17,14 +18,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const admin = getAdminClient();
-  const { data, error } = await admin
-    .from('plans')
-    .select('*')
-    .eq('gym_id', gym_id)
-    .eq('is_active', true)
-    .order('created_at', { ascending: false });
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+  try {
+    const data = await listActivePlans(gym_id);
+    return NextResponse.json({ data });
+  } catch (error) {
+    if (isServiceError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }

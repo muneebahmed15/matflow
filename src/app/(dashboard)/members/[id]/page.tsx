@@ -116,7 +116,7 @@ export default function MemberDetailPage() {
 
         <div className="flex gap-1 bg-white/5 rounded-xl p-1">
           {tabs.map((tab) => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
+            <button key={tab.key} onClick={() => setActiveTab(tab.key as 'info' | 'attendance' | 'waivers')}
               className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition ${activeTab === tab.key ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white'}`}>
               {tab.label}
             </button>

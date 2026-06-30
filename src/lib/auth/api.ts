@@ -2,14 +2,13 @@ import { NextResponse } from 'next/server';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { getAdminClient } from '@/lib/supabase/admin';
+import {
+  resolveStaffAuth,
+  type StaffAuth,
+  type StaffRole,
+} from '@/lib/auth/staff';
 
-export type StaffRole = 'admin' | 'coach';
-
-export type StaffAuth = {
-  user: User;
-  gymId: string;
-  role: StaffRole;
-};
+export type { StaffAuth, StaffRole };
 
 export type MemberAuth = {
   user: User;
@@ -20,36 +19,6 @@ export type MemberAuth = {
 
 export function isErrorResponse(value: unknown): value is NextResponse {
   return value instanceof NextResponse;
-}
-
-async function resolveStaffAuth(user: User): Promise<StaffAuth | null> {
-  const supabase = await createClient();
-
-  const { data: staffRole } = await supabase
-    .from('staff_roles')
-    .select('role, gym_id')
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (staffRole?.gym_id) {
-    return {
-      user,
-      gymId: staffRole.gym_id,
-      role: staffRole.role as StaffRole,
-    };
-  }
-
-  const { data: gym } = await supabase
-    .from('gyms')
-    .select('id')
-    .eq('owner_id', user.id)
-    .maybeSingle();
-
-  if (gym) {
-    return { user, gymId: gym.id, role: 'admin' };
-  }
-
-  return null;
 }
 
 /** Require an authenticated gym staff member (admin or coach). */
@@ -203,8 +172,6 @@ export async function validateKioskCheckIn(
 
   return null;
 }
-
-/** Ensure a subscription belongs to the staff member's gym. */
 export async function assertSubscriptionInGym(
   auth: StaffAuth,
   subscriptionId: string

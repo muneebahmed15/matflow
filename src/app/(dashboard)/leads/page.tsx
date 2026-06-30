@@ -4,6 +4,11 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { UserPlus, Plus, ArrowRight } from 'lucide-react'
+import {
+  convertLeadAction,
+  createLeadAction,
+  updateLeadStatusAction,
+} from '@/app/(dashboard)/actions'
 
 interface Lead {
   id: string
@@ -65,10 +70,19 @@ export default function LeadsPage() {
     if (!firstName || !lastName) { setError('First and last name are required.'); return }
     setSubmitting(true)
     setError('')
-    const { error: err } = await supabase.from('leads').insert({
-      gym_id: gymId, first_name: firstName, last_name: lastName, email, phone, source, interested_in: interestedIn, status: 'new'
+    const result = await createLeadAction({
+      firstName,
+      lastName,
+      email,
+      phone,
+      source,
+      interestedIn,
     })
-    if (err) { setError(err.message); setSubmitting(false); return }
+    if (!result.ok) {
+      setError(result.error)
+      setSubmitting(false)
+      return
+    }
     const { data } = await supabase.from('leads').select('*').eq('gym_id', gymId).order('created_at', { ascending: false })
     setLeads(data || [])
     setFirstName(''); setLastName(''); setEmail(''); setPhone(''); setSource('walk-in'); setInterestedIn('')
@@ -77,25 +91,19 @@ export default function LeadsPage() {
   }
 
   const handleStatusChange = async (id: string, status: string) => {
-    await supabase.from('leads').update({ status }).eq('id', id)
-    setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l))
+    const result = await updateLeadStatusAction(id, status)
+    if (result.ok) {
+      setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l))
+    }
   }
 
   const handleConvert = async (lead: Lead) => {
     if (!confirm(`Convert ${lead.first_name} ${lead.last_name} to a full member?`)) return
-    const { data: newMember, error: memberErr } = await supabase.from('members').insert({
-      gym_id: gymId,
-      first_name: lead.first_name,
-      last_name: lead.last_name,
-      email: lead.email,
-      phone: lead.phone,
-      belt_rank: 'white',
-      status: 'active',
-    }).select().single()
-
-    if (memberErr) { alert(memberErr.message); return }
-
-    await supabase.from('leads').update({ status: 'converted', converted_member_id: newMember.id }).eq('id', lead.id)
+    const result = await convertLeadAction(lead.id)
+    if (!result.ok) {
+      alert(result.error)
+      return
+    }
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'converted' } : l))
   }
 

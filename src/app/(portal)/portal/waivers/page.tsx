@@ -3,14 +3,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getWaivers, getMemberSignatures, signWaiver, hasSignedWaiver, type Waiver } from '@/lib/waivers'
+import type { MemberSignatureSummary } from '@/types/queries'
 import WaiverSignatureBox from '@/components/WaiverSignatureBox'
 import { FileText } from 'lucide-react'
 
-interface SignedWaiver {
-  waiver_id: string
-  signed_at: string
-  signed_name: string
-}
+interface SignedWaiver extends MemberSignatureSummary {}
 
 export default function PortalWaiversPage() {
   const [waivers, setWaivers] = useState<Waiver[]>([])
@@ -43,8 +40,8 @@ export default function PortalWaiversPage() {
         const s = await hasSignedWaiver(active[0].id, member.id)
         setAlreadySigned(s)
         if (s) {
-          const match = sigs.find((sig: any) => sig.waiver_id === active[0].id)
-          setSignedAt((match as any)?.signed_at)
+          const match = sigs.find((sig) => sig.waiver_id === active[0].id)
+          setSignedAt(match?.signed_at)
         }
       }
       setLoading(false)
@@ -59,8 +56,8 @@ export default function PortalWaiversPage() {
     const s = await hasSignedWaiver(waiver.id, memberId)
     setAlreadySigned(s)
     if (s) {
-      const match = signed.find((sig: any) => sig.waiver_id === waiver.id)
-      setSignedAt((match as any)?.signed_at)
+      const match = signed.find((sig) => sig.waiver_id === waiver.id)
+      setSignedAt(match?.signed_at)
     } else {
       setSignedAt(undefined)
     }

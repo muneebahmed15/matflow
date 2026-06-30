@@ -57,6 +57,23 @@ export type Database = {
         };
         Update: Partial<Database['public']['Tables']['members']['Insert']>;
       };
+      families: {
+        Row: {
+          id: string;
+          gym_id: string;
+          family_name: string;
+          primary_email: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          gym_id: string;
+          family_name: string;
+          primary_email?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['families']['Insert']>;
+      };
       staff_roles: {
         Row: {
           id: string;
@@ -148,6 +165,123 @@ export type Database = {
           notes?: string | null;
         };
         Update: Partial<Database['public']['Tables']['attendance']['Insert']>;
+      };
+      waivers: {
+        Row: {
+          id: string;
+          gym_id: string;
+          title: string;
+          body: string;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          gym_id: string;
+          title: string;
+          body: string;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['waivers']['Insert']>;
+      };
+      waiver_signatures: {
+        Row: {
+          id: string;
+          waiver_id: string;
+          member_id: string;
+          gym_id: string;
+          signed_name: string;
+          signed_at: string;
+        };
+        Insert: {
+          id?: string;
+          waiver_id: string;
+          member_id: string;
+          gym_id: string;
+          signed_name: string;
+          signed_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['waiver_signatures']['Insert']>;
+      };
+      classes: {
+        Row: {
+          id: string;
+          gym_id: string;
+          name: string;
+          instructor: string | null;
+          day_of_week: string | null;
+          start_time: string | null;
+          end_time: string | null;
+          capacity: number | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          gym_id: string;
+          name: string;
+          instructor?: string | null;
+          day_of_week?: string | null;
+          start_time?: string | null;
+          end_time?: string | null;
+          capacity?: number | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['classes']['Insert']>;
+      };
+      leads: {
+        Row: {
+          id: string;
+          gym_id: string;
+          first_name: string;
+          last_name: string;
+          email: string | null;
+          phone: string | null;
+          source: string | null;
+          status: string;
+          notes: string | null;
+          interested_in: string | null;
+          converted_member_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          gym_id: string;
+          first_name: string;
+          last_name: string;
+          email?: string | null;
+          phone?: string | null;
+          source?: string | null;
+          status?: string;
+          notes?: string | null;
+          interested_in?: string | null;
+          converted_member_id?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['leads']['Insert']>;
+      };
+      belt_promotions: {
+        Row: {
+          id: string;
+          gym_id: string;
+          member_id: string;
+          from_belt: string;
+          to_belt: string;
+          notes: string | null;
+          promoted_at: string;
+        };
+        Insert: {
+          id?: string;
+          gym_id: string;
+          member_id: string;
+          from_belt: string;
+          to_belt: string;
+          notes?: string | null;
+          promoted_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['belt_promotions']['Insert']>;
       };
     };
     Views: Record<string, never>;

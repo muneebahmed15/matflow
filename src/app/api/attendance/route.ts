@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminClient } from '@/lib/supabase/admin';
 import {
-  isErrorResponse,
-  requireStaffAuth,
-  validateKioskCheckIn,
-} from '@/lib/auth/api';
+  checkInMember,
+  listAttendance,
+  validateKioskCheckIn as validateKioskCheckInService,
+} from '@/services/attendance';
+import { isErrorResponse, requireStaffAuth } from '@/lib/auth/api';
+import { isServiceError } from '@/services/errors';
+
+function serviceErrorResponse(error: unknown): NextResponse {
+  if (isServiceError(error)) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
+  }
+  return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+}
 
 export async function POST(req: NextRequest) {
   const { member_id, gym_id, notes, checked_in_by } = await req.json();
@@ -15,53 +23,26 @@ export async function POST(req: NextRequest) {
   const staffAuth = await requireStaffAuth();
   const isStaff = !isErrorResponse(staffAuth);
 
-  if (isStaff) {
-    if (staffAuth.gymId !== gym_id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  try {
+    if (isStaff) {
+      if (staffAuth.gymId !== gym_id) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    } else {
+      await validateKioskCheckInService(gym_id, member_id);
     }
-    const admin = getAdminClient();
-    const { data: member } = await admin
-      .from('members')
-      .select('id')
-      .eq('id', member_id)
-      .eq('gym_id', gym_id)
-      .maybeSingle();
-    if (!member) {
-      return NextResponse.json({ error: 'Member not found' }, { status: 404 });
-    }
-  } else {
-    const kioskError = await validateKioskCheckIn(gym_id, member_id);
-    if (kioskError) return kioskError;
-  }
 
-  const admin = getAdminClient();
-  const today = new Date().toISOString().split('T')[0];
-  const { data: existing } = await admin
-    .from('attendance')
-    .select('id')
-    .eq('gym_id', gym_id)
-    .eq('member_id', member_id)
-    .gte('checked_in_at', `${today}T00:00:00`)
-    .lte('checked_in_at', `${today}T23:59:59`)
-    .maybeSingle();
-
-  if (existing) {
-    return NextResponse.json({ error: 'Member already checked in today' }, { status: 409 });
-  }
-
-  const { data, error } = await admin
-    .from('attendance')
-    .insert({
-      member_id,
-      gym_id,
+    const data = await checkInMember({
+      gymId: gym_id,
+      memberId: member_id,
       notes: notes || null,
-      checked_in_by: isStaff ? staffAuth.user.id : checked_in_by || null,
-    })
-    .select()
-    .single();
+      checkedInBy: isStaff ? staffAuth.user.id : checked_in_by || null,
+    });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+    return NextResponse.json({ data });
+  } catch (error) {
+    return serviceErrorResponse(error);
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -79,20 +60,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const admin = getAdminClient();
-  let query = admin
-    .from('attendance')
-    .select('*, members(id, first_name, last_name, email, phone)')
-    .eq('gym_id', gym_id)
-    .order('checked_in_at', { ascending: false });
-
-  if (date) {
-    query = query
-      .gte('checked_in_at', `${date}T00:00:00`)
-      .lte('checked_in_at', `${date}T23:59:59`);
+  try {
+    const data = await listAttendance(gym_id, { date: date ?? undefined });
+    return NextResponse.json({ data });
+  } catch (error) {
+    return serviceErrorResponse(error);
   }
-
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
 }

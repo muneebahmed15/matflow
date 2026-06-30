@@ -1,22 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
-
-type AttendanceRecord = {
-  id: string
-  checked_in_at: string
-  members: {
-    first_name: string
-    last_name: string
-    email: string
-  }
-}
+import { fetchAttendanceLog, type AttendanceLogEntry } from '@/lib/api-client'
 
 export default function AttendanceLogPage() {
   const [gymId, setGymId] = useState<string | null>(null)
-  const [records, setRecords] = useState<AttendanceRecord[]>([])
+  const [records, setRecords] = useState<AttendanceLogEntry[]>([])
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [loading, setLoading] = useState(true)
 
@@ -32,16 +22,14 @@ export default function AttendanceLogPage() {
     if (!gymId) return
     const load = async () => {
       setLoading(true)
-      const { data } = await supabase
-        .from('attendance')
-        .select('id, checked_in_at, members(first_name, last_name, email)')
-        .eq('gym_id', gymId)
-        .gte('checked_in_at', `${date}T00:00:00`)
-        .lte('checked_in_at', `${date}T23:59:59`)
-        .order('checked_in_at', { ascending: false })
-
-      setRecords((data as any) || [])
-      setLoading(false)
+      try {
+        const data = await fetchAttendanceLog(gymId, date)
+        setRecords(data)
+      } catch {
+        setRecords([])
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [gymId, date])

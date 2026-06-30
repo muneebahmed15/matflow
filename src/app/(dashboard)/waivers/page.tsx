@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
-import { getWaivers, toggleWaiverStatus, type Waiver } from '@/lib/waivers'
+import { getWaivers, type Waiver } from '@/lib/waivers'
+import { toggleWaiverStatusAction } from '@/app/(dashboard)/actions'
 import { FileText, Plus, ToggleLeft, ToggleRight } from 'lucide-react'
 
 export default function WaiversPage() {
@@ -24,8 +25,10 @@ export default function WaiversPage() {
 
   const handleToggle = async (waiver: Waiver) => {
     setToggling(waiver.id)
-    await toggleWaiverStatus(waiver.id, !waiver.is_active)
-    setWaivers((prev) => prev.map((w) => w.id === waiver.id ? { ...w, is_active: !w.is_active } : w))
+    const result = await toggleWaiverStatusAction(waiver.id, !waiver.is_active)
+    if (result.ok) {
+      setWaivers((prev) => prev.map((w) => w.id === waiver.id ? { ...w, is_active: !w.is_active } : w))
+    }
     setToggling(null)
   }
 

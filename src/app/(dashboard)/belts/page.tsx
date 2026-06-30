@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { Award, Plus } from 'lucide-react'
+import { promoteMemberAction } from '@/app/(dashboard)/actions'
 
 interface Member {
   id: string
@@ -67,20 +68,20 @@ export default function BeltsPage() {
     if (!selectedMember || !gymId) return
     setSubmitting(true)
     const member = members.find(m => m.id === selectedMember)
-    if (!member) return
-    const fromBelt = member.belt_rank
-    // Insert promotion record
-    await supabase.from('belt_promotions').insert({
-      gym_id: gymId,
-      member_id: selectedMember,
-      from_belt: fromBelt,
-      to_belt: toBelt,
+    if (!member) {
+      setSubmitting(false)
+      return
+    }
+    const result = await promoteMemberAction({
+      memberId: selectedMember,
+      fromBelt: member.belt_rank,
+      toBelt,
       notes,
-      promoted_at: new Date().toISOString(),
     })
-    // Update member belt
-    await supabase.from('members').update({ belt_rank: toBelt }).eq('id', selectedMember)
-    // Refresh
+    if (!result.ok) {
+      setSubmitting(false)
+      return
+    }
     const [{ data: membersData }, { data: promoData }] = await Promise.all([
       supabase.from('members').select('id, first_name, last_name, belt_rank, email').eq('gym_id', gymId).order('first_name'),
       supabase.from('belt_promotions').select('*, members(first_name, last_name)').eq('gym_id', gymId).order('promoted_at', { ascending: false }).limit(20),
