@@ -130,7 +130,7 @@ export default function CheckInPage() {
         placeholder="Search by name or email..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full bg-white/5 border border-white/10 text-white placeholder-white/30 rounded-xl px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-red-500"
+        className="w-full bg-white/5 border border-white/10 text-white placeholder-white/30 rounded-xl px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
 
       <div className="space-y-2">
@@ -157,7 +157,7 @@ export default function CheckInPage() {
                     ? 'bg-green-500/10 text-green-400 border border-green-500/30 cursor-default'
                     : busy
                     ? 'bg-white/5 text-white/30 cursor-wait'
-                    : 'bg-red-600 hover:bg-red-500 text-white'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white'
                 }`}
               >
                 {done ? 'Checked In ✓' : busy ? 'Checking...' : 'Check In'}

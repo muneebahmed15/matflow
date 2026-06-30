@@ -33,7 +33,7 @@ export default function SettingsPage() {
     else alert(error.message)
   }
 
-  const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+  const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
 
@@ -51,7 +51,7 @@ export default function SettingsPage() {
             <span className="text-white text-sm">{userEmail}</span>
           </div>
           <button onClick={async () => { await supabase.auth.signOut(); window.location.href = '/login' }}
-            className="mt-4 text-red-400 text-sm hover:underline">
+            className="mt-4 text-blue-400 text-sm hover:underline">
             Sign out
           </button>
         </div>
@@ -68,7 +68,7 @@ export default function SettingsPage() {
               <p className="text-white/20 text-xs mt-1">Lowercase letters, numbers, hyphens only.</p>
             </div>
             {saved && <p className="text-green-400 text-sm">✅ Settings saved!</p>}
-            <button onClick={handleSave} disabled={saving || !gymName} className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition">
+            <button onClick={handleSave} disabled={saving || !gymName} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition">
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>

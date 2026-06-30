@@ -39,7 +39,7 @@ export default function DashboardPage() {
   const statCards = [
     { label: 'Total Members', value: stats.totalMembers, sub: `${stats.activeMembers} active`, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
     { label: "Today's Check-Ins", value: stats.todayCheckIns, sub: 'checked in today', icon: UserCheck, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
-    { label: 'Active Subscriptions', value: stats.activeSubscriptions, sub: 'recurring billing', icon: CreditCard, color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' },
+    { label: 'Active Subscriptions', value: stats.activeSubscriptions, sub: 'recurring billing', icon: CreditCard, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
     { label: 'Active Waivers', value: stats.activeWaivers, sub: 'available to sign', icon: FileText, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
   ]
 
@@ -69,7 +69,7 @@ export default function DashboardPage() {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {[
-          { href: '/attendance/check-in', icon: UserCheck, iconColor: 'text-red-400', bg: 'bg-red-600/20', title: 'Check In a Member', sub: 'One-tap attendance tracking' },
+          { href: '/attendance/check-in', icon: UserCheck, iconColor: 'text-blue-400', bg: 'bg-blue-600/20', title: 'Check In a Member', sub: 'One-tap attendance tracking' },
           { href: '/members/new', icon: Users, iconColor: 'text-blue-400', bg: 'bg-blue-600/20', title: 'Add New Member', sub: 'Register a new student' },
           { href: '/waivers', icon: FileText, iconColor: 'text-purple-400', bg: 'bg-purple-600/20', title: 'Manage Waivers', sub: 'Digital e-signature waivers' },
           { href: '/plans', icon: CreditCard, iconColor: 'text-green-400', bg: 'bg-green-600/20', title: 'Membership Plans', sub: 'Create and manage billing plans' },

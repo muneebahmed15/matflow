@@ -6,7 +6,7 @@ import { CreditCard, Plus } from 'lucide-react'
 
 interface Plan {
   id: string; name: string; description: string
-  price_cents: number; interval: string; is_active: boolean; created_at: string
+  price: number; interval: string; is_active: boolean; created_at: string
 }
 
 export default function PlansPage() {
@@ -54,7 +54,7 @@ export default function PlansPage() {
     setSubmitting(false)
   }
 
-  const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-red-500"
+  const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500"
 
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
 
@@ -65,7 +65,7 @@ export default function PlansPage() {
           <h1 className="text-3xl font-extrabold">Plans</h1>
           <p className="text-white/40 text-sm mt-1">Membership billing plans connected to Stripe.</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
           <Plus size={16} /> New Plan
         </button>
       </div>
@@ -96,7 +96,7 @@ export default function PlansPage() {
           </div>
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <div className="flex gap-3">
-            <button onClick={handleSubmit} disabled={submitting} className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
+            <button onClick={handleSubmit} disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
               {submitting ? 'Creating...' : 'Create Plan'}
             </button>
             <button onClick={() => setShowForm(false)} className="px-4 border border-white/10 text-gray-400 rounded-xl hover:bg-white/5 transition">
@@ -117,8 +117,8 @@ export default function PlansPage() {
           {plans.map((plan) => (
             <div key={plan.id} className="bg-[#111] border border-white/10 rounded-2xl p-5 flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-red-500/10 rounded-xl flex items-center justify-center">
-                  <CreditCard size={18} className="text-red-400" />
+                <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center">
+                  <CreditCard size={18} className="text-blue-400" />
                 </div>
                 <div>
                   <p className="font-semibold text-white">{plan.name}</p>
@@ -126,7 +126,7 @@ export default function PlansPage() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-white font-bold">${(Number(plan.price_cents) / 100).toFixed(2)}<span className="text-white/30 font-normal text-xs"> / {plan.interval}</span></p>
+                <p className="text-white font-bold">${Number(plan.price).toFixed(2)}<span className="text-white/30 font-normal text-xs"> / {plan.interval}</span></p>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${plan.is_active ? 'bg-green-500/10 text-green-400' : 'bg-white/5 text-white/30'}`}>
                   {plan.is_active ? 'Active' : 'Inactive'}
                 </span>

@@ -184,7 +184,7 @@ export default function MemberDetailPage() {
           {signatures.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-white/30 text-sm mb-3">No waivers signed yet.</p>
-              <a href={`/waivers/${id}/sign-waiver`} className="text-red-400 text-sm hover:underline">Sign a waiver →</a>
+              <a href={`/waivers/${id}/sign-waiver`} className="text-blue-400 text-sm hover:underline">Sign a waiver →</a>
             </div>
           ) : (
             <div className="space-y-2">
@@ -214,7 +214,7 @@ export default function MemberDetailPage() {
                 <button
                   onClick={() => handleSubscribe(plan.stripe_price_id)}
                   disabled={subscribing || !plan.stripe_price_id}
-                  className="bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-red-700 transition disabled:opacity-50">
+                  className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-700 transition disabled:opacity-50">
                   {subscribing ? 'Loading...' : 'Subscribe'}
                 </button>
               </div>
@@ -226,7 +226,7 @@ export default function MemberDetailPage() {
       {activeTab === 'info' && plans.length === 0 && (
         <div className="bg-[#111] border border-white/10 rounded-2xl p-6 text-center">
           <p className="text-gray-400 text-sm">No active plans yet.</p>
-          <a href="/plans" className="text-red-400 text-sm hover:underline mt-2 inline-block">Create a plan →</a>
+          <a href="/plans" className="text-blue-400 text-sm hover:underline mt-2 inline-block">Create a plan →</a>
         </div>
       )}
     </div>

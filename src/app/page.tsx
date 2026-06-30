@@ -10,7 +10,7 @@ export default function HomePage() {
         <span className="text-xl font-bold tracking-tight">East Coast MMA</span>
         <Link
           href="/signup"
-          className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
         >
           Start Free Trial
         </Link>
@@ -22,11 +22,11 @@ export default function HomePage() {
           Train Hard.<br />Track Everything.
         </h1>
         <p className="text-white/60 text-lg max-w-xl">
-          MatFlow helps martial arts gyms manage members, classes, belts, and payments — all in one place.
+          MatsFlow helps martial arts gyms manage members, classes, belts, and payments — all in one place.
         </p>
         <Link
           href="/signup"
-          className="bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-4 rounded-xl text-lg transition"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-4 rounded-xl text-lg transition"
         >
           Get Started Free
         </Link>
@@ -41,7 +41,7 @@ export default function HomePage() {
           { icon: Shield, title: 'Secure & Private', desc: 'Each gym\'s data is fully isolated and protected.' },
         ].map(({ icon: Icon, title, desc }) => (
           <div key={title} className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col gap-3">
-            <Icon className="text-red-500" size={28} />
+            <Icon className="text-blue-500" size={28} />
             <h3 className="font-bold text-lg">{title}</h3>
             <p className="text-white/50 text-sm">{desc}</p>
           </div>

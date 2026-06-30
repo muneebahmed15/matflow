@@ -58,7 +58,7 @@ export default function MembersPage() {
           <h1 className="text-3xl font-extrabold">Members</h1>
           <p className="text-white/40 text-sm mt-1">{members.length} total members</p>
         </div>
-        <Link href="/members/new" className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+        <Link href="/members/new" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
           <Plus size={16} /> Add Member
         </Link>
       </div>
@@ -70,7 +70,7 @@ export default function MembersPage() {
           placeholder="Search by name or email..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-red-500"
+          className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
@@ -78,7 +78,7 @@ export default function MembersPage() {
         <div className="bg-white/5 border border-white/10 rounded-2xl p-16 text-center">
           <Users size={40} className="text-white/20 mx-auto mb-4" />
           <p className="text-white/40 font-medium">No members found</p>
-          <Link href="/members/new" className="mt-4 inline-block text-red-400 text-sm hover:underline">Add your first member →</Link>
+          <Link href="/members/new" className="mt-4 inline-block text-blue-400 text-sm hover:underline">Add your first member →</Link>
         </div>
       ) : (
         <div className="bg-[#111] border border-white/10 rounded-2xl overflow-hidden">
@@ -108,7 +108,7 @@ export default function MembersPage() {
                     </span>
                   </td>
                   <td className="px-5 py-3 text-right">
-                    <Link href={`/members/${m.id}`} className="text-red-400 hover:underline text-xs">View →</Link>
+                    <Link href={`/members/${m.id}`} className="text-blue-400 hover:underline text-xs">View →</Link>
                   </td>
                 </tr>
               ))}

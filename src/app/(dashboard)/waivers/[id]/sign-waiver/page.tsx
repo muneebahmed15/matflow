@@ -119,7 +119,7 @@ export default function SignWaiverPage() {
                       onClick={() => handleSelectWaiver(w)}
                       className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
                         selected?.id === w.id
-                          ? 'border-red-500 bg-red-500/20 text-red-400'
+                          ? 'border-blue-500 bg-blue-500/20 text-blue-400'
                           : 'border-white/10 bg-white/5 text-gray-300 hover:border-white/30'
                       }`}
                     >

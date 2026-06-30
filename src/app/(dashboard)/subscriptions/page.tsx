@@ -70,7 +70,7 @@ function SubscriptionsContent() {
           <CreditCard size={40} className="text-white/20 mx-auto mb-4" />
           <p className="text-white/40 font-medium">No subscriptions yet</p>
           <p className="text-white/20 text-sm mt-1">Subscribe a member from their profile page.</p>
-          <a href="/members" className="mt-6 inline-block text-red-400 text-sm hover:underline">Go to Members →</a>
+          <a href="/members" className="mt-6 inline-block text-blue-400 text-sm hover:underline">Go to Members →</a>
         </div>
       ) : (
         <div className="space-y-3">

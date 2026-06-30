@@ -39,7 +39,7 @@ export default function WaiversPage() {
           <h1 className="text-3xl font-extrabold">Waivers</h1>
           <p className="text-white/40 text-sm mt-1">Manage digital liability waivers.</p>
         </div>
-        <a href="/waivers/new" className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+        <a href="/waivers/new" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
           <Plus size={16} /> New Waiver
         </a>
       </div>
@@ -48,7 +48,7 @@ export default function WaiversPage() {
         <div className="bg-white/5 border border-white/10 rounded-2xl p-16 text-center">
           <FileText size={40} className="text-white/20 mx-auto mb-4" />
           <p className="text-white/40 font-medium">No waivers yet</p>
-          <a href="/waivers/new" className="mt-4 inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+          <a href="/waivers/new" className="mt-4 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
             <Plus size={16} /> Create Waiver
           </a>
         </div>
@@ -58,7 +58,7 @@ export default function WaiversPage() {
             <div key={waiver.id} className="bg-[#111] border border-white/10 rounded-2xl p-5 flex items-center justify-between gap-4">
               <div className="flex items-center gap-4 min-w-0">
                 <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <FileText size={18} className={waiver.is_active ? 'text-red-400' : 'text-white/20'} />
+                  <FileText size={18} className={waiver.is_active ? 'text-blue-400' : 'text-white/20'} />
                 </div>
                 <div className="min-w-0">
                   <p className="font-semibold text-white truncate">{waiver.title}</p>
@@ -72,7 +72,7 @@ export default function WaiversPage() {
                 <button onClick={() => handleToggle(waiver)} disabled={toggling === waiver.id} className="text-white/40 hover:text-white transition disabled:opacity-50">
                   {waiver.is_active ? <ToggleRight size={22} className="text-green-400" /> : <ToggleLeft size={22} />}
                 </button>
-                <a href={`/waivers/${waiver.id}`} className="text-sm text-red-400 hover:underline">View</a>
+                <a href={`/waivers/${waiver.id}`} className="text-sm text-blue-400 hover:underline">View</a>
               </div>
             </div>
           ))}

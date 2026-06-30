@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import Logo from '@/components/Logo'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -39,8 +40,12 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
 
         <div className="mb-8 text-center">
+          <div className="flex items-center justify-center gap-2 mb-5">
+            <Logo size={28} />
+            <span className="font-bold text-lg">MatsFlow</span>
+          </div>
           <h1 className="text-3xl font-extrabold mb-2">Welcome back</h1>
-          <p className="text-white/50">Log in to your MatFlow account</p>
+          <p className="text-white/50">Log in to your MatsFlow account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -51,7 +56,7 @@ export default function LoginPage() {
             value={form.email}
             onChange={handleChange}
             required
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-red-500"
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-blue-500"
           />
 
           <input
@@ -61,7 +66,7 @@ export default function LoginPage() {
             value={form.password}
             onChange={handleChange}
             required
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-red-500"
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-blue-500"
           />
 
           {error && <p className="text-red-400 text-sm">{error}</p>}
@@ -69,7 +74,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition"
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition"
           >
             {loading ? 'Logging in...' : 'Log In'}
           </button>
@@ -77,7 +82,7 @@ export default function LoginPage() {
 
         <p className="text-center text-white/40 text-sm mt-6">
           Don't have an account?{' '}
-          <Link href="/signup" className="text-red-400 hover:underline">Start free trial</Link>
+          <Link href="/signup" className="text-blue-400 hover:underline">Start free trial</Link>
         </p>
 
       </div>

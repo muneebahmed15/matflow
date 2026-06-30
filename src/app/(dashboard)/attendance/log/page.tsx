@@ -60,7 +60,7 @@ export default function AttendanceLogPage() {
         type="date"
         value={date}
         onChange={(e) => setDate(e.target.value)}
-        className="bg-white/5 border border-white/10 text-white rounded-xl px-4 py-2 mb-6 focus:outline-none focus:ring-2 focus:ring-red-500"
+        className="bg-white/5 border border-white/10 text-white rounded-xl px-4 py-2 mb-6 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
 
       <p className="text-sm text-white/40 mb-4">

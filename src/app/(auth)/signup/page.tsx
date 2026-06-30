@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import Logo from '@/components/Logo'
 
 export default function SignupPage() {
   const [form, setForm] = useState({
@@ -60,6 +61,10 @@ export default function SignupPage() {
       <div className="w-full max-w-md">
 
         <div className="mb-8 text-center">
+          <div className="flex items-center justify-center gap-2 mb-5">
+            <Logo size={28} />
+            <span className="font-bold text-lg">MatsFlow</span>
+          </div>
           <h1 className="text-3xl font-extrabold mb-2">Start your free trial</h1>
           <p className="text-white/50">No credit card required</p>
         </div>
@@ -72,7 +77,7 @@ export default function SignupPage() {
               value={form.first_name}
               onChange={handleChange}
               required
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-red-500"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-blue-500"
             />
             <input
               name="last_name"
@@ -80,7 +85,7 @@ export default function SignupPage() {
               value={form.last_name}
               onChange={handleChange}
               required
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-red-500"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -91,7 +96,7 @@ export default function SignupPage() {
             value={form.email}
             onChange={handleChange}
             required
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-red-500"
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-blue-500"
           />
 
           <input
@@ -101,7 +106,7 @@ export default function SignupPage() {
             value={form.password}
             onChange={handleChange}
             required
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-red-500"
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-blue-500"
           />
 
           {error && <p className="text-red-400 text-sm">{error}</p>}
@@ -109,7 +114,7 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={loading}
-            className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition"
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition"
           >
             {loading ? 'Creating account...' : 'Create Free Account'}
           </button>
@@ -117,7 +122,7 @@ export default function SignupPage() {
 
         <p className="text-center text-white/40 text-sm mt-6">
           Already have an account?{' '}
-          <Link href="/login" className="text-red-400 hover:underline">Log in</Link>
+          <Link href="/login" className="text-blue-400 hover:underline">Log in</Link>
         </p>
 
       </div>

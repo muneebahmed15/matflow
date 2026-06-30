@@ -61,7 +61,7 @@ export default function ClassesPage() {
     setClasses(prev => prev.filter(c => c.id !== id))
   }
 
-  const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-red-500"
+  const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500"
 
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
 
@@ -77,7 +77,7 @@ export default function ClassesPage() {
           <h1 className="text-3xl font-extrabold">Classes</h1>
           <p className="text-white/40 text-sm mt-1">Weekly class schedule.</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
           <Plus size={16} /> New Class
         </button>
       </div>
@@ -117,7 +117,7 @@ export default function ClassesPage() {
           </div>
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <div className="flex gap-3">
-            <button onClick={handleSubmit} disabled={submitting} className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
+            <button onClick={handleSubmit} disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
               {submitting ? 'Adding...' : 'Add Class'}
             </button>
             <button onClick={() => setShowForm(false)} className="px-4 border border-white/10 text-gray-400 rounded-xl hover:bg-white/5 transition">Cancel</button>
@@ -140,8 +140,8 @@ export default function ClassesPage() {
                 {grouped[day].map((cls) => (
                   <div key={cls.id} className="bg-[#111] border border-white/10 rounded-2xl p-4 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="w-9 h-9 bg-red-500/10 rounded-xl flex items-center justify-center">
-                        <Dumbbell size={16} className="text-red-400" />
+                      <div className="w-9 h-9 bg-blue-500/10 rounded-xl flex items-center justify-center">
+                        <Dumbbell size={16} className="text-blue-400" />
                       </div>
                       <div>
                         <p className="font-semibold text-white">{cls.name}</p>
