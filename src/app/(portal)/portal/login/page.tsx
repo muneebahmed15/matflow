@@ -97,11 +97,11 @@ export default function PortalLoginPage() {
           <div className="mt-6 pt-6 border-t border-white/10 text-center">
             <p className="text-white/30 text-sm">
               Don&apos;t have an account?{' '}
-              <Link href="/portal/signup" className="text-blue-400 hover:underline">Create one</Link>
+              <Link href="/portal/signup" prefetch={false} className="text-blue-400 hover:underline">Create one</Link>
             </p>
             <p className="text-white/20 text-xs mt-3">
               Are you a gym admin?{' '}
-              <Link href="/login" className="text-white/40 hover:underline">Admin login →</Link>
+              <Link href="/login" prefetch={false} className="text-white/40 hover:underline">Admin login →</Link>
             </p>
           </div>
         </div>

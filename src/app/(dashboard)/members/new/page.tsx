@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createMemberAction, listFamiliesAction } from '@/app/(dashboard)/actions'
 import { useAppUi } from '@/components/ui/AppUiProvider'
+import { BELT_RANKS } from '@/lib/belt-colors'
 
 interface Family {
   id: string
@@ -97,7 +98,7 @@ export default function AddMemberPage() {
           <div>
             <label className={labelClass}>Belt Rank</label>
             <select value={belt_rank} onChange={(e) => setBeltRank(e.target.value)} className={inputClass}>
-              {['white','yellow','orange','green','blue','purple','brown','black'].map(b => (
+              {BELT_RANKS.map(b => (
                 <option key={b} value={b} className="bg-gray-900 capitalize">{b}</option>
               ))}
             </select>

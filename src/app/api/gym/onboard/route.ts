@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { defaultGymName, slugifyGymName } from '@/lib/gym';
+import { parseJsonBody } from '@/lib/api-validate';
+import { gymOnboardSchema } from '@/lib/api-schemas';
+import { logger } from '@/lib/logger';
 
 async function userHasGym(userId: string): Promise<boolean> {
   const admin = getAdminClient();
@@ -37,11 +40,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Gym already exists for this account' }, { status: 409 });
   }
 
-  const body = await req.json().catch(() => ({}));
-  const requestedName =
-    typeof body.name === 'string' && body.name.trim()
-      ? body.name.trim()
-      : defaultGymName(user.user_metadata);
+  const parsed = await parseJsonBody(req, gymOnboardSchema);
+  if (!parsed.success) return parsed.response;
+  const requestedName = parsed.data.name ?? defaultGymName(user.user_metadata);
 
   const admin = getAdminClient();
   let slug = slugifyGymName(requestedName);
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) {
-    console.error('Gym onboard error:', error.message);
+    logger.error({ err: error, userId: user.id }, 'Gym onboard failed');
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
   });
 
   if (staffError) {
-    console.error('Staff role onboard error:', staffError.message);
+    logger.error({ err: staffError, userId: user.id, gymId: gym.id }, 'Staff role onboard failed');
     await admin.from('gyms').delete().eq('id', gym.id);
     return NextResponse.json({ error: staffError.message }, { status: 500 });
   }

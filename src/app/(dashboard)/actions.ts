@@ -372,7 +372,7 @@ export async function inviteStaffAction(input: {
 }): Promise<ActionResult<{ staffRoleId: string }>> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });
-    const limit = checkRateLimit(`staff-invite:${auth.user.id}`, 20, 60 * 60 * 1000);
+    const limit = await checkRateLimit(`staff-invite:${auth.user.id}`, 20, 60 * 60 * 1000);
     if (!limit.allowed) {
       return { ok: false, error: 'Too many invites. Try again later.' };
     }

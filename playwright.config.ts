@@ -1,4 +1,7 @@
+import dotenv from 'dotenv'
 import { defineConfig, devices } from '@playwright/test'
+
+dotenv.config({ path: '.env.local' })
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3000'
 

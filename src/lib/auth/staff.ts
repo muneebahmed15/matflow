@@ -1,5 +1,7 @@
 import type { User } from '@supabase/supabase-js';
+import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { logger, errorMessage } from '@/lib/logger';
 
 export type StaffRole = 'admin' | 'coach';
 
@@ -68,5 +70,22 @@ export async function requireStaffSession(options?: {
 export function assertGymAccess(auth: StaffAuth, gymId: string): void {
   if (auth.gymId !== gymId) {
     throw new Error('Forbidden');
+  }
+}
+
+/**
+ * Server Component auth guard: resolves the staff session or redirects to
+ * /dashboard, logging the reason first (Unauthorized vs Forbidden) instead of
+ * silently discarding it. Centralizes the pattern so every page under
+ * (dashboard) gets it the same way rather than re-implementing try/catch.
+ */
+export async function requireStaffSessionForPage(options?: {
+  adminOnly?: boolean;
+}): Promise<StaffAuth> {
+  try {
+    return await requireStaffSession(options);
+  } catch (error) {
+    logger.warn({ reason: errorMessage(error) }, 'Redirecting unauthenticated/unauthorized page request');
+    redirect('/dashboard');
   }
 }

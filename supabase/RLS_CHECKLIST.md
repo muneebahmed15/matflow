@@ -2,6 +2,29 @@
 
 Run after applying migrations to **staging** before production cutover.
 
+## Enforcement model: which boundary actually protects each path
+
+matflow has two parallel authorization boundaries, and only one of them is RLS.
+Knowing which one applies to a given code path matters for security review.
+
+1. **API routes (`src/app/api/**`) and services (`src/services/**`)** — these call
+   `getAdminClient()` (`src/lib/supabase/admin.ts`), which uses the
+   `SUPABASE_SERVICE_ROLE_KEY` and **bypasses RLS entirely**. For these paths,
+   authorization is enforced purely by application code: `requireStaffAuth`,
+   `requireMemberAuth`, `assertGymScope`, `assertSubscriptionInGym`, and the
+   per-route Zod schemas in `src/lib/api-schemas.ts`. If one of those checks has a
+   bug, RLS will **not** catch it — the admin client would still let the query
+   through.
+2. **Direct client-side Supabase queries** (components calling `supabase.from(...)`
+   with the public anon key, e.g. `DashboardLayoutClient`, `attendance/check-in`,
+   `plans`, `subscriptions`) — these run as the authenticated browser session and
+   **are** subject to RLS. The policies below (`members_staff_all`,
+   `members_select_self`, `subscriptions_member_select`, etc.) are the actual
+   enforcement for these paths.
+
+Rule of thumb: grep the code path for `getAdminClient()` vs `supabase.from(...)`
+(anon client) to know which model applies before assuming RLS is a safety net.
+
 ## Setup
 
 1. Apply migrations:

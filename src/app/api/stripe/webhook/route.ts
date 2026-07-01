@@ -9,6 +9,7 @@ import {
   markStripeWebhookProcessed,
 } from '@/services/stripe-webhook';
 import Stripe from 'stripe';
+import { logger } from '@/lib/logger';
 
 export const maxDuration = 30;
 export const runtime = 'nodejs';
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
     event = stripe.webhooks.constructEvent(body, sig, STRIPE_WEBHOOK_SECRET);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Invalid signature';
-    console.error('Webhook signature error:', message);
+    logger.error({ err }, 'Webhook signature verification failed');
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
@@ -39,11 +40,11 @@ export async function POST(req: NextRequest) {
     await markStripeWebhookProcessed(event.id);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Handler error';
-    console.error('Webhook handler error:', message);
+    logger.error({ err, eventId: event.id, eventType: event.type }, 'Webhook handler failed');
     try {
       await markStripeWebhookFailed(event.id, message);
-    } catch {
-      // Best-effort failure marking
+    } catch (markErr: unknown) {
+      logger.error({ err: markErr, eventId: event.id }, 'Failed to record webhook failure state');
     }
     if (isServiceError(err)) {
       return NextResponse.json({ error: message }, { status: err.status });

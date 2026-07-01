@@ -2,23 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { assertGymScope, isErrorResponse, requireStaffAuth } from '@/lib/auth/api';
+import { parseJsonBody } from '@/lib/api-validate';
+import { createPlanSchema } from '@/lib/api-schemas';
+import { handleRouteError } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
   const auth = await requireStaffAuth({ adminOnly: true });
   if (isErrorResponse(auth)) return auth;
 
-  const { name, description, price_cents, interval, gym_id } = await req.json();
-
-  if (!name || !price_cents || !interval || !gym_id) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(req, createPlanSchema);
+  if (!parsed.success) return parsed.response;
+  const { name, description, price_cents, interval, gym_id } = parsed.data;
 
   const scopeError = assertGymScope(auth, gym_id);
   if (scopeError) return scopeError;
-
-  if (!['month', 'year'].includes(interval)) {
-    return NextResponse.json({ error: 'Invalid billing interval' }, { status: 400 });
-  }
 
   try {
     const product = await stripe.products.create({
@@ -37,7 +34,6 @@ export async function POST(req: NextRequest) {
       gym_id,
       name,
       description,
-      price: price_cents / 100,
       price_cents,
       interval,
       stripe_product_id: product.id,
@@ -48,8 +44,10 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Create plan error';
-    console.error('Create plan error:', message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleRouteError(err, {
+      fallbackMessage: 'Create plan error',
+      logMessage: 'Plan creation failed',
+      logContext: { gymId: gym_id },
+    });
   }
 }

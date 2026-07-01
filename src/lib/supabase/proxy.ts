@@ -27,7 +27,7 @@ async function resolveStaffRole(
 }
 
 export async function handleProxy(request: NextRequest) {
-  const rateLimited = applyRateLimit(request);
+  const rateLimited = await applyRateLimit(request);
   if (rateLimited) {
     return NextResponse.json(
       { error: 'Too many requests. Please try again later.' },

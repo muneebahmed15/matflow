@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { Award, Plus } from 'lucide-react'
 import { promoteMemberAction } from '@/app/(dashboard)/actions'
+import { BELT_RANKS, BELT_COLORS } from '@/lib/belt-colors'
 
 interface Member {
   id: string
@@ -22,19 +23,6 @@ interface BeltPromotion {
   promoted_at: string
   notes: string
   members: { first_name: string; last_name: string }
-}
-
-const BELTS = ['white','yellow','orange','green','blue','purple','brown','black']
-
-const beltColors: Record<string, string> = {
-  white: 'bg-white/10 text-white',
-  yellow: 'bg-yellow-500/20 text-yellow-400',
-  orange: 'bg-orange-500/20 text-orange-400',
-  green: 'bg-green-500/20 text-green-400',
-  blue: 'bg-blue-500/20 text-blue-400',
-  purple: 'bg-purple-500/20 text-purple-400',
-  brown: 'bg-amber-700/20 text-amber-500',
-  black: 'bg-white/5 text-white/60',
 }
 
 export default function BeltsPage() {
@@ -129,14 +117,14 @@ export default function BeltsPage() {
             <div className="flex items-center gap-4 p-3 bg-white/5 rounded-xl">
               <div>
                 <p className="text-white/40 text-xs mb-1">Current Belt</p>
-                <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${beltColors[selectedMemberData.belt_rank]}`}>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${BELT_COLORS[selectedMemberData.belt_rank]}`}>
                   {selectedMemberData.belt_rank}
                 </span>
               </div>
               <div className="text-white/20 text-lg">→</div>
               <div>
                 <p className="text-white/40 text-xs mb-1">Promoting To</p>
-                <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${beltColors[toBelt]}`}>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${BELT_COLORS[toBelt]}`}>
                   {toBelt}
                 </span>
               </div>
@@ -145,7 +133,7 @@ export default function BeltsPage() {
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Promote To</label>
             <select value={toBelt} onChange={(e) => setToBelt(e.target.value)} className={inputClass}>
-              {BELTS.map(b => (
+              {BELT_RANKS.map(b => (
                 <option key={b} value={b} className="bg-gray-900 capitalize">{b}</option>
               ))}
             </select>
@@ -167,11 +155,11 @@ export default function BeltsPage() {
       <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-6">
         <h2 className="font-semibold text-white mb-4">Current Belt Rankings</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {BELTS.map(belt => {
+          {BELT_RANKS.map(belt => {
             const count = members.filter(m => m.belt_rank === belt).length
             return (
               <div key={belt} className={`rounded-xl p-3 border border-white/10 ${count > 0 ? '' : 'opacity-30'}`}>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${beltColors[belt]}`}>{belt}</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${BELT_COLORS[belt]}`}>{belt}</span>
                 <p className="text-2xl font-bold text-white mt-2">{count}</p>
                 <p className="text-white/30 text-xs">members</p>
               </div>
@@ -199,9 +187,9 @@ export default function BeltsPage() {
                   <div>
                     <p className="text-white font-medium">{p.members.first_name} {p.members.last_name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`px-1.5 py-0.5 rounded text-xs capitalize ${beltColors[p.from_belt]}`}>{p.from_belt}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-xs capitalize ${BELT_COLORS[p.from_belt]}`}>{p.from_belt}</span>
                       <span className="text-white/20 text-xs">→</span>
-                      <span className={`px-1.5 py-0.5 rounded text-xs capitalize ${beltColors[p.to_belt]}`}>{p.to_belt}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-xs capitalize ${BELT_COLORS[p.to_belt]}`}>{p.to_belt}</span>
                     </div>
                   </div>
                 </div>

@@ -82,7 +82,7 @@ export default function LoginPage() {
 
         <p className="text-center text-white/40 text-sm mt-6">
           Don&apos;t have an account?{' '}
-          <Link href="/signup" className="text-blue-400 hover:underline">Start free trial</Link>
+          <Link href="/signup" prefetch={false} className="text-blue-400 hover:underline">Start free trial</Link>
         </p>
 
       </div>

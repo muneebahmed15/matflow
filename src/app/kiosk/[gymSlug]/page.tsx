@@ -30,7 +30,7 @@ export default function KioskCheckInPage() {
       if (!gymData) { setLoading(false); return }
       setGym(gymData)
       if (gymData.kiosk_enabled) {
-        const { data } = await supabase.from('members').select('id, first_name, last_name, email').eq('gym_id', gymData.id).eq('status', 'active').order('first_name')
+        const { data } = await supabase.from('members').select('id, first_name, last_name, email').eq('gym_id', gymData.id).in('status', ['active', 'past_due']).order('first_name')
         setMembers(data || [])
       }
       setLoading(false)

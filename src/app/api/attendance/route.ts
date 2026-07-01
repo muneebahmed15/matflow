@@ -5,20 +5,14 @@ import {
   validateKioskCheckIn as validateKioskCheckInService,
 } from '@/services/attendance';
 import { isErrorResponse, requireStaffAuth } from '@/lib/auth/api';
-import { isServiceError } from '@/services/errors';
-
-function serviceErrorResponse(error: unknown): NextResponse {
-  if (isServiceError(error)) {
-    return NextResponse.json({ error: error.message }, { status: error.status });
-  }
-  return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-}
+import { parseJsonBody, parseSearchParams } from '@/lib/api-validate';
+import { attendanceLogQuerySchema, checkInSchema } from '@/lib/api-schemas';
+import { handleRouteError } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
-  const { member_id, gym_id, notes, checked_in_by } = await req.json();
-  if (!member_id || !gym_id) {
-    return NextResponse.json({ error: 'member_id and gym_id required' }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(req, checkInSchema);
+  if (!parsed.success) return parsed.response;
+  const { member_id, gym_id, notes, checked_in_by } = parsed.data;
 
   const staffAuth = await requireStaffAuth();
   const isStaff = !isErrorResponse(staffAuth);
@@ -35,13 +29,17 @@ export async function POST(req: NextRequest) {
     const data = await checkInMember({
       gymId: gym_id,
       memberId: member_id,
-      notes: notes || null,
-      checkedInBy: isStaff ? staffAuth.user.id : checked_in_by || null,
+      notes: notes ?? null,
+      checkedInBy: isStaff ? staffAuth.user.id : checked_in_by ?? null,
     });
 
     return NextResponse.json({ data });
   } catch (error) {
-    return serviceErrorResponse(error);
+    return handleRouteError(error, {
+      fallbackMessage: 'Internal server error',
+      logMessage: 'Check-in failed',
+      logContext: { gymId: gym_id, memberId: member_id },
+    });
   }
 }
 
@@ -50,20 +48,22 @@ export async function GET(req: NextRequest) {
   if (isErrorResponse(auth)) return auth;
 
   const { searchParams } = new URL(req.url);
-  const gym_id = searchParams.get('gym_id');
-  const date = searchParams.get('date');
+  const parsed = parseSearchParams(searchParams, attendanceLogQuerySchema);
+  if (!parsed.success) return parsed.response;
+  const { gym_id, date } = parsed.data;
 
-  if (!gym_id) {
-    return NextResponse.json({ error: 'gym_id required' }, { status: 400 });
-  }
   if (auth.gymId !== gym_id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   try {
-    const data = await listAttendance(gym_id, { date: date ?? undefined });
+    const data = await listAttendance(gym_id, { date });
     return NextResponse.json({ data });
   } catch (error) {
-    return serviceErrorResponse(error);
+    return handleRouteError(error, {
+      fallbackMessage: 'Internal server error',
+      logMessage: 'Attendance log lookup failed',
+      logContext: { gymId: gym_id },
+    });
   }
 }

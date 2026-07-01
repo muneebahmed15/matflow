@@ -61,7 +61,7 @@ export default function PortalSignupPage() {
         </div>
         <h2 className="text-2xl font-bold mb-2">Check your email</h2>
         <p className="text-white/40">We sent a confirmation link to <span className="text-white">{email}</span>. Click it to activate your account.</p>
-        <Link href="/portal/login" className="mt-6 inline-block text-blue-400 hover:underline text-sm">Back to login →</Link>
+        <Link href="/portal/login" prefetch={false} className="mt-6 inline-block text-blue-400 hover:underline text-sm">Back to login →</Link>
       </div>
     </div>
   )
@@ -118,7 +118,7 @@ export default function PortalSignupPage() {
           <div className="mt-6 pt-6 border-t border-white/10 text-center">
             <p className="text-white/30 text-sm">
               Already have an account?{' '}
-              <Link href="/portal/login" className="text-blue-400 hover:underline">Sign in</Link>
+              <Link href="/portal/login" prefetch={false} className="text-blue-400 hover:underline">Sign in</Link>
             </p>
           </div>
         </div>

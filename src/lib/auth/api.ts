@@ -141,37 +141,6 @@ export function assertGymScope(
   return null;
 }
 
-/** Validate kiosk check-in without a logged-in user. */
-export async function validateKioskCheckIn(
-  gymId: string,
-  memberId: string
-): Promise<NextResponse | null> {
-  const admin = getAdminClient();
-
-  const { data: gym } = await admin
-    .from('gyms')
-    .select('id, kiosk_enabled')
-    .eq('id', gymId)
-    .maybeSingle();
-
-  if (!gym?.kiosk_enabled) {
-    return NextResponse.json({ error: 'Kiosk check-in disabled' }, { status: 403 });
-  }
-
-  const { data: member } = await admin
-    .from('members')
-    .select('id')
-    .eq('id', memberId)
-    .eq('gym_id', gymId)
-    .eq('status', 'active')
-    .maybeSingle();
-
-  if (!member) {
-    return NextResponse.json({ error: 'Member not found' }, { status: 404 });
-  }
-
-  return null;
-}
 export async function assertSubscriptionInGym(
   auth: StaffAuth,
   subscriptionId: string

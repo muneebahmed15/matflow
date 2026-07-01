@@ -8,6 +8,7 @@ import { useAppUi } from '@/components/ui/AppUiProvider'
 import PageLoader from '@/components/PageLoader'
 import ErrorState from '@/components/ErrorState'
 import { redirectTo } from '@/lib/navigation'
+import { BELT_RANKS } from '@/lib/belt-colors'
 import {
   deleteMemberAction,
   getMemberAction,
@@ -155,7 +156,7 @@ export default function MemberDetailPage() {
             <span className="text-gray-400 text-sm">Belt Rank</span>
             <select value={member.belt_rank} onChange={(e) => handleEdit('belt_rank', e.target.value)}
               className="bg-transparent text-white text-sm capitalize cursor-pointer">
-              {['white','yellow','orange','green','blue','purple','brown','black'].map(b => (
+              {BELT_RANKS.map(b => (
                 <option key={b} value={b} className="bg-gray-900">{b}</option>
               ))}
             </select>
@@ -165,6 +166,7 @@ export default function MemberDetailPage() {
             <select value={member.status} onChange={(e) => handleEdit('status', e.target.value)}
               className="bg-transparent text-sm cursor-pointer">
               <option value="active" className="bg-gray-900">active</option>
+              <option value="past_due" className="bg-gray-900">past due (billing)</option>
               <option value="inactive" className="bg-gray-900">inactive</option>
             </select>
           </div>

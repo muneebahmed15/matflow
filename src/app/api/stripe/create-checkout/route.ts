@@ -6,13 +6,14 @@ import {
   isErrorResponse,
   requireStaffOrMemberAuth,
 } from '@/lib/auth/api';
+import { parseJsonBody } from '@/lib/api-validate';
+import { createCheckoutSchema } from '@/lib/api-schemas';
+import { handleRouteError } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
-  const { stripe_price_id, member_id, gym_id, member_email } = await req.json();
-
-  if (!stripe_price_id || !member_id || !gym_id) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(req, createCheckoutSchema);
+  if (!parsed.success) return parsed.response;
+  const { stripe_price_id, member_id, gym_id, member_email } = parsed.data;
 
   const access = await requireStaffOrMemberAuth({ gymId: gym_id, memberId: member_id });
   if (isErrorResponse(access)) return access;
@@ -52,8 +53,10 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ url: session.url });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Checkout error';
-    console.error('Checkout error:', message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleRouteError(err, {
+      fallbackMessage: 'Checkout error',
+      logMessage: 'Checkout session creation failed',
+      logContext: { gymId: gym_id, memberId: member_id },
+    });
   }
 }

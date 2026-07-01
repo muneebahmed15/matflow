@@ -4,27 +4,18 @@ import {
   isErrorResponse,
   requireStaffAuth,
 } from '@/lib/auth/api';
-import { isServiceError } from '@/services/errors';
 import { refundLatestSubscriptionPayment } from '@/services/stripe-subscriptions';
+import { parseJsonBody } from '@/lib/api-validate';
+import { refundSchema } from '@/lib/api-schemas';
+import { handleRouteError } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
   const auth = await requireStaffAuth({ adminOnly: true });
   if (isErrorResponse(auth)) return auth;
 
-  const {
-    stripe_subscription_id,
-    member_id,
-    subscription_id,
-    amount_cents,
-    reason,
-  } = await req.json();
-
-  if (!stripe_subscription_id || !subscription_id) {
-    return NextResponse.json(
-      { error: 'subscription_id and stripe_subscription_id required' },
-      { status: 400 }
-    );
-  }
+  const parsed = await parseJsonBody(req, refundSchema);
+  if (!parsed.success) return parsed.response;
+  const { stripe_subscription_id, member_id, subscription_id, amount_cents, reason } = parsed.data;
 
   const scopeError = await assertSubscriptionInGym(auth, subscription_id);
   if (scopeError) return scopeError;
@@ -41,11 +32,10 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ success: true, refund });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Refund error';
-    console.error('Refund error:', message);
-    if (isServiceError(err)) {
-      return NextResponse.json({ error: message }, { status: err.status });
-    }
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleRouteError(err, {
+      fallbackMessage: 'Refund error',
+      logMessage: 'Refund failed',
+      logContext: { subscriptionId: subscription_id, gymId: auth.gymId, memberId: member_id },
+    });
   }
 }

@@ -122,13 +122,20 @@ export async function validateKioskCheckIn(gymId: string, memberId: string): Pro
 
   const { data: member } = await admin
     .from('members')
-    .select('id')
+    .select('id, status')
     .eq('id', memberId)
     .eq('gym_id', gymId)
-    .eq('status', 'active')
     .maybeSingle();
 
   if (!member) {
     throw new ServiceError(404, 'Member not found');
+  }
+
+  if (member.status === 'past_due') {
+    throw new ServiceError(403, 'Membership payment is past due. See the front desk to update billing.');
+  }
+
+  if (member.status !== 'active') {
+    throw new ServiceError(403, 'Membership is not active');
   }
 }

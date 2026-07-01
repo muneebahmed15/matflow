@@ -2,8 +2,26 @@ import Stripe from 'stripe';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { stripe } from '@/lib/stripe';
 import { ServiceError } from '@/services/errors';
+import { logger } from '@/lib/logger';
 
 export type WebhookClaimResult = 'claimed' | 'duplicate' | 'retry';
+
+/** Maps a Stripe subscription status to the member-facing gate. null = no change (ambiguous/transient state). */
+function memberStatusForSubscription(stripeStatus: string): 'active' | 'past_due' | 'inactive' | null {
+  switch (stripeStatus) {
+    case 'active':
+    case 'trialing':
+      return 'active';
+    case 'past_due':
+    case 'unpaid':
+      return 'past_due';
+    case 'canceled':
+    case 'incomplete_expired':
+      return 'inactive';
+    default:
+      return null;
+  }
+}
 
 /** Claim a Stripe event id before processing. Returns duplicate if already processed. */
 export async function claimStripeWebhookEvent(
@@ -115,20 +133,22 @@ export async function handleStripeWebhookEvent(event: Stripe.Event): Promise<voi
           plan_id: plan?.id || null,
           stripe_subscription_id: stripeSubId,
           stripe_customer_id: session.customer as string,
-          status: 'active',
+          status: stripeSub.status,
           current_period_end: periodEnd
             ? new Date(periodEnd * 1000).toISOString()
             : null,
         },
         { onConflict: 'stripe_subscription_id' }
       );
-      await admin.from('members').update({ status: 'active' }).eq('id', member_id);
+
+      const checkoutMemberStatus = memberStatusForSubscription(stripeSub.status) ?? 'active';
+      await admin.from('members').update({ status: checkoutMemberStatus }).eq('id', member_id);
       break;
     }
     case 'customer.subscription.updated': {
       const sub = event.data.object as Stripe.Subscription;
       const periodEnd = sub.items.data[0]?.current_period_end;
-      await admin
+      const { data: updated } = await admin
         .from('subscriptions')
         .update({
           status: sub.status,
@@ -136,18 +156,38 @@ export async function handleStripeWebhookEvent(event: Stripe.Event): Promise<voi
             ? new Date(periodEnd * 1000).toISOString()
             : null,
         })
-        .eq('stripe_subscription_id', sub.id);
+        .eq('stripe_subscription_id', sub.id)
+        .select('member_id')
+        .maybeSingle();
+
+      const memberStatus = memberStatusForSubscription(sub.status);
+      if (updated?.member_id) {
+        if (memberStatus) {
+          await admin.from('members').update({ status: memberStatus }).eq('id', updated.member_id);
+        } else {
+          logger.warn(
+            { stripeStatus: sub.status, memberId: updated.member_id, subscriptionId: sub.id },
+            'Unmapped Stripe subscription status; members.status left unchanged'
+          );
+        }
+      }
       break;
     }
     case 'customer.subscription.deleted': {
       const sub = event.data.object as Stripe.Subscription;
-      await admin
+      const { data: updated } = await admin
         .from('subscriptions')
         .update({
           status: 'cancelled',
           cancelled_at: new Date().toISOString(),
         })
-        .eq('stripe_subscription_id', sub.id);
+        .eq('stripe_subscription_id', sub.id)
+        .select('member_id')
+        .maybeSingle();
+
+      if (updated?.member_id) {
+        await admin.from('members').update({ status: 'inactive' }).eq('id', updated.member_id);
+      }
       break;
     }
     case 'invoice.payment_failed': {
@@ -158,10 +198,16 @@ export async function handleStripeWebhookEvent(event: Stripe.Event): Promise<voi
           ? subscriptionRef
           : subscriptionRef?.id;
       if (subId) {
-        await admin
+        const { data: updated } = await admin
           .from('subscriptions')
           .update({ status: 'past_due' })
-          .eq('stripe_subscription_id', subId);
+          .eq('stripe_subscription_id', subId)
+          .select('member_id')
+          .maybeSingle();
+
+        if (updated?.member_id) {
+          await admin.from('members').update({ status: 'past_due' }).eq('id', updated.member_id);
+        }
       }
       break;
     }

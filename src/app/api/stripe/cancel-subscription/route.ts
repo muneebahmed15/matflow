@@ -4,22 +4,18 @@ import {
   isErrorResponse,
   requireStaffAuth,
 } from '@/lib/auth/api';
-import { isServiceError } from '@/services/errors';
 import { cancelSubscription } from '@/services/stripe-subscriptions';
+import { parseJsonBody } from '@/lib/api-validate';
+import { cancelSubscriptionSchema } from '@/lib/api-schemas';
+import { handleRouteError } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
   const auth = await requireStaffAuth({ adminOnly: true });
   if (isErrorResponse(auth)) return auth;
 
-  const { subscription_id, stripe_subscription_id, reason, cancel_immediately } =
-    await req.json();
-
-  if (!stripe_subscription_id || !subscription_id) {
-    return NextResponse.json(
-      { error: 'subscription_id and stripe_subscription_id required' },
-      { status: 400 }
-    );
-  }
+  const parsed = await parseJsonBody(req, cancelSubscriptionSchema);
+  if (!parsed.success) return parsed.response;
+  const { subscription_id, stripe_subscription_id, reason, cancel_immediately } = parsed.data;
 
   const scopeError = await assertSubscriptionInGym(auth, subscription_id);
   if (scopeError) return scopeError;
@@ -34,11 +30,10 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Cancel subscription error';
-    console.error('Cancel subscription error:', message);
-    if (isServiceError(err)) {
-      return NextResponse.json({ error: message }, { status: err.status });
-    }
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleRouteError(err, {
+      fallbackMessage: 'Cancel subscription error',
+      logMessage: 'Subscription cancellation failed',
+      logContext: { subscriptionId: subscription_id, gymId: auth.gymId },
+    });
   }
 }
