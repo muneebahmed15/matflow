@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
       name,
       description,
       price: price_cents / 100,
+      price_cents,
       interval,
       stripe_product_id: product.id,
       stripe_price_id: price.id,
