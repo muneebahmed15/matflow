@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { UserCheck, FileText, CreditCard } from 'lucide-react'
-import { BELT_COLORS } from '@/lib/belt-colors'
 
 interface MemberData {
   id: string
@@ -19,6 +18,13 @@ export default function PortalPage() {
   const [loading, setLoading] = useState(true)
   const [attendanceCount, setAttendanceCount] = useState(0)
   const [waiverCount, setWaiverCount] = useState(0)
+
+  const beltColors: Record<string, string> = {
+    white: 'bg-white/10 text-white', yellow: 'bg-yellow-500/20 text-yellow-400',
+    orange: 'bg-orange-500/20 text-orange-400', green: 'bg-green-500/20 text-green-400',
+    blue: 'bg-blue-500/20 text-blue-400', purple: 'bg-purple-500/20 text-purple-400',
+    brown: 'bg-amber-700/20 text-amber-500', black: 'bg-white/5 text-white/60',
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -57,17 +63,11 @@ export default function PortalPage() {
           <div>
             <h1 className="text-2xl font-bold">{member.first_name} {member.last_name}</h1>
             <div className="flex items-center gap-2 mt-1">
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${BELT_COLORS[member.belt_rank] || 'bg-white/5 text-white/40'}`}>
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${beltColors[member.belt_rank] || 'bg-white/5 text-white/40'}`}>
                 {member.belt_rank} belt
               </span>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                member.status === 'active'
-                  ? 'bg-green-500/10 text-green-400'
-                  : member.status === 'past_due'
-                  ? 'bg-yellow-500/10 text-yellow-400'
-                  : 'bg-white/5 text-white/30'
-              }`}>
-                {member.status === 'past_due' ? 'payment due' : member.status}
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${member.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-white/5 text-white/30'}`}>
+                {member.status}
               </span>
             </div>
           </div>

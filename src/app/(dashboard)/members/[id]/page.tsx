@@ -2,19 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { getCurrentStaffInfo } from '@/lib/permissions'
 import { useParams, useRouter } from 'next/navigation'
-import { useAppUi } from '@/components/ui/AppUiProvider'
-import PageLoader from '@/components/PageLoader'
-import ErrorState from '@/components/ErrorState'
+import { getMemberSignatures } from '@/lib/waivers'
 import { redirectTo } from '@/lib/navigation'
-import { BELT_RANKS } from '@/lib/belt-colors'
-import {
-  deleteMemberAction,
-  getMemberAction,
-  getMemberWaiverSignaturesAction,
-  updateMemberAction,
-} from '@/app/(dashboard)/actions'
 
 interface Member {
   id: string; first_name: string; last_name: string
@@ -33,7 +23,6 @@ interface WaiverSig {
 export default function MemberDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const { confirm, error: showError } = useAppUi()
   const [member, setMember] = useState<Member | null>(null)
   const [plans, setPlans] = useState<Plan[]>([])
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
@@ -44,28 +33,38 @@ export default function MemberDetailPage() {
   const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'waivers'>('info')
 
   useEffect(() => {
-    void (async () => {
-      const info = await getCurrentStaffInfo()
-      if (!info.gymId) return
-      setGymId(info.gymId)
-      const { data: plansData } = await supabase
-        .from('plans')
-        .select('id, name, stripe_price_id, price_cents, interval')
-        .eq('gym_id', info.gymId)
-      setPlans(plansData || [])
-      const memberResult = await getMemberAction(id)
-      if (memberResult.ok && memberResult.data) setMember(memberResult.data as Member)
+    let cancelled = false
+
+    async function loadMember() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+      const { data: gym } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
+      if (gym && !cancelled) {
+        setGymId(gym.id)
+        const { data: plansData } = await supabase
+          .from('plans')
+          .select('id, name, stripe_price_id, price_cents, interval')
+          .eq('gym_id', gym.id)
+        if (!cancelled) setPlans(plansData || [])
+      }
+      const { data: memberData } = await supabase.from('members').select('*').eq('id', id).single()
+      if (memberData && !cancelled) setMember(memberData)
       const { data: attendanceData } = await supabase
         .from('attendance')
         .select('id, checked_in_at')
         .eq('member_id', id)
         .order('checked_in_at', { ascending: false })
         .limit(10)
-      setAttendance(attendanceData || [])
-      const sigResult = await getMemberWaiverSignaturesAction(id)
-      if (sigResult.ok) setSignatures(sigResult.data as WaiverSig[])
-      setLoading(false)
-    })()
+      if (!cancelled) setAttendance(attendanceData || [])
+      const sigs = await getMemberSignatures(id)
+      if (!cancelled) {
+        setSignatures(sigs as WaiverSig[])
+        setLoading(false)
+      }
+    }
+
+    void loadMember()
+    return () => { cancelled = true }
   }, [id])
 
   async function handleSubscribe(stripePriceId: string) {
@@ -83,39 +82,28 @@ export default function MemberDetailPage() {
         }),
       })
       const { url, error } = await res.json()
-      if (error) { showError(error); return }
+      if (error) { alert(error); return }
       if (url) redirectTo(url)
-    } catch { showError('Failed to start checkout') }
+    } catch { alert('Failed to start checkout') }
     finally { setSubscribing(false) }
   }
 
   const handleEdit = async (field: string, value: string) => {
     if (!member) return
-    const result = await updateMemberAction(member.id, { [field]: value })
-    if (result.ok) setMember({ ...member, [field]: value })
-    else showError(result.error)
+    const { error } = await supabase.from('members').update({ [field]: value }).eq('id', member.id)
+    if (!error) setMember({ ...member, [field]: value })
   }
 
   const handleDelete = async () => {
-    const ok = await confirm({
-      title: 'Delete member',
-      message: 'This permanently removes the member and their records.',
-      confirmLabel: 'Delete',
-      destructive: true,
-    })
-    if (!ok) return
-    const result = await deleteMemberAction(id)
-    if (!result.ok) {
-      showError(result.error)
-      return
-    }
+    if (!confirm('Delete this member?')) return
+    await supabase.from('members').delete().eq('id', id)
     router.push('/members')
   }
 
-  if (loading) return <PageLoader />
-  if (!member) return <ErrorState message="Member not found." />
+  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
+  if (!member) return <div className="p-8 text-gray-400">Member not found.</div>
 
-  const tabs = [
+  const tabs: { key: 'info' | 'attendance' | 'waivers'; label: string }[] = [
     { key: 'info', label: 'Info' },
     { key: 'attendance', label: `Attendance (${attendance.length})` },
     { key: 'waivers', label: `Waivers (${signatures.length})` },
@@ -138,7 +126,7 @@ export default function MemberDetailPage() {
 
         <div className="flex gap-1 bg-white/5 rounded-xl p-1">
           {tabs.map((tab) => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key as 'info' | 'attendance' | 'waivers')}
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition ${activeTab === tab.key ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white'}`}>
               {tab.label}
             </button>
@@ -156,7 +144,7 @@ export default function MemberDetailPage() {
             <span className="text-gray-400 text-sm">Belt Rank</span>
             <select value={member.belt_rank} onChange={(e) => handleEdit('belt_rank', e.target.value)}
               className="bg-transparent text-white text-sm capitalize cursor-pointer">
-              {BELT_RANKS.map(b => (
+              {['white','yellow','orange','green','blue','purple','brown','black'].map(b => (
                 <option key={b} value={b} className="bg-gray-900">{b}</option>
               ))}
             </select>
@@ -166,7 +154,6 @@ export default function MemberDetailPage() {
             <select value={member.status} onChange={(e) => handleEdit('status', e.target.value)}
               className="bg-transparent text-sm cursor-pointer">
               <option value="active" className="bg-gray-900">active</option>
-              <option value="past_due" className="bg-gray-900">past due (billing)</option>
               <option value="inactive" className="bg-gray-900">inactive</option>
             </select>
           </div>

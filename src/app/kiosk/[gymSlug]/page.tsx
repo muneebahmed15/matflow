@@ -1,12 +1,9 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { UserCheck, Search } from 'lucide-react'
-import { filterMembersByName } from '@/lib/filter-members'
 
 interface Member {
   id: string
@@ -30,7 +27,7 @@ export default function KioskCheckInPage() {
       if (!gymData) { setLoading(false); return }
       setGym(gymData)
       if (gymData.kiosk_enabled) {
-        const { data } = await supabase.from('members').select('id, first_name, last_name, email').eq('gym_id', gymData.id).in('status', ['active', 'past_due']).order('first_name')
+        const { data } = await supabase.from('members').select('id, first_name, last_name, email').eq('gym_id', gymData.id).eq('status', 'active').order('first_name')
         setMembers(data || [])
       }
       setLoading(false)
@@ -38,10 +35,10 @@ export default function KioskCheckInPage() {
     load()
   }, [gymSlug])
 
-  const filtered = useMemo(
-    () => filterMembersByName(members, search),
-    [members, search]
-  )
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return members.filter(m => `${m.first_name} ${m.last_name}`.toLowerCase().includes(q))
+  }, [search, members])
 
   const handleCheckIn = async (member: Member) => {
     if (!gym) return

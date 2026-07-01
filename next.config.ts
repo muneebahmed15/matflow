@@ -1,4 +1,4 @@
-import type { NextConfig } from 'next';
+import type { NextConfig } from 'next'
 
 const csp = [
   "default-src 'self'",
@@ -12,7 +12,7 @@ const csp = [
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-].join('; ');
+].join('; ')
 
 const nextConfig: NextConfig = {
   async headers() {
@@ -33,8 +33,8 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-    ];
+    ]
   },
-};
+}
 
-export default nextConfig;
+export default nextConfig

@@ -2,10 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { getCurrentStaffInfo } from '@/lib/permissions'
-import { fetchTodayCheckedInMemberIds, postCheckIn } from '@/lib/api-client'
-import { useAppUi } from '@/components/ui/AppUiProvider'
-import { filterMembersByQuery } from '@/lib/filter-members'
 
 type Member = {
   id: string
@@ -16,59 +12,97 @@ type Member = {
 }
 
 export default function CheckInPage() {
-  const { success, error: showError } = useAppUi()
   const [gymId, setGymId] = useState<string | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [search, setSearch] = useState('')
   const [checkedIn, setCheckedIn] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
     const load = async () => {
-      const info = await getCurrentStaffInfo()
-      if (!info.gymId) return
-      setGymId(info.gymId)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: gym } = await supabase
+        .from('gyms')
+        .select('id')
+        .eq('owner_id', user.id)
+        .single()
+
+      if (!gym) return
+      setGymId(gym.id)
 
       const { data: memberData } = await supabase
         .from('members')
         .select('id, first_name, last_name, email, phone')
-        .eq('gym_id', info.gymId)
+        .eq('gym_id', gym.id)
         .order('first_name')
 
       setMembers(memberData || [])
 
-      try {
-        const ids = await fetchTodayCheckedInMemberIds(info.gymId)
-        setCheckedIn(ids)
-      } catch {
-        setCheckedIn(new Set())
-      }
+      const today = new Date().toISOString().split('T')[0]
+      const { data: todayAttendance } = await supabase
+        .from('attendance')
+        .select('member_id')
+        .eq('gym_id', gym.id)
+        .gte('checked_in_at', `${today}T00:00:00`)
+        .lte('checked_in_at', `${today}T23:59:59`)
+
+      const ids = new Set<string>((todayAttendance || []).map((a) => a.member_id))
+      setCheckedIn(ids)
     }
 
     load()
   }, [])
 
-  const filtered = useMemo(
-    () => filterMembersByQuery(members, search),
-    [members, search]
-  )
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return members.filter(
+      (m) =>
+        m.first_name.toLowerCase().includes(q) ||
+        m.last_name.toLowerCase().includes(q) ||
+        m.email.toLowerCase().includes(q)
+    )
+  }, [search, members])
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   const handleCheckIn = async (member: Member) => {
     if (!gymId) return
     setLoading(member.id)
 
-    try {
-      await postCheckIn({ gymId, memberId: member.id })
+    const today = new Date().toISOString().split('T')[0]
+    const { data: existing } = await supabase
+      .from('attendance')
+      .select('id')
+      .eq('gym_id', gymId)
+      .eq('member_id', member.id)
+      .gte('checked_in_at', `${today}T00:00:00`)
+      .lte('checked_in_at', `${today}T23:59:59`)
+      .maybeSingle()
+
+    if (existing) {
+      showToast(`⚠️ ${member.first_name} already checked in today`, 'error')
       setCheckedIn((prev) => new Set([...prev, member.id]))
-      success(`${member.first_name} ${member.last_name} checked in!`)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Check-in failed'
-      if (message.includes('already checked in')) {
-        setCheckedIn((prev) => new Set([...prev, member.id]))
-      }
-      showError(message)
-    } finally {
       setLoading(null)
+      return
+    }
+
+    const { error } = await supabase
+      .from('attendance')
+      .insert({ member_id: member.id, gym_id: gymId, checked_in_by: (await supabase.auth.getUser()).data.user?.id })
+
+    setLoading(null)
+
+    if (error) {
+      showToast(`⚠️ ${error.message}`, 'error')
+    } else {
+      setCheckedIn((prev) => new Set([...prev, member.id]))
+      showToast(`✅ ${member.first_name} ${member.last_name} checked in!`, 'success')
     }
   }
 
@@ -76,6 +110,16 @@ export default function CheckInPage() {
     <div className="p-8 max-w-2xl mx-auto">
       <h1 className="text-3xl font-extrabold mb-1">Check-In</h1>
       <p className="text-white/50 text-sm mb-6">Search for a member and tap to check them in.</p>
+
+      {toast && (
+        <div className={`mb-4 px-4 py-3 rounded-xl text-sm font-medium border ${
+          toast.type === 'success'
+            ? 'bg-green-500/10 text-green-400 border-green-500/30'
+            : 'bg-red-500/10 text-red-400 border-red-500/30'
+        }`}>
+          {toast.message}
+        </div>
+      )}
 
       <input
         type="text"

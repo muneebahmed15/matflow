@@ -1,10 +1,24 @@
 'use client'
 
+import { redirectTo } from '@/lib/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { CreditCard } from 'lucide-react'
-import type { PortalSubscription } from '@/types/queries'
-import { redirectTo } from '@/lib/navigation'
+
+interface PortalMember {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+  gym_id: string
+}
+
+interface Subscription {
+  id: string
+  status: string
+  current_period_end: string | null
+  plans: { name: string; price_cents: number; interval: string } | null
+}
 
 interface Plan {
   id: string
@@ -14,16 +28,8 @@ interface Plan {
   interval: string
 }
 
-interface PortalMember {
-  id: string
-  first_name: string
-  last_name: string
-  email: string | null
-  gym_id: string
-}
-
 export default function PortalSubscriptionPage() {
-  const [subscription, setSubscription] = useState<PortalSubscription | null>(null)
+  const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [plans, setPlans] = useState<Plan[]>([])
   const [member, setMember] = useState<PortalMember | null>(null)
   const [loading, setLoading] = useState(true)
@@ -42,7 +48,7 @@ export default function PortalSubscriptionPage() {
         .eq('member_id', memberData.id)
         .eq('status', 'active')
         .single()
-      setSubscription(sub as PortalSubscription | null)
+      setSubscription(sub as Subscription | null)
       if (!sub) {
         const { data: plansData } = await supabase.from('plans').select('id, name, stripe_price_id, price_cents, interval').eq('gym_id', memberData.gym_id).eq('is_active', true)
         setPlans(plansData || [])

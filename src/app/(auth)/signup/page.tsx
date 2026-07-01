@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import Logo from '@/components/Logo'
+import { SpringButton } from '@/components/SpringButton'
 
 export default function SignupPage() {
   const [form, setForm] = useState({
@@ -63,7 +64,7 @@ export default function SignupPage() {
         <div className="mb-8 text-center">
           <div className="flex items-center justify-center gap-2 mb-5">
             <Logo size={28} />
-            <span className="font-bold text-lg">MatsFlow</span>
+            <span className="font-bold text-lg">MatFlow</span>
           </div>
           <h1 className="text-3xl font-extrabold mb-2">Start your free trial</h1>
           <p className="text-white/50">No credit card required</p>
@@ -111,13 +112,9 @@ export default function SignupPage() {
 
           {error && <p className="text-red-400 text-sm">{error}</p>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition"
-          >
+          <SpringButton type="submit" disabled={loading} size="lg" className="w-full">
             {loading ? 'Creating account...' : 'Create Free Account'}
-          </button>
+          </SpringButton>
         </form>
 
         <p className="text-center text-white/40 text-sm mt-6">

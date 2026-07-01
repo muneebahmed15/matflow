@@ -1,13 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Logo from '@/components/Logo'
+import { SpringButton } from '@/components/SpringButton'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const nextPath = searchParams.get('next') || '/dashboard'
   const [form, setForm] = useState({ email: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -29,7 +32,7 @@ export default function LoginPage() {
     if (error) {
       setError(error.message)
     } else {
-      router.push('/dashboard')
+      router.push(nextPath.startsWith('/') ? nextPath : '/dashboard')
     }
 
     setLoading(false)
@@ -38,14 +41,13 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen bg-black text-white flex items-center justify-center px-6">
       <div className="w-full max-w-md">
-
         <div className="mb-8 text-center">
           <div className="flex items-center justify-center gap-2 mb-5">
             <Logo size={28} />
-            <span className="font-bold text-lg">MatsFlow</span>
+            <span className="font-bold text-lg">MatFlow</span>
           </div>
           <h1 className="text-3xl font-extrabold mb-2">Welcome back</h1>
-          <p className="text-white/50">Log in to your MatsFlow account</p>
+          <p className="text-white/50">Log in to your MatFlow account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -71,21 +73,29 @@ export default function LoginPage() {
 
           {error && <p className="text-red-400 text-sm">{error}</p>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition"
-          >
+          <SpringButton type="submit" disabled={loading} size="lg" className="w-full">
             {loading ? 'Logging in...' : 'Log In'}
-          </button>
+          </SpringButton>
         </form>
 
         <p className="text-center text-white/40 text-sm mt-6">
           Don&apos;t have an account?{' '}
-          <Link href="/signup" prefetch={false} className="text-blue-400 hover:underline">Start free trial</Link>
+          <Link href="/signup" className="text-blue-400 hover:underline">Start free trial</Link>
         </p>
 
+        <p className="text-center text-white/30 text-sm mt-4">
+          Member at a gym?{' '}
+          <Link href="/portal/login" className="text-blue-400 hover:underline">Sign in to the member portal</Link>
+        </p>
       </div>
     </main>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black" />}>
+      <LoginForm />
+    </Suspense>
   )
 }

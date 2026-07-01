@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import { getCurrentStaffInfo } from '@/lib/permissions'
 import { useRouter } from 'next/navigation'
-import { createMemberAction, listFamiliesAction } from '@/app/(dashboard)/actions'
-import { useAppUi } from '@/components/ui/AppUiProvider'
-import { BELT_RANKS } from '@/lib/belt-colors'
 
 interface Family {
   id: string
@@ -13,8 +12,8 @@ interface Family {
 
 export default function AddMemberPage() {
   const router = useRouter()
-  const { success, error: showError } = useAppUi()
   const [loading, setLoading] = useState(false)
+  const [gymId, setGymId] = useState<string | null>(null)
   const [first_name, setFirstName] = useState('')
   const [last_name, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -31,10 +30,14 @@ export default function AddMemberPage() {
   const [newFamilyEmail, setNewFamilyEmail] = useState('')
 
   useEffect(() => {
-    void (async () => {
-      const result = await listFamiliesAction()
-      if (result.ok) setFamilies(result.data ?? [])
-    })()
+    const load = async () => {
+      const info = await getCurrentStaffInfo()
+      if (!info.gymId) return
+      setGymId(info.gymId)
+      const { data } = await supabase.from('families').select('id, family_name').eq('gym_id', info.gymId).order('family_name')
+      setFamilies(data || [])
+    }
+    load()
   }, [])
 
   const handleSubmit = async () => {
@@ -45,27 +48,25 @@ export default function AddMemberPage() {
     setLoading(true)
     setError('')
 
-    const result = await createMemberAction({
-      firstName: first_name,
-      lastName: last_name,
-      email,
-      phone,
-      beltRank: belt_rank,
-      status,
-      familyOption,
-      existingFamilyId: familyOption === 'existing' ? selectedFamilyId : undefined,
-      newFamilyName: familyOption === 'new' ? newFamilyName : undefined,
-      newFamilyEmail: familyOption === 'new' ? newFamilyEmail : undefined,
-    })
+    let familyId: string | null = null
 
-    setLoading(false)
-    if (!result.ok) {
-      setError(result.error)
-      showError(result.error)
-      return
+    if (familyOption === 'new') {
+      const { data: newFamily, error: famErr } = await supabase.from('families').insert({
+        gym_id: gymId,
+        family_name: newFamilyName,
+        primary_email: newFamilyEmail || email,
+      }).select().single()
+      if (famErr) { setError(famErr.message); setLoading(false); return }
+      familyId = newFamily.id
+    } else if (familyOption === 'existing') {
+      familyId = selectedFamilyId
     }
-    success('Member added successfully')
-    router.push('/members')
+
+    const { error: err } = await supabase.from('members').insert({
+      first_name, last_name, email, phone, belt_rank, status, gym_id: gymId, family_id: familyId
+    })
+    setLoading(false)
+    if (err) { setError(err.message) } else { router.push('/members') }
   }
 
   const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -98,7 +99,7 @@ export default function AddMemberPage() {
           <div>
             <label className={labelClass}>Belt Rank</label>
             <select value={belt_rank} onChange={(e) => setBeltRank(e.target.value)} className={inputClass}>
-              {BELT_RANKS.map(b => (
+              {['white','yellow','orange','green','blue','purple','brown','black'].map(b => (
                 <option key={b} value={b} className="bg-gray-900 capitalize">{b}</option>
               ))}
             </select>
@@ -117,12 +118,12 @@ export default function AddMemberPage() {
           <label className={labelClass}>Family Billing</label>
           <p className="text-white/20 text-xs mb-3">Link this member to a family for shared billing (e.g. parent + kids).</p>
           <div className="flex gap-2 mb-3">
-            {[
+            {([
               { val: 'none', label: 'No family' },
               { val: 'existing', label: 'Existing family' },
               { val: 'new', label: 'New family' },
-            ].map(opt => (
-              <button key={opt.val} onClick={() => setFamilyOption(opt.val as 'none' | 'existing' | 'new')}
+            ] as const).map(opt => (
+              <button key={opt.val} onClick={() => setFamilyOption(opt.val)}
                 className={`flex-1 text-xs font-medium py-2 rounded-lg border transition ${familyOption === opt.val ? 'bg-blue-600/15 border-blue-600/30 text-white' : 'bg-white/5 border-white/10 text-white/40'}`}>
                 {opt.label}
               </button>

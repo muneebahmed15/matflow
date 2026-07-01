@@ -1,11 +1,16 @@
-import PortalLayoutClient from './PortalLayoutClient';
+import type { Metadata } from 'next'
+import PortalShell from './PortalShell'
 
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic'
 
-export default function PortalLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return <PortalLayoutClient>{children}</PortalLayoutClient>;
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: { index: false, follow: false },
+  },
+}
+
+export default function PortalLayout({ children }: { children: React.ReactNode }) {
+  return <PortalShell>{children}</PortalShell>
 }

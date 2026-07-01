@@ -1,9 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { listWaiversAction, toggleWaiverStatusAction } from '@/app/(dashboard)/actions'
 import type { Waiver } from '@/services/waivers'
-import Link from 'next/link'
 import { FileText, Plus, ToggleLeft, ToggleRight } from 'lucide-react'
 import { useAppUi } from '@/components/ui/AppUiProvider'
 import PageLoader from '@/components/PageLoader'

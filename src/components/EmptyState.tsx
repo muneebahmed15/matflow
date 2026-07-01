@@ -1,4 +1,5 @@
 import { LucideIcon } from 'lucide-react'
+import { SpringButton } from '@/components/SpringButton'
 
 interface Props {
   icon: LucideIcon
@@ -16,9 +17,9 @@ export default function EmptyState({ icon: Icon, title, description, action }: P
       <p className="text-white/40 font-medium">{title}</p>
       {description && <p className="text-white/20 text-sm mt-1">{description}</p>}
       {action && (
-        <a href={action.href} className="mt-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition">
+        <SpringButton href={action.href} size="sm" className="mt-4">
           {action.label}
-        </a>
+        </SpringButton>
       )}
     </div>
   )

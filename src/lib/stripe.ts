@@ -13,6 +13,11 @@ export function getStripe(): Stripe {
   return stripeClient;
 }
 
+export function getSubscriptionPeriodEnd(subscription: Stripe.Subscription): string | null {
+  const periodEnd = subscription.items.data[0]?.current_period_end;
+  return periodEnd ? new Date(periodEnd * 1000).toISOString() : null;
+}
+
 /** @deprecated Use getStripe() — kept for existing imports during migration. */
 export const stripe = new Proxy({} as Stripe, {
   get(_target, prop, receiver) {
