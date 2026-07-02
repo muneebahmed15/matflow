@@ -1,0 +1,82 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
+import { usePortalMember } from '@/lib/portal-member-context';
+
+type Promotion = {
+  id: string;
+  from_belt: string;
+  to_belt: string;
+  notes: string | null;
+  promoted_at: string;
+};
+
+export default function PortalBeltPage() {
+  const { activeMember, loading: memberLoading } = usePortalMember();
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!activeMember) return;
+    void (async () => {
+      const { data: promos } = await supabase
+        .from('belt_promotions')
+        .select('id, from_belt, to_belt, notes, promoted_at')
+        .eq('member_id', activeMember.id)
+        .order('promoted_at', { ascending: false });
+
+      setPromotions((promos as Promotion[]) ?? []);
+      setLoading(false);
+    })();
+  }, [activeMember]);
+
+  if (memberLoading || loading || !activeMember) {
+    return <p className="text-white/40 py-12 text-center">Loading...</p>;
+  }
+
+  const beltRank = activeMember.belt_rank ?? 'white';
+  const stripeCount = activeMember.stripe_count ?? 0;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <Link href="/portal" className="text-sm text-gray-400 hover:text-white">← Back</Link>
+        <h1 className="text-2xl font-bold mt-2">My Belt Progress</h1>
+        <p className="text-white/40 text-sm mt-1">
+          {activeMember.first_name} {activeMember.last_name}
+        </p>
+      </div>
+
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
+        <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Current Rank</p>
+        <p className="text-3xl font-extrabold capitalize text-white">{beltRank} belt</p>
+        {stripeCount > 0 && (
+          <p className="text-white/50 text-sm mt-2">{stripeCount} stripe{stripeCount === 1 ? '' : 's'}</p>
+        )}
+      </div>
+
+      <div>
+        <h2 className="font-semibold text-white mb-3">Promotion History</h2>
+        {promotions.length === 0 ? (
+          <p className="text-white/30 text-sm">No promotions recorded yet. Keep training!</p>
+        ) : (
+          <div className="space-y-2">
+            {promotions.map((p) => (
+              <div key={p.id} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+                <p className="text-white text-sm font-medium capitalize">
+                  {p.from_belt} → {p.to_belt}
+                </p>
+                <p className="text-white/30 text-xs mt-0.5">
+                  {new Date(p.promoted_at).toLocaleDateString()}
+                </p>
+                {p.notes && <p className="text-white/50 text-xs mt-1">{p.notes}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

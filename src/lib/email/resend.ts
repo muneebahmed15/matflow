@@ -65,7 +65,12 @@ export function staffInviteEmail(input: {
   role: string;
   actionLink: string;
 }): SendEmailInput {
-  const roleLabel = input.role === 'admin' ? 'Admin' : 'Coach';
+  const roleLabel =
+    input.role === 'admin'
+      ? 'Admin'
+      : input.role === 'supervisor'
+        ? 'Supervisor'
+        : 'Instructor';
   const subject = `You're invited to ${input.gymName} on MatsFlow`;
   const text = [
     `Hi ${input.fullName},`,
@@ -94,7 +99,12 @@ export function staffAddedEmail(input: {
   role: string;
   loginLink: string;
 }): SendEmailInput {
-  const roleLabel = input.role === 'admin' ? 'Admin' : 'Coach';
+  const roleLabel =
+    input.role === 'admin'
+      ? 'Admin'
+      : input.role === 'supervisor'
+        ? 'Supervisor'
+        : 'Instructor';
   const subject = `You now have ${roleLabel} access at ${input.gymName}`;
   const text = [
     `Hi ${input.fullName},`,
@@ -122,4 +132,58 @@ function escapeHtml(value: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+export function memberPortalInviteEmail(input: {
+  fullName: string;
+  gymName: string;
+  actionLink: string;
+}): SendEmailInput {
+  const subject = `Access your ${input.gymName} member portal`;
+  const text = [
+    `Hi ${input.fullName},`,
+    '',
+    `Your gym has invited you to the member portal at ${input.gymName}.`,
+    'Sign in to view attendance, waivers, and billing:',
+    input.actionLink,
+  ].join('\n');
+
+  return {
+    to: '',
+    subject,
+    text,
+    html: `
+      <p>Hi ${escapeHtml(input.fullName)},</p>
+      <p>Your gym has invited you to the <strong>${escapeHtml(input.gymName)}</strong> member portal.</p>
+      <p><a href="${escapeHtml(input.actionLink)}">Open member portal</a></p>
+      <p>You can sign in with a magic link sent to this email address.</p>
+    `.trim(),
+  };
+}
+
+export function waitlistPromotedEmail(input: {
+  memberName: string;
+  className: string;
+  dayOfWeek: string | null;
+  portalUrl: string;
+}): SendEmailInput {
+  const when = input.dayOfWeek ? ` on ${input.dayOfWeek}` : '';
+  const subject = `Spot available: ${input.className}`;
+  const text = [
+    `Hi ${input.memberName},`,
+    '',
+    `A spot opened up for ${input.className}${when}.`,
+    `View your schedule: ${input.portalUrl}`,
+  ].join('\n');
+
+  return {
+    to: '',
+    subject,
+    text,
+    html: `
+      <p>Hi ${escapeHtml(input.memberName)},</p>
+      <p>A spot opened up for <strong>${escapeHtml(input.className)}</strong>${escapeHtml(when)}.</p>
+      <p><a href="${escapeHtml(input.portalUrl)}">View class schedule</a></p>
+    `.trim(),
+  };
 }

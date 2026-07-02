@@ -79,6 +79,9 @@ export async function checkInMember(input: {
     throw new ServiceError(404, 'Member not found');
   }
 
+  const { assertMemberWaiverCompliance } = await import('@/services/waivers');
+  await assertMemberWaiverCompliance(input.gymId, input.memberId);
+
   const { data: existing } = await admin
     .from('attendance')
     .select('id')
@@ -104,6 +107,10 @@ export async function checkInMember(input: {
     .single();
 
   if (error) throw new ServiceError(500, error.message);
+
+  const { maybeRequestReviewAfterCheckIn } = await import('@/services/review-automation');
+  void maybeRequestReviewAfterCheckIn(input.gymId, input.memberId).catch(() => undefined);
+
   return data;
 }
 
@@ -138,4 +145,7 @@ export async function validateKioskCheckIn(gymId: string, memberId: string): Pro
   if (member.status !== 'active') {
     throw new ServiceError(403, 'Membership is not active');
   }
+
+  const { assertMemberWaiverCompliance } = await import('@/services/waivers');
+  await assertMemberWaiverCompliance(gymId, memberId);
 }

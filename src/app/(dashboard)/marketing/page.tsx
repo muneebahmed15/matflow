@@ -1,0 +1,172 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { Megaphone, Send, BarChart3 } from 'lucide-react';
+import {
+  createCampaignAction,
+  listCampaignsAction,
+  sendCampaignAction,
+  getMarketingFunnelAction,
+  getLeadSourceStatsAction,
+} from '@/app/(dashboard)/actions';
+
+export default function MarketingPage() {
+  const [campaigns, setCampaigns] = useState<
+    { id: string; name: string; subject: string; audience: string; status: string; sent_count: number }[]
+  >([]);
+  const [funnel, setFunnel] = useState({
+    leads: 0,
+    trialScheduled: 0,
+    contacted: 0,
+    converted: 0,
+    lost: 0,
+  });
+  const [sources, setSources] = useState<{ source: string; count: number }[]>([]);
+  const [name, setName] = useState('');
+  const [subject, setSubject] = useState('');
+  const [bodyHtml, setBodyHtml] = useState('');
+  const [audience, setAudience] = useState('active_members');
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    const [campaignRes, funnelRes, sourceRes] = await Promise.all([
+      listCampaignsAction(),
+      getMarketingFunnelAction(),
+      getLeadSourceStatsAction(),
+    ]);
+    if (campaignRes.ok && campaignRes.data) setCampaigns(campaignRes.data);
+    if (funnelRes.ok && funnelRes.data) setFunnel(funnelRes.data);
+    if (sourceRes.ok && sourceRes.data) setSources(sourceRes.data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const create = async () => {
+    const res = await createCampaignAction({ name, subject, bodyHtml, audience });
+    if (res.ok) {
+      setName('');
+      setSubject('');
+      setBodyHtml('');
+      void load();
+    }
+  };
+
+  const send = async (id: string) => {
+    await sendCampaignAction(id);
+    void load();
+  };
+
+  const inputClass =
+    'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+
+  const funnelTotal = funnel.leads || 1;
+
+  return (
+    <div className="p-6 md:p-8 max-w-4xl mx-auto">
+      <h1 className="text-3xl font-extrabold mb-2">Marketing</h1>
+      <p className="text-white/40 text-sm mb-8">Campaigns, funnel analytics, and lead sources.</p>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {[
+          { label: 'Total Leads', value: funnel.leads, color: 'text-white' },
+          { label: 'Trial Scheduled', value: funnel.trialScheduled, color: 'text-blue-400' },
+          { label: 'Converted', value: funnel.converted, color: 'text-green-400' },
+          { label: 'Lost', value: funnel.lost, color: 'text-red-400' },
+        ].map((stat) => (
+          <div key={stat.label} className="bg-[#111] border border-white/10 rounded-2xl p-5">
+            <p className="text-white/40 text-xs uppercase tracking-wide">{stat.label}</p>
+            <p className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <BarChart3 size={18} className="text-blue-400" />
+          <h2 className="font-semibold text-white">Lead → Member Funnel</h2>
+        </div>
+        <div className="space-y-3">
+          {[
+            { label: 'Leads', count: funnel.leads },
+            { label: 'Trial Scheduled', count: funnel.trialScheduled },
+            { label: 'Contacted', count: funnel.contacted },
+            { label: 'Converted', count: funnel.converted },
+          ].map((step) => (
+            <div key={step.label}>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-white/60">{step.label}</span>
+                <span className="text-white">{step.count}</span>
+              </div>
+              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 rounded-full"
+                  style={{ width: `${Math.round((step.count / funnelTotal) * 100)}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {sources.length > 0 && (
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8">
+          <h2 className="font-semibold text-white mb-4">Lead Sources</h2>
+          <div className="space-y-2">
+            {sources.map((s) => (
+              <div key={s.source} className="flex justify-between text-sm">
+                <span className="text-white/60 capitalize">{s.source.replace(/_/g, ' ')}</span>
+                <span className="text-white font-medium">{s.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8 space-y-3">
+        <h2 className="font-semibold text-white">New Campaign</h2>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Campaign name" className={inputClass} />
+        <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Email subject" className={inputClass} />
+        <textarea value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} placeholder="HTML body" rows={5} className={inputClass} />
+        <select value={audience} onChange={(e) => setAudience(e.target.value)} className={inputClass}>
+          <option value="all_members" className="bg-gray-900">All members</option>
+          <option value="active_members" className="bg-gray-900">Active members</option>
+          <option value="inactive_members" className="bg-gray-900">Inactive members</option>
+          <option value="past_due" className="bg-gray-900">Past due</option>
+          <option value="leads" className="bg-gray-900">Leads</option>
+        </select>
+        <button onClick={() => void create()} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-sm">
+          Save Draft
+        </button>
+      </div>
+
+      <h2 className="font-semibold text-white mb-3">Campaigns</h2>
+      {loading ? (
+        <p className="text-white/30 text-sm">Loading...</p>
+      ) : campaigns.length === 0 ? (
+        <div className="text-center py-12 text-white/30">
+          <Megaphone size={40} className="mx-auto mb-3 opacity-30" />
+          No campaigns yet.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {campaigns.map((c) => (
+            <div key={c.id} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 flex justify-between items-center">
+              <div>
+                <p className="text-white font-medium text-sm">{c.name}</p>
+                <p className="text-white/40 text-xs">{c.status} · {c.sent_count} sent</p>
+              </div>
+              {c.status === 'draft' && (
+                <button onClick={() => void send(c.id)} className="flex items-center gap-1 text-blue-400 text-sm hover:text-blue-300">
+                  <Send size={14} /> Send
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -29,7 +29,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const pathname = usePathname()
   const [user, setUser] = useState<{ email?: string } | null>(null)
   const [gymName, setGymName] = useState('East Coast MMA')
-  const [role, setRole] = useState<StaffRole>(null)
+  const [role, setRole] = useState<StaffRole | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [checked, setChecked] = useState(false)
 

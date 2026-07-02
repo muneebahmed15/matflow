@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo, canAccessRoute, type StaffRole } from '@/lib/permissions'
-import { LayoutDashboard, Users, UserCheck, Calendar, CreditCard, Settings, LogOut, Menu, X, FileText, Dumbbell, Award, UserPlus, ShieldCheck } from 'lucide-react'
+import { LayoutDashboard, Users, UserCheck, Calendar, CreditCard, Settings, LogOut, Menu, X, FileText, Dumbbell, Award, UserPlus, ShieldCheck, Upload, Megaphone, ShoppingBag, Sparkles, Globe, ScrollText, UsersRound, Bot, Inbox } from 'lucide-react'
 import Logo from '@/components/Logo'
 import { AppUiProvider } from '@/components/ui/AppUiProvider'
 import PageLoader from '@/components/PageLoader'
@@ -21,6 +21,15 @@ const navItems = [
   { label: 'Waivers', href: '/waivers', icon: FileText, adminOnly: false },
   { label: 'Plans', href: '/plans', icon: CreditCard, adminOnly: true },
   { label: 'Subscriptions', href: '/subscriptions', icon: CreditCard, adminOnly: true },
+  { label: 'Families', href: '/families', icon: UsersRound, adminOnly: true },
+  { label: 'Migration', href: '/migration', icon: Upload, adminOnly: true },
+  { label: 'Marketing', href: '/marketing', icon: Megaphone, adminOnly: true },
+  { label: 'Inbox', href: '/inbox', icon: Inbox, adminOnly: true },
+  { label: 'Shop', href: '/shop', icon: ShoppingBag, adminOnly: true },
+  { label: 'Insights', href: '/insights', icon: Sparkles, adminOnly: true },
+  { label: 'AI Desk', href: '/ai-desk', icon: Bot, adminOnly: true },
+  { label: 'Website', href: '/website-content', icon: Globe, adminOnly: true },
+  { label: 'Audit Log', href: '/audit', icon: ScrollText, adminOnly: true },
   { label: 'Staff', href: '/staff', icon: ShieldCheck, adminOnly: true },
   { label: 'Settings', href: '/settings', icon: Settings, adminOnly: true },
 ]
@@ -30,7 +39,7 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
   const pathname = usePathname()
   const [user, setUser] = useState<User | null>(null)
   const [gymName, setGymName] = useState('My Gym')
-  const [role, setRole] = useState<StaffRole>(null)
+  const [role, setRole] = useState<StaffRole | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [checked, setChecked] = useState(false)
 
@@ -78,7 +87,7 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
     return pathname.startsWith(href)
   }
 
-  const visibleNavItems = navItems.filter(item => !item.adminOnly || role === 'admin')
+  const visibleNavItems = navItems.filter((item) => canAccessRoute(role, item.href))
 
   if (!checked) {
     return (

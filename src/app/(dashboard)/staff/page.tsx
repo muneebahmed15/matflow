@@ -127,10 +127,11 @@ export default function StaffPage() {
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Role</label>
             <select value={role} onChange={(e) => setRole(e.target.value as StaffRole)} className={inputClass}>
-              <option value="coach" className="bg-gray-900">Coach (limited access)</option>
+              <option value="coach" className="bg-gray-900">Instructor (classes & check-in)</option>
+              <option value="supervisor" className="bg-gray-900">Supervisor (ops & leads, no billing)</option>
               <option value="admin" className="bg-gray-900">Admin (full access)</option>
             </select>
-            <p className="text-white/20 text-xs mt-1">Coaches can&apos;t see billing, plans, subscriptions, or staff settings.</p>
+            <p className="text-white/20 text-xs mt-1">Supervisors can manage members and leads. Instructors have class-scoped access.</p>
           </div>
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <div className="flex gap-3">
@@ -167,7 +168,8 @@ export default function StaffPage() {
                   onChange={(e) => handleRoleChange(s.id, e.target.value as StaffRole)}
                   className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white"
                 >
-                  <option value="coach" className="bg-gray-900">Coach</option>
+                  <option value="coach" className="bg-gray-900">Instructor</option>
+                  <option value="supervisor" className="bg-gray-900">Supervisor</option>
                   <option value="admin" className="bg-gray-900">Admin</option>
                 </select>
                 <button onClick={() => handleRemove(s.id)} className="text-white/30 hover:text-red-400 transition">

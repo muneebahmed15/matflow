@@ -16,6 +16,24 @@ export type Database = {
           name: string;
           slug: string;
           kiosk_enabled: boolean;
+          require_waiver_for_checkin: boolean;
+          website_enabled: boolean;
+          store_enabled: boolean;
+          ai_front_desk_enabled: boolean;
+          daily_digest_enabled: boolean;
+          logo_url: string | null;
+          primary_color: string | null;
+          tagline: string | null;
+          about_text: string | null;
+          contact_email: string | null;
+          contact_phone: string | null;
+          address_line1: string | null;
+          address_city: string | null;
+          address_state: string | null;
+          address_zip: string | null;
+          custom_domain: string | null;
+          white_label_enabled: boolean;
+          store_return_policy: string | null;
           created_at: string;
         };
         Insert: {
@@ -24,6 +42,23 @@ export type Database = {
           name: string;
           slug: string;
           kiosk_enabled?: boolean;
+          website_enabled?: boolean;
+          store_enabled?: boolean;
+          ai_front_desk_enabled?: boolean;
+          daily_digest_enabled?: boolean;
+          logo_url?: string | null;
+          primary_color?: string | null;
+          tagline?: string | null;
+          about_text?: string | null;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          address_line1?: string | null;
+          address_city?: string | null;
+          address_state?: string | null;
+          address_zip?: string | null;
+          custom_domain?: string | null;
+          white_label_enabled?: boolean;
+          store_return_policy?: string | null;
           created_at?: string;
         };
         Update: Partial<Database['public']['Tables']['gyms']['Insert']>;
@@ -38,8 +73,11 @@ export type Database = {
           email: string | null;
           phone: string | null;
           belt_rank: string | null;
+          stripe_count: number;
+          external_id: string | null;
           status: string;
           family_id: string | null;
+          portal_role: string;
           created_at: string;
         };
         Insert: {
@@ -51,6 +89,8 @@ export type Database = {
           email?: string | null;
           phone?: string | null;
           belt_rank?: string | null;
+          stripe_count?: number;
+          external_id?: string | null;
           status?: string;
           family_id?: string | null;
           created_at?: string;
@@ -63,6 +103,7 @@ export type Database = {
           gym_id: string;
           family_name: string;
           primary_email: string | null;
+          stripe_customer_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -70,6 +111,7 @@ export type Database = {
           gym_id: string;
           family_name: string;
           primary_email?: string | null;
+          stripe_customer_id?: string | null;
           created_at?: string;
         };
         Update: Partial<Database['public']['Tables']['families']['Insert']>;
@@ -79,7 +121,7 @@ export type Database = {
           id: string;
           user_id: string;
           gym_id: string;
-          role: 'admin' | 'coach';
+          role: 'admin' | 'supervisor' | 'coach';
           full_name: string | null;
           created_at: string;
         };
@@ -87,7 +129,7 @@ export type Database = {
           id?: string;
           user_id: string;
           gym_id: string;
-          role: 'admin' | 'coach';
+          role: 'admin' | 'supervisor' | 'coach';
           full_name?: string | null;
           created_at?: string;
         };
@@ -181,6 +223,7 @@ export type Database = {
           title: string;
           body: string;
           is_active: boolean;
+          expires_after_days: number | null;
           created_at: string;
         };
         Insert: {
@@ -189,6 +232,7 @@ export type Database = {
           title: string;
           body: string;
           is_active?: boolean;
+          expires_after_days?: number | null;
           created_at?: string;
         };
         Update: Partial<Database['public']['Tables']['waivers']['Insert']>;
@@ -201,6 +245,7 @@ export type Database = {
           gym_id: string;
           signed_name: string;
           signed_at: string;
+          expires_at: string | null;
         };
         Insert: {
           id?: string;
@@ -209,6 +254,7 @@ export type Database = {
           gym_id: string;
           signed_name: string;
           signed_at?: string;
+          expires_at?: string | null;
         };
         Update: Partial<Database['public']['Tables']['waiver_signatures']['Insert']>;
       };
@@ -218,6 +264,7 @@ export type Database = {
           gym_id: string;
           name: string;
           instructor: string | null;
+          instructor_staff_id: string | null;
           day_of_week: string | null;
           start_time: string | null;
           end_time: string | null;
@@ -334,6 +381,75 @@ export type Database = {
           created_at?: string;
         };
         Update: Partial<Database['public']['Tables']['refunds']['Insert']>;
+      };
+      crm_notes: {
+        Row: {
+          id: string;
+          gym_id: string;
+          member_id: string | null;
+          lead_id: string | null;
+          author_id: string | null;
+          note_type: string;
+          body: string;
+          is_pinned: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          gym_id: string;
+          member_id?: string | null;
+          lead_id?: string | null;
+          author_id?: string | null;
+          note_type?: string;
+          body: string;
+          is_pinned?: boolean;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['crm_notes']['Insert']>;
+      };
+      emergency_contacts: {
+        Row: {
+          id: string;
+          gym_id: string;
+          member_id: string;
+          full_name: string;
+          phone: string;
+          relationship: string;
+          is_primary: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          gym_id: string;
+          member_id: string;
+          full_name: string;
+          phone: string;
+          relationship: string;
+          is_primary?: boolean;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['emergency_contacts']['Insert']>;
+      };
+      class_waitlist: {
+        Row: {
+          id: string;
+          gym_id: string;
+          class_id: string;
+          member_id: string;
+          position: number;
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          gym_id: string;
+          class_id: string;
+          member_id: string;
+          position?: number;
+          status?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['class_waitlist']['Insert']>;
       };
     };
     Views: Record<string, never>;

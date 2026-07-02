@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import DashboardShell from './DashboardShell'
+import DashboardLayoutClient from './DashboardLayoutClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,5 +12,5 @@ export const metadata: Metadata = {
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  return <DashboardShell>{children}</DashboardShell>
+  return <DashboardLayoutClient>{children}</DashboardLayoutClient>
 }

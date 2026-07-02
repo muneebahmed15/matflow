@@ -1,0 +1,74 @@
+# Module 6: Digital Waivers (51 todos)
+
+## Waiver Templates
+- [x] 6.1 Waivers table (done)
+- [x] 6.2 Create waiver (done)
+- [x] 6.3 Toggle active/inactive (done)
+- [x] 6.4 Waiver list page (done)
+- [ ] 6.5 Waiver rich text editor
+- [ ] 6.6 Waiver version numbering
+- [~] 6.7 Waiver expires_at field (Wave 1)
+- [ ] 6.8 Require re-sign on template update
+- [ ] 6.9 Waiver templates library (MMA, BJJ presets)
+- [ ] 6.10 Multi-language waiver support
+
+## Signing
+- [x] 6.11 waiver_signatures table (done)
+- [x] 6.12 Staff-assisted signing (done)
+- [x] 6.13 Member portal signing (done)
+- [ ] 6.14 Canvas signature capture (draw)
+- [ ] 6.15 Parent signs for minor
+- [ ] 6.16 IP address + user agent on signature
+- [ ] 6.17 Signature timestamp timezone-aware display
+
+## Storage & Compliance
+- [x] 6.18 Store signed PDF in Supabase Storage
+- [ ] 6.19 Immutable signature record (no delete)
+- [ ] 6.20 GDPR export member waiver history
+- [ ] 6.21 Retention policy config per gym
+- [ ] 6.22 Legal hold flag on signature
+
+## Expiration
+- [~] 6.23 Check waiver expiry on check-in (Wave 1)
+- [ ] 6.24 Dashboard: members with expired waivers
+- [ ] 6.25 Email reminder before expiry
+- [ ] 6.26 Block check-in if waiver expired (configurable)
+
+## Notifications
+- [x] 6.27 waiver_signed notification type (done)
+- [ ] 6.28 Send waiver link via email to member
+- [ ] 6.29 Bulk send waiver to all active members
+- [ ] 6.30 Waiver completion rate report
+
+## Portal
+- [x] 6.31 Portal waivers page (done)
+- [x] 6.32 Download signed waiver PDF
+- [ ] 6.33 Show pending vs signed status
+
+## Staff Views
+- [x] 6.34 Waiver detail with signatures (done)
+- [x] 6.35 Member profile waivers tab (done)
+- [ ] 6.36 Export signatures CSV
+- [ ] 6.37 Print-friendly waiver view
+
+## Kiosk / Onboarding
+- [ ] 6.38 Kiosk waiver sign before first check-in
+- [ ] 6.39 New member auto-assigned active waivers
+- [ ] 6.40 Trial member waiver flow
+
+## API
+- [ ] 6.41 Public API: get active waivers for gym (anon)
+- [ ] 6.42 Webhook on signature completed
+
+## Testing
+- [ ] 6.43 Unit test signWaiver idempotency
+- [ ] 6.44 RLS: member can only sign own waivers
+
+## Integrations
+- [ ] 6.45 DocuSign export path (enterprise)
+- [ ] 6.46 Import signed waivers from PDF upload
+- [ ] 6.47 Waiver merge fields (member name, date)
+- [ ] 6.48 Minor age verification field
+- [ ] 6.49 Witness signature field
+- [ ] 6.50 State-specific waiver templates
+- [ ] 6.51 Audit log on waiver template edits

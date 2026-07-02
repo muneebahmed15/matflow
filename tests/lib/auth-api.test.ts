@@ -14,6 +14,12 @@ vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({ from: adminFrom }),
 }));
 
+const assertPortalMemberAccess = vi.hoisted(() => vi.fn());
+
+vi.mock('@/services/portal-family', () => ({
+  assertPortalMemberAccess,
+}));
+
 import {
   assertGymScope,
   assertSubscriptionInGym,
@@ -30,6 +36,7 @@ function chain(result: { data?: unknown; error?: unknown } = { data: null }) {
     builder[method] = () => builder;
   }
   builder.maybeSingle = async () => result;
+  builder.single = async () => result;
   return builder;
 }
 
@@ -92,13 +99,13 @@ describe('requireStaffAuth', () => {
     if (isErrorResponse(result)) expect(result.status).toBe(403);
   });
 
-  it('allows an admin when adminOnly is required', async () => {
+  it('allows a supervisor when leads.read capability is required', async () => {
     getUser.mockResolvedValue({ data: { user: USER }, error: null });
-    serverFrom.mockReturnValueOnce(chain({ data: { role: 'admin', gym_id: 'gym-1' } }));
+    serverFrom.mockReturnValueOnce(chain({ data: { role: 'supervisor', gym_id: 'gym-1' } }));
 
-    const result = await requireStaffAuth({ adminOnly: true });
+    const result = await requireStaffAuth({ capability: 'leads.read' });
 
-    expect(result).toMatchObject({ role: 'admin' });
+    expect(result).toMatchObject({ role: 'supervisor' });
   });
 });
 
@@ -106,6 +113,8 @@ describe('requireMemberAuth', () => {
   beforeEach(() => {
     getUser.mockReset();
     serverFrom.mockReset();
+    adminFrom.mockReset();
+    assertPortalMemberAccess.mockReset();
   });
 
   it('returns 401 when there is no session', async () => {
@@ -130,24 +139,42 @@ describe('requireMemberAuth', () => {
   it('returns the member auth when a matching row exists', async () => {
     getUser.mockResolvedValue({ data: { user: USER }, error: null });
     serverFrom.mockReturnValueOnce(
-      chain({ data: { id: 'member-1', gym_id: 'gym-1', email: USER.email } })
+      chain({ data: { id: 'member-1', gym_id: 'gym-1', email: USER.email, portal_role: 'primary' } })
     );
 
     const result = await requireMemberAuth();
 
-    expect(result).toMatchObject({ memberId: 'member-1', gymId: 'gym-1' });
+    expect(result).toMatchObject({ memberId: 'member-1', gymId: 'gym-1', portalRole: 'primary' });
   });
 
-  it('returns 403 when the resolved member id does not match the requested one', async () => {
+  it('returns 403 when family access is denied for another member', async () => {
     getUser.mockResolvedValue({ data: { user: USER }, error: null });
-    serverFrom.mockReturnValueOnce(
-      chain({ data: { id: 'member-1', gym_id: 'gym-1', email: USER.email } })
-    );
+    assertPortalMemberAccess.mockRejectedValue(new Error('Forbidden'));
 
     const result = await requireMemberAuth({ memberId: 'member-2' });
 
     expect(isErrorResponse(result)).toBe(true);
     if (isErrorResponse(result)) expect(result.status).toBe(403);
+  });
+
+  it('allows acting as a family member when access is granted', async () => {
+    getUser.mockResolvedValue({ data: { user: USER }, error: null });
+    assertPortalMemberAccess.mockResolvedValue({
+      memberId: 'member-2',
+      gymId: 'gym-1',
+      email: USER.email,
+    });
+    adminFrom
+      .mockReturnValueOnce(chain({ data: { portal_role: 'dependent' } }))
+      .mockReturnValueOnce(chain({ data: { id: 'member-1' } }));
+
+    const result = await requireMemberAuth({ memberId: 'member-2' });
+
+    expect(result).toMatchObject({
+      memberId: 'member-2',
+      portalRole: 'dependent',
+      authMemberId: 'member-1',
+    });
   });
 });
 
@@ -172,10 +199,15 @@ describe('requireStaffOrMemberAuth', () => {
     getUser.mockResolvedValue({ data: { user: USER }, error: null });
     serverFrom
       .mockReturnValueOnce(chain({ data: null })) // not staff
-      .mockReturnValueOnce(chain({ data: null })) // does not own a gym
-      .mockReturnValueOnce(
-        chain({ data: { id: 'member-1', gym_id: 'gym-1', email: USER.email } })
-      );
+      .mockReturnValueOnce(chain({ data: null })); // does not own a gym
+    assertPortalMemberAccess.mockResolvedValue({
+      memberId: 'member-1',
+      gymId: 'gym-1',
+      email: USER.email!,
+    });
+    adminFrom
+      .mockReturnValueOnce(chain({ data: { portal_role: 'primary' } }))
+      .mockReturnValueOnce(chain({ data: { id: 'member-1' } }));
 
     const result = await requireStaffOrMemberAuth({ gymId: 'gym-1', memberId: 'member-1' });
 

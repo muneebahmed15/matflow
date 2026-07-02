@@ -69,6 +69,25 @@ describe('POST /api/attendance', () => {
     expect(res.status).toBe(403);
     expect(checkInMember).not.toHaveBeenCalled();
   });
+
+  it('surfaces waiver compliance errors from the service layer', async () => {
+    const { ServiceError } = await import('@/services/errors');
+    requireStaffAuth.mockResolvedValue(makeStaffAuth({ gymId: VALID_GYM_ID }));
+    checkInMember.mockRejectedValue(
+      new ServiceError(403, 'Waiver signature required: Liability must be signed before check-in.')
+    );
+
+    const res = await POST(
+      jsonRequest('http://test/api/attendance', {
+        member_id: VALID_MEMBER_ID,
+        gym_id: VALID_GYM_ID,
+      }) as unknown as NextRequest
+    );
+
+    expect(res.status).toBe(403);
+    const body = await readJson(res);
+    expect(body.error).toMatch(/waiver signature required/i);
+  });
 });
 
 describe('GET /api/attendance', () => {

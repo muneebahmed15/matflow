@@ -24,6 +24,13 @@ export type CreateLeadInput = {
   phone?: string;
   source?: string;
   interestedIn?: string;
+  notes?: string;
+  smsConsent?: boolean;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  trialDate?: string;
+  skipAutomation?: boolean;
 };
 
 export async function createLead(input: CreateLeadInput): Promise<LeadRow> {
@@ -38,13 +45,87 @@ export async function createLead(input: CreateLeadInput): Promise<LeadRow> {
       phone: input.phone?.trim() || null,
       source: input.source ?? 'walk-in',
       interested_in: input.interestedIn?.trim() || null,
+      notes: input.notes?.trim() || null,
       status: 'new',
+      sms_consent: input.smsConsent ?? false,
+      utm_source: input.utmSource?.trim() || null,
+      utm_medium: input.utmMedium?.trim() || null,
+      utm_campaign: input.utmCampaign?.trim() || null,
+      trial_date: input.trialDate || null,
     })
     .select()
     .single();
 
   if (error) throw new ServiceError(500, error.message);
+
+  if (input.smsConsent && input.phone) {
+    await admin.from('sms_consent_log').insert({
+      gym_id: input.gymId,
+      phone: input.phone.trim(),
+      lead_id: data.id,
+      consented: true,
+      source: input.source ?? 'form',
+    });
+  }
+
+  if (!input.skipAutomation) {
+    const { runNewLeadAutomations } = await import('@/services/lead-automation');
+    void runNewLeadAutomations(data.id).catch(() => undefined);
+  }
+
   return data;
+}
+
+export type LeadSourceStat = { source: string; count: number };
+
+export async function getLeadSourceStats(gymId: string): Promise<LeadSourceStat[]> {
+  const admin = getAdminClient();
+  const { data, error } = await admin.from('leads').select('source').eq('gym_id', gymId);
+
+  if (error) throw new ServiceError(500, error.message);
+
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const key = row.source ?? 'unknown';
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([source, count]) => ({ source, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+export type MarketingFunnel = {
+  leads: number;
+  trialScheduled: number;
+  contacted: number;
+  converted: number;
+  lost: number;
+};
+
+export async function getMarketingFunnel(gymId: string): Promise<MarketingFunnel> {
+  const admin = getAdminClient();
+  const { data, error } = await admin.from('leads').select('status').eq('gym_id', gymId);
+
+  if (error) throw new ServiceError(500, error.message);
+
+  const funnel: MarketingFunnel = {
+    leads: 0,
+    trialScheduled: 0,
+    contacted: 0,
+    converted: 0,
+    lost: 0,
+  };
+
+  for (const row of data ?? []) {
+    funnel.leads++;
+    if (row.status === 'trial_scheduled') funnel.trialScheduled++;
+    else if (row.status === 'contacted') funnel.contacted++;
+    else if (row.status === 'converted') funnel.converted++;
+    else if (row.status === 'lost') funnel.lost++;
+  }
+
+  return funnel;
 }
 
 export async function updateLeadStatus(

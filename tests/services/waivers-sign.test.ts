@@ -1,0 +1,94 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+
+const mockFrom = vi.fn();
+const mockStorageFrom = vi.fn();
+
+vi.mock('@/lib/supabase/admin', () => ({
+  getAdminClient: () => ({
+    from: mockFrom,
+    storage: { from: mockStorageFrom },
+  }),
+}));
+
+vi.mock('@/lib/waiver-pdf', () => ({
+  buildWaiverPdf: vi.fn(async () => new Uint8Array([1, 2, 3])),
+}));
+
+import { signWaiver } from '@/services/waivers';
+
+function chain(result: { data?: unknown; error?: { message: string } | null }) {
+  const builder: Record<string, unknown> = {};
+  for (const method of ['select', 'eq', 'insert', 'update']) {
+    builder[method] = vi.fn(() => builder);
+  }
+  builder.maybeSingle = vi.fn(async () => result);
+  builder.single = vi.fn(async () => result);
+  return builder;
+}
+
+describe('signWaiver', () => {
+  beforeEach(() => {
+    mockFrom.mockReset();
+    mockStorageFrom.mockReset();
+    mockStorageFrom.mockReturnValue({
+      upload: vi.fn(async () => ({ error: null })),
+    });
+  });
+
+  it('rejects when a valid signature already exists', async () => {
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    mockFrom
+      .mockReturnValueOnce(chain({ data: { id: 'w1', title: 'Waiver', body: 'text', expires_after_days: 30 }, error: null }))
+      .mockReturnValueOnce(chain({ data: { email: 'm@example.com' }, error: null }))
+      .mockReturnValueOnce(chain({ data: { name: 'Gym' }, error: null }))
+      .mockReturnValueOnce(chain({ data: { id: 'sig-1', expires_at: future }, error: null }));
+
+    await expect(
+      signWaiver({
+        waiverId: 'w1',
+        memberId: 'm1',
+        gymId: 'g1',
+        signedName: 'Ada Lovelace',
+      })
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('updates an expired signature instead of inserting a duplicate', async () => {
+    const past = new Date(Date.now() - 86_400_000).toISOString();
+    mockFrom
+      .mockReturnValueOnce(chain({ data: { id: 'w1', title: 'Waiver', body: 'text', expires_after_days: 30 }, error: null }))
+      .mockReturnValueOnce(chain({ data: { email: 'm@example.com' }, error: null }))
+      .mockReturnValueOnce(chain({ data: { name: 'Gym' }, error: null }))
+      .mockReturnValueOnce(chain({ data: { id: 'sig-1', expires_at: past }, error: null }))
+      .mockReturnValueOnce(chain({ data: { id: 'sig-1' }, error: null }))
+      .mockReturnValueOnce(chain({ data: null, error: null }));
+
+    const result = await signWaiver({
+      waiverId: 'w1',
+      memberId: 'm1',
+      gymId: 'g1',
+      signedName: 'Ada Lovelace',
+    });
+
+    expect(result.signatureId).toBe('sig-1');
+  });
+
+  it('inserts a new signature when none exists', async () => {
+    mockFrom
+      .mockReturnValueOnce(chain({ data: { id: 'w1', title: 'Waiver', body: 'text', expires_after_days: null }, error: null }))
+      .mockReturnValueOnce(chain({ data: { email: 'm@example.com' }, error: null }))
+      .mockReturnValueOnce(chain({ data: { name: 'Gym' }, error: null }))
+      .mockReturnValueOnce(chain({ data: null, error: null }))
+      .mockReturnValueOnce(chain({ data: { id: 'sig-new' }, error: null }))
+      .mockReturnValueOnce(chain({ data: null, error: null }));
+
+    const result = await signWaiver({
+      waiverId: 'w1',
+      memberId: 'm1',
+      gymId: 'g1',
+      signedName: 'Ada Lovelace',
+    });
+
+    expect(result.signatureId).toBe('sig-new');
+  });
+});

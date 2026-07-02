@@ -7,6 +7,8 @@ import {
   type StaffAuth,
   type StaffRole,
 } from '@/lib/auth/staff';
+import { hasCapability, type Capability } from '@/lib/permissions/capabilities';
+import { assertPortalMemberAccess } from '@/services/portal-family';
 
 export type { StaffAuth, StaffRole };
 
@@ -15,15 +17,18 @@ export type MemberAuth = {
   memberId: string;
   gymId: string;
   email: string;
+  portalRole: string;
+  authMemberId: string;
 };
 
 export function isErrorResponse(value: unknown): value is NextResponse {
   return value instanceof NextResponse;
 }
 
-/** Require an authenticated gym staff member (admin or coach). */
+/** Require an authenticated gym staff member (admin, supervisor, or instructor/coach). */
 export async function requireStaffAuth(options?: {
   adminOnly?: boolean;
+  capability?: Capability;
 }): Promise<StaffAuth | NextResponse> {
   const supabase = await createClient();
   const {
@@ -40,6 +45,10 @@ export async function requireStaffAuth(options?: {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  if (options?.capability && !hasCapability(auth.role, options.capability)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   if (options?.adminOnly && auth.role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -47,7 +56,7 @@ export async function requireStaffAuth(options?: {
   return auth;
 }
 
-/** Require an authenticated member portal user. */
+/** Require an authenticated member portal user, optionally acting as a family member. */
 export async function requireMemberAuth(options?: {
   memberId?: string;
 }): Promise<MemberAuth | NextResponse> {
@@ -61,26 +70,51 @@ export async function requireMemberAuth(options?: {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data: member } = await supabase
-    .from('members')
-    .select('id, gym_id, email')
-    .eq('email', user.email)
-    .maybeSingle();
+  const targetMemberId = options?.memberId;
 
-  if (!member) {
+  try {
+    if (targetMemberId) {
+      const access = await assertPortalMemberAccess(user, targetMemberId);
+      const admin = getAdminClient();
+      const { data: member } = await admin
+        .from('members')
+        .select('portal_role')
+        .eq('id', access.memberId)
+        .single();
+
+      return {
+        user,
+        memberId: access.memberId,
+        gymId: access.gymId,
+        email: access.email,
+        portalRole: member?.portal_role ?? 'primary',
+        authMemberId: (
+          await admin.from('members').select('id').eq('email', user.email).single()
+        ).data?.id ?? access.memberId,
+      };
+    }
+
+    const { data: member } = await supabase
+      .from('members')
+      .select('id, gym_id, email, portal_role')
+      .eq('email', user.email)
+      .maybeSingle();
+
+    if (!member) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    return {
+      user,
+      memberId: member.id,
+      gymId: member.gym_id,
+      email: member.email ?? user.email,
+      portalRole: member.portal_role ?? 'primary',
+      authMemberId: member.id,
+    };
+  } catch {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
-
-  if (options?.memberId && member.id !== options.memberId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  return {
-    user,
-    memberId: member.id,
-    gymId: member.gym_id,
-    email: member.email,
-  };
 }
 
 /** Require staff auth OR member auth (for shared endpoints like checkout). */

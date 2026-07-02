@@ -5,6 +5,9 @@ import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
 import { Users, UserCheck, CreditCard, FileText } from 'lucide-react'
 import { StatsSkeleton } from '@/components/LoadingSkeleton'
+import BusinessInsightsWidget from '@/components/dashboard/BusinessInsightsWidget'
+import BillingMetricsWidget from '@/components/dashboard/BillingMetricsWidget'
+import WaiverComplianceWidget from '@/components/dashboard/WaiverComplianceWidget'
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({ totalMembers: 0, activeMembers: 0, todayCheckIns: 0, activeSubscriptions: 0, activeWaivers: 0 })
@@ -68,6 +71,13 @@ export default function DashboardPage() {
             <p className="text-white/30 text-xs mt-1">{sub}</p>
           </div>
         ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+        <BusinessInsightsWidget />
+        <BillingMetricsWidget />
+      </div>
+      <div className="mb-8">
+        <WaiverComplianceWidget />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {[

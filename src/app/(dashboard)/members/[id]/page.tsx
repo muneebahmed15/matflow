@@ -5,6 +5,10 @@ import { supabase } from '@/lib/supabase'
 import { useParams, useRouter } from 'next/navigation'
 import { getMemberSignatures } from '@/lib/waivers'
 import { redirectTo } from '@/lib/navigation'
+import { getCurrentStaffInfo } from '@/lib/permissions'
+import { inviteMemberToPortalAction } from '@/app/(dashboard)/actions'
+import MemberNotesPanel from '@/components/members/MemberNotesPanel'
+import MemberEmergencyContactsPanel from '@/components/members/MemberEmergencyContactsPanel'
 
 interface Member {
   id: string; first_name: string; last_name: string
@@ -30,7 +34,9 @@ export default function MemberDetailPage() {
   const [gymId, setGymId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [subscribing, setSubscribing] = useState(false)
-  const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'waivers'>('info')
+  const [inviting, setInviting] = useState(false)
+  const [inviteMsg, setInviteMsg] = useState('')
+  const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'waivers' | 'notes' | 'contacts'>('info')
 
   useEffect(() => {
     let cancelled = false
@@ -38,13 +44,13 @@ export default function MemberDetailPage() {
     async function loadMember() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user || cancelled) return
-      const { data: gym } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
-      if (gym && !cancelled) {
-        setGymId(gym.id)
+      const staffInfo = await getCurrentStaffInfo()
+      if (staffInfo.gymId && !cancelled) {
+        setGymId(staffInfo.gymId)
         const { data: plansData } = await supabase
           .from('plans')
           .select('id, name, stripe_price_id, price_cents, interval')
-          .eq('gym_id', gym.id)
+          .eq('gym_id', staffInfo.gymId)
         if (!cancelled) setPlans(plansData || [])
       }
       const { data: memberData } = await supabase.from('members').select('*').eq('id', id).single()
@@ -100,11 +106,25 @@ export default function MemberDetailPage() {
     router.push('/members')
   }
 
+  const handleInvitePortal = async () => {
+    if (!member?.email) {
+      setInviteMsg('Add an email address first.')
+      return
+    }
+    setInviting(true)
+    setInviteMsg('')
+    const res = await inviteMemberToPortalAction(member.id)
+    setInviting(false)
+    setInviteMsg(res.ok ? 'Portal invite sent.' : (res.error ?? 'Invite failed'))
+  }
+
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
   if (!member) return <div className="p-8 text-gray-400">Member not found.</div>
 
-  const tabs: { key: 'info' | 'attendance' | 'waivers'; label: string }[] = [
+  const tabs: { key: typeof activeTab; label: string }[] = [
     { key: 'info', label: 'Info' },
+    { key: 'notes', label: 'Notes' },
+    { key: 'contacts', label: 'Contacts' },
     { key: 'attendance', label: `Attendance (${attendance.length})` },
     { key: 'waivers', label: `Waivers (${signatures.length})` },
   ]
@@ -157,6 +177,16 @@ export default function MemberDetailPage() {
               <option value="inactive" className="bg-gray-900">inactive</option>
             </select>
           </div>
+          <div className="border-t border-white/10 pt-4">
+            <button
+              onClick={() => void handleInvitePortal()}
+              disabled={inviting || !member.email}
+              className="text-sm text-blue-400 hover:underline disabled:opacity-40"
+            >
+              {inviting ? 'Sending invite...' : 'Invite to member portal'}
+            </button>
+            {inviteMsg && <p className="text-xs text-white/40 mt-1">{inviteMsg}</p>}
+          </div>
           <a href={`/waivers/${id}/sign-waiver`}
             className="block w-full text-center border border-white/10 text-gray-300 py-2 rounded-xl text-sm hover:bg-white/5 transition mt-2">
             ✍️ Sign Waiver for this Member
@@ -183,6 +213,20 @@ export default function MemberDetailPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'notes' && (
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
+          <h2 className="font-semibold text-white mb-4">CRM Notes</h2>
+          <MemberNotesPanel memberId={id} />
+        </div>
+      )}
+
+      {activeTab === 'contacts' && (
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
+          <h2 className="font-semibold text-white mb-4">Emergency Contacts</h2>
+          <MemberEmergencyContactsPanel memberId={id} />
         </div>
       )}
 

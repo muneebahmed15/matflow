@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
+import { linkMemberAuthUser } from '@/lib/portal-auth'
 
 function PortalLoginForm() {
   const router = useRouter()
@@ -13,29 +14,71 @@ function PortalLoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [mode, setMode] = useState<'password' | 'magic'>('password')
+  const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
+  const finishLogin = async (userEmail: string, userId: string) => {
+    const { data: member } = await supabase.from('members').select('id').eq('email', userEmail).single()
+    if (!member) {
+      setError('No member profile found for this email. Contact your gym admin.')
+      await supabase.auth.signOut()
+      return false
+    }
+    await linkMemberAuthUser(supabase, userEmail, userId)
+    router.push(nextPath.startsWith('/') ? nextPath : '/portal')
+    return true
+  }
+
   const handleLogin = async () => {
-    if (!email || !password) {
-      setError('Please enter email and password.')
+    if (!email) {
+      setError('Please enter your email.')
       return
     }
     setLoading(true)
     setError('')
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password })
+    setMessage('')
+
+    if (mode === 'magic') {
+      const { error: err } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: `${window.location.origin}/portal` },
+      })
+      setLoading(false)
+      if (err) setError(err.message)
+      else setMessage('Check your email for a magic link to sign in.')
+      return
+    }
+
+    if (!password) {
+      setError('Please enter your password.')
+      setLoading(false)
+      return
+    }
+
+    const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
     if (err) {
       setError(err.message)
       setLoading(false)
       return
     }
-    const { data: member } = await supabase.from('members').select('id').eq('email', email).single()
-    if (!member) {
-      setError('No member profile found for this email. Contact your gym admin.')
-      await supabase.auth.signOut()
-      setLoading(false)
+    if (data.user) await finishLogin(email, data.user.id)
+    setLoading(false)
+  }
+
+  const handlePasswordReset = async () => {
+    if (!email) {
+      setError('Enter your email first.')
       return
     }
-    router.push(nextPath.startsWith('/') ? nextPath : '/portal')
+    setLoading(true)
+    setError('')
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/portal/login`,
+    })
+    setLoading(false)
+    if (err) setError(err.message)
+    else setMessage('Password reset email sent.')
   }
 
   const inputClass =
@@ -53,6 +96,21 @@ function PortalLoginForm() {
           <h1 className="text-2xl font-bold mb-1">Member Portal</h1>
           <p className="text-white/40 text-sm mb-6">Sign in to view your membership</p>
 
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setMode('password')}
+              className={`flex-1 text-xs py-2 rounded-lg ${mode === 'password' ? 'bg-blue-600/20 text-white' : 'text-white/40'}`}
+            >
+              Password
+            </button>
+            <button
+              onClick={() => setMode('magic')}
+              className={`flex-1 text-xs py-2 rounded-lg ${mode === 'magic' ? 'bg-blue-600/20 text-white' : 'text-white/40'}`}
+            >
+              Magic link
+            </button>
+          </div>
+
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
@@ -62,34 +120,51 @@ function PortalLoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
                 className={inputClass}
-                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                onKeyDown={(e) => e.key === 'Enter' && void handleLogin()}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className={inputClass}
-                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-              />
-            </div>
+            {mode === 'password' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className={inputClass}
+                  onKeyDown={(e) => e.key === 'Enter' && void handleLogin()}
+                />
+              </div>
+            )}
 
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
                 <p className="text-red-400 text-sm">{error}</p>
               </div>
             )}
+            {message && (
+              <div className="bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-3">
+                <p className="text-green-400 text-sm">{message}</p>
+              </div>
+            )}
 
             <button
-              onClick={handleLogin}
+              onClick={() => void handleLogin()}
               disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? 'Please wait...' : mode === 'magic' ? 'Send Magic Link' : 'Sign In'}
             </button>
+
+            {mode === 'password' && (
+              <button
+                type="button"
+                onClick={() => void handlePasswordReset()}
+                className="w-full text-white/40 text-sm hover:text-white"
+              >
+                Forgot password?
+              </button>
+            )}
           </div>
 
           <div className="mt-6 pt-6 border-t border-white/10 text-center">
@@ -97,12 +172,6 @@ function PortalLoginForm() {
               Don&apos;t have an account?{' '}
               <Link href="/portal/signup" className="text-blue-400 hover:underline">
                 Create one
-              </Link>
-            </p>
-            <p className="text-white/20 text-xs mt-3">
-              Are you a gym admin?{' '}
-              <Link href="/login" className="text-white/40 hover:underline">
-                Admin login →
               </Link>
             </p>
           </div>

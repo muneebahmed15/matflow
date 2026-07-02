@@ -2,12 +2,21 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { ServiceError } from '@/services/errors';
 
 const mockFrom = vi.fn();
+const assertMemberWaiverCompliance = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
     from: mockFrom,
   }),
 }));
+
+vi.mock('@/services/waivers', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/waivers')>();
+  return {
+    ...actual,
+    assertMemberWaiverCompliance,
+  };
+});
 
 import {
   checkInMember,
@@ -31,6 +40,8 @@ function chain(result: { data?: unknown; error?: { message: string } | null }) {
 describe('attendance service', () => {
   beforeEach(() => {
     mockFrom.mockReset();
+    assertMemberWaiverCompliance.mockReset();
+    assertMemberWaiverCompliance.mockResolvedValue(undefined);
   });
 
   it('throws 404 when member is not in gym', async () => {
@@ -133,6 +144,7 @@ describe('attendance service', () => {
         .mockReturnValueOnce(chain({ data: { id: 'member-1', status: 'active' } }));
 
       await expect(validateKioskCheckIn('gym-1', 'member-1')).resolves.toBeUndefined();
+      expect(assertMemberWaiverCompliance).toHaveBeenCalledWith('gym-1', 'member-1');
     });
   });
 });

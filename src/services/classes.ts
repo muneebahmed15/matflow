@@ -17,10 +17,20 @@ export async function listClasses(gymId: string): Promise<ClassRow[]> {
   return data ?? [];
 }
 
+export async function listClassesForStaff(
+  gymId: string,
+  scopedClassIds: string[] | null
+): Promise<ClassRow[]> {
+  const classes = await listClasses(gymId);
+  if (scopedClassIds === null) return classes;
+  return classes.filter((c) => scopedClassIds.includes(c.id));
+}
+
 export type CreateClassInput = {
   gymId: string;
   name: string;
   instructor: string;
+  instructorStaffId?: string | null;
   dayOfWeek: string;
   startTime: string;
   endTime: string;
@@ -35,6 +45,7 @@ export async function createClass(input: CreateClassInput): Promise<ClassRow> {
       gym_id: input.gymId,
       name: input.name.trim(),
       instructor: input.instructor.trim(),
+      instructor_staff_id: input.instructorStaffId ?? null,
       day_of_week: input.dayOfWeek,
       start_time: input.startTime,
       end_time: input.endTime,
@@ -56,4 +67,34 @@ export async function deleteClass(gymId: string, classId: string): Promise<void>
     .eq('gym_id', gymId);
 
   if (error) throw new ServiceError(500, error.message);
+}
+
+export async function updateClass(
+  gymId: string,
+  classId: string,
+  input: Partial<CreateClassInput>
+): Promise<ClassRow> {
+  const admin = getAdminClient();
+  const updates: Record<string, unknown> = {};
+
+  if (input.name !== undefined) updates.name = input.name.trim();
+  if (input.instructor !== undefined) updates.instructor = input.instructor.trim();
+  if (input.instructorStaffId !== undefined) {
+    updates.instructor_staff_id = input.instructorStaffId;
+  }
+  if (input.dayOfWeek !== undefined) updates.day_of_week = input.dayOfWeek;
+  if (input.startTime !== undefined) updates.start_time = input.startTime;
+  if (input.endTime !== undefined) updates.end_time = input.endTime;
+  if (input.capacity !== undefined) updates.capacity = input.capacity;
+
+  const { data, error } = await admin
+    .from('classes')
+    .update(updates)
+    .eq('id', classId)
+    .eq('gym_id', gymId)
+    .select('*')
+    .single();
+
+  if (error) throw new ServiceError(500, error.message);
+  return data;
 }

@@ -12,7 +12,13 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test e2e/smoke.spec.ts",
-    "test:rls": "vitest run --config vitest.rls.config.ts"
+    "test:rls": "vitest run --config vitest.rls.config.ts",
+    "db:start": "npx supabase start",
+    "db:stop": "npx supabase stop",
+    "db:reset": "npx supabase db reset",
+    "db:push": "npx supabase db push",
+    "db:types": "npx supabase gen types typescript --local > src/types/database.ts",
+    "db:sync-env": "node scripts/sync-supabase-env.mjs"
   },
   "dependencies": {
     "@stripe/stripe-js": "^9.8.0",
@@ -22,6 +28,7 @@
     "framer-motion": "^12.42.1",
     "lucide-react": "^1.22.0",
     "next": "16.2.9",
+    "pdf-lib": "^1.17.1",
     "pino": "^10.3.1",
     "react": "19.2.7",
     "react-dom": "19.2.7",
@@ -42,6 +49,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "jsdom": "^29.1.1",
+    "supabase": "^2.109.0",
     "tailwindcss": "^4.3.2",
     "typescript": "^5",
     "vitest": "^4.1.9"

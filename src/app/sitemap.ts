@@ -1,10 +1,25 @@
 import type { MetadataRoute } from 'next'
 import { absoluteUrl, publicRoutes } from '@/lib/seo/site'
+import { getAdminClient } from '@/lib/supabase/admin'
 
-export default function sitemap(): MetadataRoute.Sitemap {
+const GYM_PUBLIC_PATHS = [
+  '',
+  '/about',
+  '/programs',
+  '/coaches',
+  '/schedule',
+  '/pricing',
+  '/reviews',
+  '/gallery',
+  '/blog',
+  '/contact',
+  '/trial',
+]
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const lastModified = new Date()
 
-  return [
+  const platformEntries: MetadataRoute.Sitemap = [
     {
       url: absoluteUrl(publicRoutes.home),
       lastModified,
@@ -36,4 +51,25 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.6,
     },
   ]
+
+  try {
+    const admin = getAdminClient()
+    const { data: gyms } = await admin
+      .from('gyms')
+      .select('slug')
+      .eq('website_enabled', true)
+
+    const gymEntries: MetadataRoute.Sitemap = (gyms ?? []).flatMap((gym) =>
+      GYM_PUBLIC_PATHS.map((path) => ({
+        url: absoluteUrl(`/g/${gym.slug}${path}`),
+        lastModified,
+        changeFrequency: 'weekly' as const,
+        priority: path === '' ? 0.9 : 0.7,
+      }))
+    )
+
+    return [...platformEntries, ...gymEntries]
+  } catch {
+    return platformEntries
+  }
 }

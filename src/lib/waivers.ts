@@ -16,8 +16,44 @@ export type WaiverSignature = {
   gym_id: string;
   signed_name: string;
   signed_at: string;
+  expires_at?: string | null;
   ip_address?: string;
 };
+
+export type WaiverSignatureStatus = 'pending' | 'signed' | 'expired';
+
+export function isSignatureValid(expiresAt: string | null | undefined): boolean {
+  if (!expiresAt) return true;
+  return new Date(expiresAt) > new Date();
+}
+
+export function waiverStatusFromSignature(
+  signature: Pick<WaiverSignature, 'expires_at'> | null | undefined
+): WaiverSignatureStatus {
+  if (!signature) return 'pending';
+  return isSignatureValid(signature.expires_at) ? 'signed' : 'expired';
+}
+
+export function latestSignatureByWaiverId<T extends { waiver_id: string; signed_at: string }>(
+  signatures: T[]
+): Map<string, T> {
+  const map = new Map<string, T>();
+  for (const sig of signatures) {
+    const existing = map.get(sig.waiver_id);
+    if (!existing || new Date(sig.signed_at) > new Date(existing.signed_at)) {
+      map.set(sig.waiver_id, sig);
+    }
+  }
+  return map;
+}
+
+export function countUnsignedActiveWaivers(
+  activeWaivers: { id: string }[],
+  signatures: Pick<WaiverSignature, 'waiver_id' | 'expires_at' | 'signed_at'>[]
+): number {
+  const latest = latestSignatureByWaiverId(signatures);
+  return activeWaivers.filter((w) => waiverStatusFromSignature(latest.get(w.id)) !== 'signed').length;
+}
 
 export async function getWaivers(gym_id: string): Promise<Waiver[]> {
   const { data, error } = await supabase
@@ -99,9 +135,12 @@ export async function signWaiver(
 export async function hasSignedWaiver(waiver_id: string, member_id: string): Promise<boolean> {
   const { data } = await supabase
     .from('waiver_signatures')
-    .select('id')
+    .select('id, expires_at, signed_at')
     .eq('waiver_id', waiver_id)
     .eq('member_id', member_id)
+    .order('signed_at', { ascending: false })
+    .limit(1)
     .maybeSingle();
-  return !!data;
+
+  return waiverStatusFromSignature(data) === 'signed';
 }

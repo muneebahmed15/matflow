@@ -20,6 +20,7 @@ export default function NewWaiverPage() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState(DEFAULT_BODY);
+  const [expiresAfterDays, setExpiresAfterDays] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -30,7 +31,11 @@ export default function NewWaiverPage() {
     }
     setLoading(true);
     setError('');
-    const result = await createWaiverAction({ title: title.trim(), body: body.trim() });
+    const result = await createWaiverAction({
+      title: title.trim(),
+      body: body.trim(),
+      expiresAfterDays: expiresAfterDays ? parseInt(expiresAfterDays, 10) : undefined,
+    });
     if (!result.ok) {
       setError(result.error);
       setLoading(false);
@@ -66,6 +71,17 @@ export default function NewWaiverPage() {
               onChange={(e) => setBody(e.target.value)}
               rows={16}
               className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm leading-relaxed"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Expires after (days, optional)</label>
+            <input
+              type="number"
+              min={1}
+              value={expiresAfterDays}
+              onChange={(e) => setExpiresAfterDays(e.target.value)}
+              placeholder="e.g. 365"
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           {error && <p className="text-red-400 text-sm">{error}</p>}

@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { stripe } from '@/lib/stripe';
 import { ServiceError } from '@/services/errors';
+import { logAuditEvent } from '@/services/audit';
 
 export type CancelSubscriptionInput = {
   gymId: string;
@@ -137,6 +138,19 @@ export async function refundLatestSubscriptionPayment(
   });
 
   if (error) throw new ServiceError(500, error.message);
+
+  try {
+    await logAuditEvent({
+      gymId: input.gymId,
+      actorId: input.issuedBy,
+      action: 'refund.issued',
+      entityType: 'subscription',
+      entityId: input.subscriptionId,
+      payload: { refundId: refund.id, amountCents: refund.amount },
+    });
+  } catch {
+    // Audit is best-effort
+  }
 
   return { refundId: refund.id, amountCents: refund.amount };
 }

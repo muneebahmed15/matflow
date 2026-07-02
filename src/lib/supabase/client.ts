@@ -1,6 +1,11 @@
 import { createBrowserClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getPublicEnv, isProduction } from '@/lib/env';
+import {
+  isPlaceholderSupabaseUrl,
+  LOCAL_SUPABASE_ANON_KEY,
+  LOCAL_SUPABASE_URL,
+} from '@/lib/supabase/local';
 
 export function createClient() {
   if (isProduction()) {
@@ -8,8 +13,14 @@ export function createClient() {
     return createBrowserClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321';
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'dev-anon-key';
+  const url = isPlaceholderSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL)
+    ? LOCAL_SUPABASE_URL
+    : (process.env.NEXT_PUBLIC_SUPABASE_URL ?? LOCAL_SUPABASE_URL);
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === 'your-anon-key' ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      ? LOCAL_SUPABASE_ANON_KEY
+      : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   return createBrowserClient(url, key);
 }
 

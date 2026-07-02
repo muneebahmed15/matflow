@@ -3,6 +3,7 @@ import { getAdminClient } from '@/lib/supabase/admin';
 import { stripe } from '@/lib/stripe';
 import { ServiceError } from '@/services/errors';
 import { logger } from '@/lib/logger';
+import { processPaymentFailedDunning } from '@/services/dunning';
 
 export type WebhookClaimResult = 'claimed' | 'duplicate' | 'retry';
 
@@ -100,7 +101,15 @@ export async function handleStripeWebhookEvent(event: Stripe.Event): Promise<voi
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
-      const { member_id, gym_id } = session.metadata || {};
+      const metadata = session.metadata || {};
+
+      if (metadata.type === 'merchandise' && metadata.order_id && metadata.gym_id) {
+        const { completeShopOrder } = await import('@/services/merchandise');
+        await completeShopOrder(metadata.gym_id, metadata.order_id);
+        break;
+      }
+
+      const { member_id, gym_id } = metadata;
       const stripeSubId =
         typeof session.subscription === 'string'
           ? session.subscription
@@ -202,11 +211,21 @@ export async function handleStripeWebhookEvent(event: Stripe.Event): Promise<voi
           .from('subscriptions')
           .update({ status: 'past_due' })
           .eq('stripe_subscription_id', subId)
-          .select('member_id')
+          .select('member_id, id, gym_id')
           .maybeSingle();
 
         if (updated?.member_id) {
           await admin.from('members').update({ status: 'past_due' }).eq('id', updated.member_id);
+
+          try {
+            await processPaymentFailedDunning({
+              gymId: updated.gym_id,
+              memberId: updated.member_id,
+              subscriptionId: updated.id,
+            });
+          } catch (err) {
+            logger.warn({ err, subscriptionId: updated.id }, 'Dunning processing failed');
+          }
         }
       }
       break;

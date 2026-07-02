@@ -5,12 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
   getWaivers,
-  signWaiver,
   hasSignedWaiver,
   getMemberSignatures,
   type Waiver,
   type WaiverSignature,
 } from '@/lib/waivers';
+import { signWaiverAction } from '@/app/(dashboard)/actions';
 import WaiverSignatureBox from '@/components/WaiverSignatureBox';
 
 type Member = { id: string; first_name: string; last_name: string; gym_id: string };
@@ -27,6 +27,7 @@ export default function SignWaiverPage() {
   const [signedAt, setSignedAt] = useState<string | undefined>();
   const [existingSigs, setExistingSigs] = useState<SignatureWithWaiver[]>([]);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -77,7 +78,16 @@ export default function SignWaiverPage() {
 
   const handleSign = async (typedName: string) => {
     if (!selected || !member) return;
-    await signWaiver(selected.id, member.id, member.gym_id, typedName);
+    setError(null);
+    const result = await signWaiverAction({
+      waiverId: selected.id,
+      memberId: member.id,
+      signedName: typedName,
+    });
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
     setAlreadySigned(true);
     setSignedAt(new Date().toISOString());
     setSuccess(true);
@@ -144,6 +154,12 @@ export default function SignWaiverPage() {
                 {success && (
                   <div className="mt-4 rounded-xl border border-green-500/30 bg-green-500/10 p-4">
                     <p className="text-green-400 font-semibold">✅ Waiver signed successfully!</p>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4">
+                    <p className="text-red-400 text-sm">{error}</p>
                   </div>
                 )}
 

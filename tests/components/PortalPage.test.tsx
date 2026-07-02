@@ -11,24 +11,40 @@ vi.mock('@/lib/supabase', () => ({
   supabase: { auth: { getUser }, from },
 }));
 
+const mockActiveMember = {
+  id: 'member-1',
+  gym_id: 'gym-1',
+  first_name: 'Ada',
+  last_name: 'Lovelace',
+  belt_rank: 'blue',
+  stripe_count: 0,
+  status: 'active',
+  email: 'ada@example.com',
+  family_id: null,
+  portal_role: 'primary',
+};
+
+vi.mock('@/lib/portal-member-context', () => ({
+  usePortalMember: () => ({
+    activeMember: mockActiveMember,
+    loading: false,
+    familyMembers: [mockActiveMember],
+    setActiveMemberId: vi.fn(),
+  }),
+}));
+
 import PortalPage from '@/app/(portal)/portal/page';
 
-function memberQueryChain(memberData: Record<string, unknown> | null) {
-  return {
-    select: () => ({
-      eq: () => ({
-        single: async () => ({ data: memberData }),
-      }),
-    }),
-  };
-}
-
-function countQueryChain(count: number) {
-  return {
-    select: () => ({
-      eq: async () => ({ count }),
-    }),
-  };
+function chainable(result: unknown = { data: [], count: 0 }) {
+  const chain: Record<string, unknown> = {};
+  const self = () => chain;
+  chain.select = () => chain;
+  chain.eq = () => chain;
+  chain.order = () => chain;
+  chain.single = async () => result;
+  chain.maybeSingle = async () => result;
+  chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve(result).then(resolve);
+  return chain;
 }
 
 describe('Portal page status badge', () => {
@@ -38,20 +54,9 @@ describe('Portal page status badge', () => {
   });
 
   it('shows a distinct "payment due" badge for past_due members, not the plain status text', async () => {
+    mockActiveMember.status = 'past_due';
     getUser.mockResolvedValue({ data: { user: { email: 'ada@example.com' } } });
-    from.mockImplementation((table: string) => {
-      if (table === 'members') {
-        return memberQueryChain({
-          id: 'member-1',
-          first_name: 'Ada',
-          last_name: 'Lovelace',
-          belt_rank: 'blue',
-          status: 'past_due',
-          email: 'ada@example.com',
-        });
-      }
-      return countQueryChain(0);
-    });
+    from.mockImplementation(() => chainable({ data: [], count: 0 }));
 
     render(<PortalPage />);
 
@@ -60,20 +65,9 @@ describe('Portal page status badge', () => {
   });
 
   it('shows the plain status text for active members with a green badge', async () => {
+    mockActiveMember.status = 'active';
     getUser.mockResolvedValue({ data: { user: { email: 'ada@example.com' } } });
-    from.mockImplementation((table: string) => {
-      if (table === 'members') {
-        return memberQueryChain({
-          id: 'member-1',
-          first_name: 'Ada',
-          last_name: 'Lovelace',
-          belt_rank: 'blue',
-          status: 'active',
-          email: 'ada@example.com',
-        });
-      }
-      return countQueryChain(0);
-    });
+    from.mockImplementation(() => chainable({ data: [], count: 0 }));
 
     render(<PortalPage />);
 

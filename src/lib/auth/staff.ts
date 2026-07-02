@@ -2,8 +2,9 @@ import type { User } from '@supabase/supabase-js';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { logger, errorMessage } from '@/lib/logger';
+import { hasCapability, type Capability } from '@/lib/permissions/capabilities';
 
-export type StaffRole = 'admin' | 'coach';
+export type StaffRole = 'admin' | 'supervisor' | 'coach';
 
 export type StaffAuth = {
   user: User;
@@ -44,6 +45,7 @@ export async function resolveStaffAuth(user: User): Promise<StaffAuth | null> {
 /** Resolve staff session for server actions and services. Throws on failure. */
 export async function requireStaffSession(options?: {
   adminOnly?: boolean;
+  capability?: Capability;
 }): Promise<StaffAuth> {
   const supabase = await createClient();
   const {
@@ -57,6 +59,10 @@ export async function requireStaffSession(options?: {
 
   const auth = await resolveStaffAuth(user);
   if (!auth) {
+    throw new Error('Forbidden');
+  }
+
+  if (options?.capability && !hasCapability(auth.role, options.capability)) {
     throw new Error('Forbidden');
   }
 
