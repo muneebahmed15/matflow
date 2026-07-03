@@ -202,3 +202,14 @@ export async function getGymBeltSystemAction(): Promise<
   }
 }
 
+export async function exportMembersByBeltCsvAction(): Promise<ActionResult<string>> {
+  try {
+    const auth = await requireStaffSession({ capability: 'reports.read' });
+    const { exportMembersByBeltCsv } = await import('@/services/belts');
+    const csv = await exportMembersByBeltCsv(auth.gymId);
+    return { ok: true, data: csv };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+

@@ -105,6 +105,21 @@ import { updateClass } from '@/services/classes';
 
 import { type ActionResult, toActionError } from './_shared';
 
+export async function getStaffContextAction(): Promise<
+  ActionResult<{ gymId: string; role: StaffRole; timezone: string }>
+> {
+  try {
+    const auth = await requireStaffSession();
+    const settings = await getGymSettings(auth.gymId);
+    return {
+      ok: true,
+      data: { gymId: auth.gymId, role: auth.role, timezone: settings.timezone },
+    };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
 export async function getGymSettingsAction(): Promise<ActionResult<GymSettings>> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });

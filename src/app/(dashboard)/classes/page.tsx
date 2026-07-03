@@ -1,146 +1,166 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { getCurrentStaffInfo } from '@/lib/permissions'
-import { hasCapability } from '@/lib/permissions/capabilities'
-import { Dumbbell, Plus } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react';
+import { hasCapability } from '@/lib/permissions/capabilities';
+import { Dumbbell, Plus } from 'lucide-react';
 import {
   createClassAction,
   deleteClassAction,
   duplicateClassAction,
   getClassAttendanceReportAction,
   getEnrollmentCountsAction,
+  getStaffContextAction,
+  listActiveMembersAction,
   listClassesAction,
   listStaffAction,
   updateClassAction,
-} from '@/app/(dashboard)/actions'
-import { formatClassTime } from '@/lib/gym-public-time'
-import { useAppUi } from '@/components/ui/AppUiProvider'
-import PageLoader from '@/components/PageLoader'
-import ClassWaitlistPanel from '@/components/classes/ClassWaitlistPanel'
-import ClassSessionPanel from '@/components/classes/ClassSessionPanel'
+} from '@/app/(dashboard)/actions';
+import { formatClassTime } from '@/lib/gym-public-time';
+import { useAppUi } from '@/components/ui/AppUiProvider';
+import PageLoader from '@/components/PageLoader';
+import ClassWaitlistPanel from '@/components/classes/ClassWaitlistPanel';
+import ClassSessionPanel from '@/components/classes/ClassSessionPanel';
 
 interface MemberOption {
-  id: string; first_name: string; last_name: string
+  id: string;
+  first_name: string;
+  last_name: string;
 }
 
 interface StaffOption {
-  id: string
-  full_name: string
-  role: string
+  id: string;
+  full_name: string;
+  role: string;
 }
 
 interface Class {
-  id: string
-  name: string
-  description: string | null
-  instructor: string
-  instructor_staff_id: string | null
-  day_of_week: string
-  start_time: string
-  end_time: string
-  capacity: number
+  id: string;
+  name: string;
+  description: string | null;
+  instructor: string;
+  instructor_staff_id: string | null;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  capacity: number;
 }
 
-const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export default function ClassesPage() {
-  const { confirm, error: showError } = useAppUi()
-  const [classes, setClasses] = useState<Class[]>([])
-  const [enrollCounts, setEnrollCounts] = useState<Record<string, number>>({})
-  const [attendanceStats, setAttendanceStats] = useState<Record<string, { sessions: number; avg: number }>>({})
-  const [members, setMembers] = useState<MemberOption[]>([])
-  const [staff, setStaff] = useState<StaffOption[]>([])
-  const [loading, setLoading] = useState(true)
-  const [canManageClasses, setCanManageClasses] = useState(false)
-  const [gymId, setGymId] = useState<string | null>(null)
-  const [gymTimezone, setGymTimezone] = useState('America/Los_Angeles')
-  const [showForm, setShowForm] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [instructor, setInstructor] = useState('')
-  const [instructorStaffId, setInstructorStaffId] = useState<string>('')
-  const [day, setDay] = useState('Monday')
-  const [startTime, setStartTime] = useState('09:00')
-  const [endTime, setEndTime] = useState('10:00')
-  const [capacity, setCapacity] = useState('20')
-  const [error, setError] = useState('')
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const { confirm, error: showError } = useAppUi();
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [enrollCounts, setEnrollCounts] = useState<Record<string, number>>({});
+  const [attendanceStats, setAttendanceStats] = useState<Record<string, { sessions: number; avg: number }>>({});
+  const [members, setMembers] = useState<MemberOption[]>([]);
+  const [staff, setStaff] = useState<StaffOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [canManageClasses, setCanManageClasses] = useState(false);
+  const [gymTimezone, setGymTimezone] = useState('America/Los_Angeles');
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [instructor, setInstructor] = useState('');
+  const [instructorStaffId, setInstructorStaffId] = useState<string>('');
+  const [day, setDay] = useState('Monday');
+  const [startTime, setStartTime] = useState('09:00');
+  const [endTime, setEndTime] = useState('10:00');
+  const [capacity, setCapacity] = useState('20');
+  const [error, setError] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const reloadClasses = async () => {
-    const result = await listClassesAction()
-    if (result.ok && result.data) setClasses(result.data as Class[])
-    else if (!result.ok) showError(result.error)
-  }
+    const result = await listClassesAction();
+    if (result.ok && result.data) setClasses(result.data as Class[]);
+    else if (!result.ok) showError(result.error);
+  };
 
-  useEffect(() => {
-    const load = async () => {
-      const info = await getCurrentStaffInfo()
-      if (!info.gymId) return
-      setGymId(info.gymId)
-      setCanManageClasses(hasCapability(info.role, 'classes.manage'))
+  const loadPage = useCallback(async () => {
+    const contextResult = await getStaffContextAction();
+    if (!contextResult.ok || !contextResult.data) {
+      if (!contextResult.ok) showError(contextResult.error);
+      setLoading(false);
+      return;
+    }
 
-      const [classResult, staffResult, countsResult, reportResult, { data: membersData }, { data: gymData }] = await Promise.all([
-        listClassesAction(),
-        listStaffAction(),
-        getEnrollmentCountsAction(),
-        getClassAttendanceReportAction(30),
-        supabase.from('members').select('id, first_name, last_name').eq('gym_id', info.gymId).eq('status', 'active').order('first_name'),
-        supabase.from('gyms').select('timezone').eq('id', info.gymId).maybeSingle(),
-      ])
+    const { role, timezone } = contextResult.data;
+    setGymTimezone(timezone);
+    setCanManageClasses(hasCapability(role, 'classes.manage'));
 
-      if (classResult.ok && classResult.data) setClasses(classResult.data as Class[])
-      else if (!classResult.ok) showError(classResult.error)
+    const [classResult, staffResult, countsResult, reportResult, membersResult] = await Promise.all([
+      listClassesAction(),
+      listStaffAction(),
+      getEnrollmentCountsAction(),
+      getClassAttendanceReportAction(30),
+      listActiveMembersAction(),
+    ]);
 
-      if (countsResult.ok && countsResult.data) setEnrollCounts(countsResult.data)
+    if (classResult.ok && classResult.data) setClasses(classResult.data as Class[]);
+    else if (!classResult.ok) showError(classResult.error);
 
-      if (reportResult.ok && reportResult.data) {
-        const stats: Record<string, { sessions: number; avg: number }> = {}
-        for (const r of reportResult.data) {
-          stats[r.classId] = { sessions: r.sessions, avg: r.avgPerSession }
-        }
-        setAttendanceStats(stats)
+    if (countsResult.ok && countsResult.data) setEnrollCounts(countsResult.data);
+
+    if (reportResult.ok && reportResult.data) {
+      const stats: Record<string, { sessions: number; avg: number }> = {};
+      for (const r of reportResult.data) {
+        stats[r.classId] = { sessions: r.sessions, avg: r.avgPerSession };
       }
+      setAttendanceStats(stats);
+    }
 
-      if (staffResult.ok && staffResult.data) {
-        setStaff(staffResult.data.map((s) => ({
+    if (staffResult.ok && staffResult.data) {
+      setStaff(
+        staffResult.data.map((s) => ({
           id: s.id,
           full_name: s.full_name,
           role: s.role,
-        })))
-      }
-
-      setMembers(membersData || [])
-      if (gymData?.timezone) setGymTimezone(gymData.timezone)
-      setLoading(false)
+        }))
+      );
     }
-    void load()
-  }, [showError])
+
+    if (membersResult.ok && membersResult.data) {
+      setMembers(
+        membersResult.data.map((m) => ({
+          id: m.id,
+          first_name: m.first_name,
+          last_name: m.last_name,
+        }))
+      );
+    }
+
+    setLoading(false);
+  }, [showError]);
+
+  useEffect(() => {
+    void loadPage();
+  }, [loadPage]);
 
   const resetForm = () => {
-    setName('')
-    setDescription('')
-    setInstructor('')
-    setInstructorStaffId('')
-    setDay('Monday')
-    setStartTime('09:00')
-    setEndTime('10:00')
-    setCapacity('20')
-    setEditingId(null)
-  }
+    setName('');
+    setDescription('');
+    setInstructor('');
+    setInstructorStaffId('');
+    setDay('Monday');
+    setStartTime('09:00');
+    setEndTime('10:00');
+    setCapacity('20');
+    setEditingId(null);
+  };
 
   const handleStaffPick = (staffId: string) => {
-    setInstructorStaffId(staffId)
-    const picked = staff.find((s) => s.id === staffId)
-    if (picked) setInstructor(picked.full_name)
-  }
+    setInstructorStaffId(staffId);
+    const picked = staff.find((s) => s.id === staffId);
+    if (picked) setInstructor(picked.full_name);
+  };
 
   const handleSubmit = async () => {
-    if (!name || !instructor) { setError('Name and instructor are required.'); return }
-    setSubmitting(true)
-    setError('')
+    if (!name || !instructor) {
+      setError('Name and instructor are required.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
     const result = await createClassAction({
       name,
       description: description || undefined,
@@ -150,33 +170,33 @@ export default function ClassesPage() {
       startTime,
       endTime,
       capacity: parseInt(capacity, 10),
-    })
-    setSubmitting(false)
+    });
+    setSubmitting(false);
     if (!result.ok) {
-      setError(result.error)
-      return
+      setError(result.error);
+      return;
     }
-    await reloadClasses()
-    resetForm()
-    setShowForm(false)
-  }
+    await reloadClasses();
+    resetForm();
+    setShowForm(false);
+  };
 
   const startEdit = (cls: Class) => {
-    setEditingId(cls.id)
-    setName(cls.name)
-    setDescription(cls.description ?? '')
-    setInstructor(cls.instructor)
-    setInstructorStaffId(cls.instructor_staff_id ?? '')
-    setDay(cls.day_of_week)
-    setStartTime(cls.start_time)
-    setEndTime(cls.end_time)
-    setCapacity(String(cls.capacity))
-    setShowForm(true)
-  }
+    setEditingId(cls.id);
+    setName(cls.name);
+    setDescription(cls.description ?? '');
+    setInstructor(cls.instructor);
+    setInstructorStaffId(cls.instructor_staff_id ?? '');
+    setDay(cls.day_of_week);
+    setStartTime(cls.start_time);
+    setEndTime(cls.end_time);
+    setCapacity(String(cls.capacity));
+    setShowForm(true);
+  };
 
   const handleUpdate = async () => {
-    if (!editingId || !name || !instructor) return
-    setSubmitting(true)
+    if (!editingId || !name || !instructor) return;
+    setSubmitting(true);
     const result = await updateClassAction(editingId, {
       name,
       description: description || null,
@@ -186,16 +206,16 @@ export default function ClassesPage() {
       startTime,
       endTime,
       capacity: parseInt(capacity, 10),
-    })
-    setSubmitting(false)
+    });
+    setSubmitting(false);
     if (!result.ok) {
-      setError(result.error)
-      return
+      setError(result.error);
+      return;
     }
-    await reloadClasses()
-    resetForm()
-    setShowForm(false)
-  }
+    await reloadClasses();
+    resetForm();
+    setShowForm(false);
+  };
 
   const handleDelete = async (id: string) => {
     const ok = await confirm({
@@ -203,32 +223,36 @@ export default function ClassesPage() {
       message: 'This removes the class from your schedule.',
       confirmLabel: 'Delete',
       destructive: true,
-    })
-    if (!ok) return
-    const result = await deleteClassAction(id)
+    });
+    if (!ok) return;
+    const result = await deleteClassAction(id);
     if (result.ok) {
-      setClasses(prev => prev.filter(c => c.id !== id))
+      setClasses((prev) => prev.filter((c) => c.id !== id));
     } else {
-      showError(result.error)
+      showError(result.error);
     }
-  }
+  };
 
   const handleDuplicate = async (cls: Class) => {
-    const targetDay = window.prompt('Duplicate to which day?', cls.day_of_week)
-    if (!targetDay || !DAYS.includes(targetDay)) return
-    const result = await duplicateClassAction(cls.id, targetDay)
-    if (result.ok) await reloadClasses()
-    else showError(result.error)
-  }
+    const targetDay = window.prompt('Duplicate to which day?', cls.day_of_week);
+    if (!targetDay || !DAYS.includes(targetDay)) return;
+    const result = await duplicateClassAction(cls.id, targetDay);
+    if (result.ok) await reloadClasses();
+    else showError(result.error);
+  };
 
-  const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500"
+  const inputClass =
+    'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500';
 
-  if (loading) return <PageLoader />
+  if (loading) return <PageLoader />;
 
-  const grouped = DAYS.reduce((acc, dayName) => {
-    acc[dayName] = classes.filter(c => c.day_of_week === dayName)
-    return acc
-  }, {} as Record<string, Class[]>)
+  const grouped = DAYS.reduce(
+    (acc, dayName) => {
+      acc[dayName] = classes.filter((c) => c.day_of_week === dayName);
+      return acc;
+    },
+    {} as Record<string, Class[]>
+  );
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">
@@ -238,7 +262,10 @@ export default function ClassesPage() {
           <p className="text-white/40 text-sm mt-1">Weekly class schedule.</p>
         </div>
         {canManageClasses && (
-          <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition"
+          >
             <Plus size={16} /> New Class
           </button>
         )}
@@ -254,12 +281,10 @@ export default function ClassesPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Assigned instructor</label>
-              <select
-                value={instructorStaffId}
-                onChange={(e) => handleStaffPick(e.target.value)}
-                className={inputClass}
-              >
-                <option value="" className="bg-gray-900">Custom name below</option>
+              <select value={instructorStaffId} onChange={(e) => handleStaffPick(e.target.value)} className={inputClass}>
+                <option value="" className="bg-gray-900">
+                  Custom name below
+                </option>
                 {staff.map((s) => (
                   <option key={s.id} value={s.id} className="bg-gray-900">
                     {s.full_name} ({s.role})
@@ -274,13 +299,23 @@ export default function ClassesPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Description (optional)</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="What to expect in this class" className={inputClass} />
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="What to expect in this class"
+              className={inputClass}
+            />
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Day</label>
               <select value={day} onChange={(e) => setDay(e.target.value)} className={inputClass}>
-                {DAYS.map(d => <option key={d} value={d} className="bg-gray-900">{d}</option>)}
+                {DAYS.map((d) => (
+                  <option key={d} value={d} className="bg-gray-900">
+                    {d}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
@@ -298,10 +333,22 @@ export default function ClassesPage() {
           </div>
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <div className="flex gap-3">
-            <button onClick={() => (editingId ? void handleUpdate() : void handleSubmit())} disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
+            <button
+              onClick={() => (editingId ? void handleUpdate() : void handleSubmit())}
+              disabled={submitting}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition"
+            >
               {submitting ? 'Saving...' : editingId ? 'Save Changes' : 'Add Class'}
             </button>
-            <button onClick={() => { setShowForm(false); setEditingId(null) }} className="px-4 border border-white/10 text-gray-400 rounded-xl hover:bg-white/5 transition">Cancel</button>
+            <button
+              onClick={() => {
+                setShowForm(false);
+                setEditingId(null);
+              }}
+              className="px-4 border border-white/10 text-gray-400 rounded-xl hover:bg-white/5 transition"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
@@ -316,7 +363,7 @@ export default function ClassesPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {DAYS.filter(d => grouped[d]?.length > 0).map(dayName => (
+          {DAYS.filter((d) => grouped[d]?.length > 0).map((dayName) => (
             <div key={dayName}>
               <h2 className="text-sm font-semibold text-white/40 uppercase tracking-wider mb-2">{dayName}</h2>
               <div className="space-y-2">
@@ -330,7 +377,8 @@ export default function ClassesPage() {
                         <p className="font-semibold text-white">{cls.name}</p>
                         {cls.description && <p className="text-xs text-white/40 mt-0.5">{cls.description}</p>}
                         <p className="text-xs text-white/30">
-                          {cls.instructor} · {formatClassTime(cls.start_time, gymTimezone)} – {formatClassTime(cls.end_time, gymTimezone)} ·{' '}
+                          {cls.instructor} · {formatClassTime(cls.start_time, gymTimezone)} –{' '}
+                          {formatClassTime(cls.end_time, gymTimezone)} ·{' '}
                           <span className={(enrollCounts[cls.id] ?? 0) >= cls.capacity ? 'text-red-400' : ''}>
                             {enrollCounts[cls.id] ?? 0}/{cls.capacity} enrolled
                           </span>
@@ -343,9 +391,15 @@ export default function ClassesPage() {
                     <div className="flex flex-col items-end gap-1">
                       {canManageClasses && (
                         <div className="flex gap-2">
-                          <button onClick={() => startEdit(cls)} className="text-white/30 hover:text-blue-400 text-xs transition">Edit</button>
-                          <button onClick={() => void handleDuplicate(cls)} className="text-white/30 hover:text-blue-400 text-xs transition">Duplicate</button>
-                          <button onClick={() => handleDelete(cls.id)} className="text-white/20 hover:text-red-400 text-xs transition">Remove</button>
+                          <button onClick={() => startEdit(cls)} className="text-white/30 hover:text-blue-400 text-xs transition">
+                            Edit
+                          </button>
+                          <button onClick={() => void handleDuplicate(cls)} className="text-white/30 hover:text-blue-400 text-xs transition">
+                            Duplicate
+                          </button>
+                          <button onClick={() => handleDelete(cls.id)} className="text-white/20 hover:text-red-400 text-xs transition">
+                            Remove
+                          </button>
                         </div>
                       )}
                       <ClassSessionPanel classId={cls.id} className={cls.name} instructor={cls.instructor} members={members} />
@@ -359,5 +413,5 @@ export default function ClassesPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

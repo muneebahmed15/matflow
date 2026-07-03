@@ -1,40 +1,26 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { getCurrentStaffInfo } from '@/lib/permissions'
-import { UserPlus, Plus, ArrowRight } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react';
+import { UserPlus, Plus, ArrowRight } from 'lucide-react';
 import {
   convertLeadAction,
   createLeadAction,
   updateLeadStatusAction,
   updateLeadNotesAction,
   assignLeadAction,
+  listLeadsAction,
   listStaffAction,
-} from '@/app/(dashboard)/actions'
-import { useAppUi } from '@/components/ui/AppUiProvider'
-import { ListSkeleton } from '@/components/LoadingSkeleton'
-
-interface Lead {
-  id: string
-  first_name: string
-  last_name: string
-  email: string
-  phone: string
-  source: string
-  status: string
-  notes: string
-  interested_in: string
-  created_at: string
-  assigned_staff_id: string | null
-}
+} from '@/app/(dashboard)/actions';
+import type { LeadSummary } from '@/services/leads';
+import { useAppUi } from '@/components/ui/AppUiProvider';
+import { ListSkeleton } from '@/components/LoadingSkeleton';
 
 interface StaffOption {
-  id: string
-  full_name: string
+  id: string;
+  full_name: string;
 }
 
-const STATUSES = ['new', 'contacted', 'trial_scheduled', 'trial_completed', 'converted', 'lost']
+const STATUSES = ['new', 'contacted', 'trial_scheduled', 'trial_completed', 'converted', 'lost'];
 
 const statusColors: Record<string, string> = {
   new: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -43,55 +29,62 @@ const statusColors: Record<string, string> = {
   trial_completed: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
   converted: 'bg-green-500/10 text-green-400 border-green-500/20',
   lost: 'bg-white/5 text-white/30 border-white/10',
-}
+};
 
 const statusLabels: Record<string, string> = {
-  new: 'New', contacted: 'Contacted', trial_scheduled: 'Trial Scheduled',
-  trial_completed: 'Trial Completed', converted: 'Converted', lost: 'Lost',
-}
+  new: 'New',
+  contacted: 'Contacted',
+  trial_scheduled: 'Trial Scheduled',
+  trial_completed: 'Trial Completed',
+  converted: 'Converted',
+  lost: 'Lost',
+};
 
 export default function LeadsPage() {
-  const { confirm, error: showError, success } = useAppUi()
-  const [leads, setLeads] = useState<Lead[]>([])
-  const [gymId, setGymId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('all')
-  const [showForm, setShowForm] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [source, setSource] = useState('walk-in')
-  const [interestedIn, setInterestedIn] = useState('')
-  const [error, setError] = useState('')
-  const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null)
-  const [notesDraft, setNotesDraft] = useState('')
-  const [notesSaving, setNotesSaving] = useState(false)
-  const [staff, setStaff] = useState<StaffOption[]>([])
+  const { confirm, error: showError, success } = useAppUi();
+  const [leads, setLeads] = useState<LeadSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [source, setSource] = useState('walk-in');
+  const [interestedIn, setInterestedIn] = useState('');
+  const [error, setError] = useState('');
+  const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
+  const [notesDraft, setNotesDraft] = useState('');
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [staff, setStaff] = useState<StaffOption[]>([]);
+
+  const loadLeads = useCallback(async () => {
+    const [leadsResult, staffResult] = await Promise.all([listLeadsAction(), listStaffAction()]);
+    if (leadsResult.ok && leadsResult.data) {
+      setLeads(leadsResult.data);
+      setLoadError('');
+    } else if (!leadsResult.ok) {
+      setLoadError(leadsResult.error);
+    }
+    if (staffResult.ok && staffResult.data) {
+      setStaff(staffResult.data.map((s) => ({ id: s.id, full_name: s.full_name })));
+    }
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    const load = async () => {
-      const info = await getCurrentStaffInfo()
-      if (!info.gymId) return
-      setGymId(info.gymId)
-      const [{ data }, staffResult] = await Promise.all([
-        supabase.from('leads').select('*').eq('gym_id', info.gymId).order('created_at', { ascending: false }),
-        listStaffAction(),
-      ])
-      setLeads(data || [])
-      if (staffResult.ok && staffResult.data) {
-        setStaff(staffResult.data.map((s) => ({ id: s.id, full_name: s.full_name })))
-      }
-      setLoading(false)
-    }
-    load()
-  }, [])
+    void loadLeads();
+  }, [loadLeads]);
 
   const handleSubmit = async () => {
-    if (!firstName || !lastName) { setError('First and last name are required.'); return }
-    setSubmitting(true)
-    setError('')
+    if (!firstName || !lastName) {
+      setError('First and last name are required.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
     const result = await createLeadAction({
       firstName,
       lastName,
@@ -99,69 +92,78 @@ export default function LeadsPage() {
       phone,
       source,
       interestedIn,
-    })
+    });
     if (!result.ok) {
-      setError(result.error)
-      setSubmitting(false)
-      return
+      setError(result.error);
+      setSubmitting(false);
+      return;
     }
-    const { data } = await supabase.from('leads').select('*').eq('gym_id', gymId).order('created_at', { ascending: false })
-    setLeads(data || [])
-    setFirstName(''); setLastName(''); setEmail(''); setPhone(''); setSource('walk-in'); setInterestedIn('')
-    setShowForm(false)
-    setSubmitting(false)
-  }
+    if (result.data) {
+      setLeads((prev) => [result.data!, ...prev]);
+    } else {
+      await loadLeads();
+    }
+    setFirstName('');
+    setLastName('');
+    setEmail('');
+    setPhone('');
+    setSource('walk-in');
+    setInterestedIn('');
+    setShowForm(false);
+    setSubmitting(false);
+  };
 
   const handleStatusChange = async (id: string, status: string) => {
-    const result = await updateLeadStatusAction(id, status)
+    const result = await updateLeadStatusAction(id, status);
     if (result.ok) {
-      setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l))
+      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
     }
-  }
+  };
 
   const handleSaveNotes = async (leadId: string) => {
-    setNotesSaving(true)
-    const result = await updateLeadNotesAction(leadId, notesDraft)
-    setNotesSaving(false)
+    setNotesSaving(true);
+    const result = await updateLeadNotesAction(leadId, notesDraft);
+    setNotesSaving(false);
     if (result.ok) {
-      setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, notes: notesDraft } : l)))
-      setExpandedLeadId(null)
+      setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, notes: notesDraft } : l)));
+      setExpandedLeadId(null);
     }
-  }
+  };
 
   const handleAssign = async (leadId: string, staffId: string) => {
-    const result = await assignLeadAction(leadId, staffId || null)
+    const result = await assignLeadAction(leadId, staffId || null);
     if (result.ok) {
-      setLeads((prev) =>
-        prev.map((l) => (l.id === leadId ? { ...l, assigned_staff_id: staffId || null } : l))
-      )
+      setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, assigned_staff_id: staffId || null } : l)));
     }
-  }
+  };
 
-  const handleConvert = async (lead: Lead) => {
+  const handleConvert = async (lead: LeadSummary) => {
     const ok = await confirm({
       title: 'Convert lead to member',
       message: `Create a full member profile for ${lead.first_name} ${lead.last_name}?`,
       confirmLabel: 'Convert',
-    })
-    if (!ok) return
-    const result = await convertLeadAction(lead.id)
+    });
+    if (!ok) return;
+    const result = await convertLeadAction(lead.id);
     if (!result.ok) {
-      showError(result.error)
-      return
+      showError(result.error);
+      return;
     }
-    success(`${lead.first_name} ${lead.last_name} converted to member.`)
-    setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'converted' } : l))
+    success(`${lead.first_name} ${lead.last_name} converted to member.`);
+    setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, status: 'converted' } : l)));
+  };
+
+  const filteredLeads = filter === 'all' ? leads : leads.filter((l) => l.status === filter);
+  const inputClass =
+    'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+
+  if (loading) {
+    return (
+      <div className="p-6 md:p-8 max-w-4xl mx-auto">
+        <ListSkeleton count={5} />
+      </div>
+    );
   }
-
-  const filteredLeads = filter === 'all' ? leads : leads.filter(l => l.status === filter)
-  const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-
-  if (loading) return (
-    <div className="p-6 md:p-8 max-w-4xl mx-auto">
-      <ListSkeleton count={5} />
-    </div>
-  )
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">
@@ -170,10 +172,15 @@ export default function LeadsPage() {
           <h1 className="text-3xl font-extrabold">Leads</h1>
           <p className="text-white/40 text-sm mt-1">Track prospects before they become members.</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition"
+        >
           <Plus size={16} /> Add Lead
         </button>
       </div>
+
+      {loadError && <p className="text-red-400 text-sm mb-4">{loadError}</p>}
 
       {showForm && (
         <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-6 space-y-4">
@@ -202,36 +209,63 @@ export default function LeadsPage() {
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Source</label>
               <select value={source} onChange={(e) => setSource(e.target.value)} className={inputClass}>
-                <option value="walk-in" className="bg-gray-900">Walk-in</option>
-                <option value="referral" className="bg-gray-900">Referral</option>
-                <option value="social" className="bg-gray-900">Social Media</option>
-                <option value="website" className="bg-gray-900">Website</option>
-                <option value="other" className="bg-gray-900">Other</option>
+                <option value="walk-in" className="bg-gray-900">
+                  Walk-in
+                </option>
+                <option value="referral" className="bg-gray-900">
+                  Referral
+                </option>
+                <option value="social" className="bg-gray-900">
+                  Social Media
+                </option>
+                <option value="website" className="bg-gray-900">
+                  Website
+                </option>
+                <option value="other" className="bg-gray-900">
+                  Other
+                </option>
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Interested In</label>
-              <input value={interestedIn} onChange={(e) => setInterestedIn(e.target.value)} placeholder="e.g. BJJ classes" className={inputClass} />
+              <input
+                value={interestedIn}
+                onChange={(e) => setInterestedIn(e.target.value)}
+                placeholder="e.g. BJJ classes"
+                className={inputClass}
+              />
             </div>
           </div>
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <div className="flex gap-3">
-            <button onClick={handleSubmit} disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
+            <button
+              onClick={() => void handleSubmit()}
+              disabled={submitting}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition"
+            >
               {submitting ? 'Saving...' : 'Add Lead'}
             </button>
-            <button onClick={() => setShowForm(false)} className="px-4 border border-white/10 text-gray-400 rounded-xl hover:bg-white/5 transition">Cancel</button>
+            <button onClick={() => setShowForm(false)} className="px-4 border border-white/10 text-gray-400 rounded-xl hover:bg-white/5 transition">
+              Cancel
+            </button>
           </div>
         </div>
       )}
 
-      {/* Status filter pills */}
       <div className="flex flex-wrap gap-2 mb-6">
-        <button onClick={() => setFilter('all')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filter === 'all' ? 'bg-white/10 text-white' : 'bg-white/5 text-white/40'}`}>
+        <button
+          onClick={() => setFilter('all')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filter === 'all' ? 'bg-white/10 text-white' : 'bg-white/5 text-white/40'}`}
+        >
           All ({leads.length})
         </button>
-        {STATUSES.map(s => (
-          <button key={s} onClick={() => setFilter(s)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filter === s ? 'bg-white/10 text-white' : 'bg-white/5 text-white/40'}`}>
-            {statusLabels[s]} ({leads.filter(l => l.status === s).length})
+        {STATUSES.map((s) => (
+          <button
+            key={s}
+            onClick={() => setFilter(s)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filter === s ? 'bg-white/10 text-white' : 'bg-white/5 text-white/40'}`}
+          >
+            {statusLabels[s]} ({leads.filter((l) => l.status === s).length})
           </button>
         ))}
       </div>
@@ -239,7 +273,9 @@ export default function LeadsPage() {
       {filteredLeads.length === 0 ? (
         <div className="bg-white/5 border border-white/10 rounded-2xl p-16 text-center">
           <UserPlus size={40} className="text-white/20 mx-auto mb-4" />
-          <p className="text-white/40 font-medium">No leads {filter !== 'all' ? `with status "${statusLabels[filter]}"` : 'yet'}</p>
+          <p className="text-white/40 font-medium">
+            No leads {filter !== 'all' ? `with status "${statusLabels[filter]}"` : 'yet'}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -248,23 +284,34 @@ export default function LeadsPage() {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center font-bold text-sm text-white/60">
-                    {lead.first_name[0]}{lead.last_name[0]}
+                    {lead.first_name[0]}
+                    {lead.last_name[0]}
                   </div>
                   <div>
-                    <p className="font-semibold text-white">{lead.first_name} {lead.last_name}</p>
+                    <p className="font-semibold text-white">
+                      {lead.first_name} {lead.last_name}
+                    </p>
                     <p className="text-xs text-white/30">{lead.email || lead.phone || 'No contact info'}</p>
                     {lead.interested_in && <p className="text-xs text-white/20 mt-0.5">Interested in: {lead.interested_in}</p>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <select value={lead.status} onChange={(e) => handleStatusChange(lead.id, e.target.value)}
-                    className={`text-xs px-2.5 py-1 rounded-full font-medium border ${statusColors[lead.status]} bg-transparent`}>
-                    {STATUSES.map(s => (
-                      <option key={s} value={s} className="bg-gray-900 text-white">{statusLabels[s]}</option>
+                  <select
+                    value={lead.status}
+                    onChange={(e) => void handleStatusChange(lead.id, e.target.value)}
+                    className={`text-xs px-2.5 py-1 rounded-full font-medium border ${statusColors[lead.status]} bg-transparent`}
+                  >
+                    {STATUSES.map((s) => (
+                      <option key={s} value={s} className="bg-gray-900 text-white">
+                        {statusLabels[s]}
+                      </option>
                     ))}
                   </select>
                   {lead.status !== 'converted' && (
-                    <button onClick={() => handleConvert(lead)} className="flex items-center gap-1 text-xs text-green-400 hover:underline font-medium">
+                    <button
+                      onClick={() => void handleConvert(lead)}
+                      className="flex items-center gap-1 text-xs text-green-400 hover:underline font-medium"
+                    >
                       Convert <ArrowRight size={12} />
                     </button>
                   )}
@@ -273,7 +320,9 @@ export default function LeadsPage() {
               <div className="flex items-center gap-3 mt-3 pt-3 border-t border-white/5 text-xs text-white/20 flex-wrap">
                 <span className="capitalize">{lead.source}</span>
                 <span>&middot;</span>
-                <span>{new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                <span>
+                  {new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
                 {staff.length > 0 && (
                   <>
                     <span>&middot;</span>
@@ -282,9 +331,13 @@ export default function LeadsPage() {
                       onChange={(e) => void handleAssign(lead.id, e.target.value)}
                       className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white/60 text-xs"
                     >
-                      <option value="" className="bg-gray-900">Unassigned</option>
+                      <option value="" className="bg-gray-900">
+                        Unassigned
+                      </option>
                       {staff.map((s) => (
-                        <option key={s.id} value={s.id} className="bg-gray-900">{s.full_name}</option>
+                        <option key={s.id} value={s.id} className="bg-gray-900">
+                          {s.full_name}
+                        </option>
                       ))}
                     </select>
                   </>
@@ -292,8 +345,8 @@ export default function LeadsPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setExpandedLeadId(expandedLeadId === lead.id ? null : lead.id)
-                    setNotesDraft(lead.notes ?? '')
+                    setExpandedLeadId(expandedLeadId === lead.id ? null : lead.id);
+                    setNotesDraft(lead.notes ?? '');
                   }}
                   className="ml-auto text-blue-400 hover:underline"
                 >
@@ -324,5 +377,5 @@ export default function LeadsPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

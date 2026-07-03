@@ -4,6 +4,8 @@ import { ServiceError } from '@/services/errors';
 
 type LeadRow = Database['public']['Tables']['leads']['Row'];
 
+export type LeadSummary = LeadRow;
+
 export async function listLeads(gymId: string): Promise<LeadRow[]> {
   const admin = getAdminClient();
   const { data, error } = await admin

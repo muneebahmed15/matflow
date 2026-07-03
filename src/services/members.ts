@@ -25,6 +25,19 @@ export async function listMembers(gymId: string): Promise<MemberSummary[]> {
   return data ?? [];
 }
 
+export async function listActiveMembers(gymId: string): Promise<MemberSummary[]> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('members')
+    .select('id, first_name, last_name, email, phone, belt_rank, status')
+    .eq('gym_id', gymId)
+    .eq('status', 'active')
+    .order('first_name');
+
+  if (error) throw new ServiceError(500, error.message);
+  return data ?? [];
+}
+
 export async function listFamilies(gymId: string): Promise<Pick<FamilyRow, 'id' | 'family_name'>[]> {
   const admin = getAdminClient();
   const { data, error } = await admin

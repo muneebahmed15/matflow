@@ -129,6 +129,17 @@ export async function listMembersAction(): Promise<ActionResult<MemberSummary[]>
   }
 }
 
+export async function listActiveMembersAction(): Promise<ActionResult<MemberSummary[]>> {
+  try {
+    const auth = await requireStaffSession();
+    const { listActiveMembers } = await import('@/services/members');
+    const members = await listActiveMembers(auth.gymId);
+    return { ok: true, data: members };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
 
 export async function listFamiliesAction(): Promise<
   ActionResult<{ id: string; family_name: string }[]>
@@ -248,18 +259,6 @@ export async function archiveMemberAction(memberId: string): Promise<ActionResul
     revalidatePath('/members');
     revalidatePath(`/members/${memberId}`);
     return { ok: true };
-  } catch (error) {
-    return toActionError(error);
-  }
-}
-
-
-export async function exportMembersByBeltCsvAction(): Promise<ActionResult<string>> {
-  try {
-    const auth = await requireStaffSession({ capability: 'reports.read' });
-    const { exportMembersByBeltCsv } = await import('@/services/belts');
-    const csv = await exportMembersByBeltCsv(auth.gymId);
-    return { ok: true, data: csv };
   } catch (error) {
     return toActionError(error);
   }

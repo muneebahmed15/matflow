@@ -17,7 +17,7 @@ import {
   type MemberSummary,
 } from '@/services/members';
 import { getGymSettings, updateGymSettings, completeGymSetup, type GymSettings } from '@/services/gym';
-import { createLead, convertLeadToMember, updateLeadStatus, updateLeadNotes, assignLead, getMarketingFunnel, getLeadSourceStats } from '@/services/leads';
+import { createLead, convertLeadToMember, updateLeadStatus, updateLeadNotes, assignLead, getMarketingFunnel, getLeadSourceStats, listLeads, type LeadSummary } from '@/services/leads';
 import { createClass, deleteClass, duplicateClass, listClassesForStaff } from '@/services/classes';
 import { getInstructorScopedClassIds } from '@/services/instructor-scope';
 import { promoteMember } from '@/services/belts';
@@ -105,6 +105,16 @@ import { updateClass } from '@/services/classes';
 
 import { type ActionResult, toActionError } from './_shared';
 
+export async function listLeadsAction(): Promise<ActionResult<LeadSummary[]>> {
+  try {
+    const auth = await requireStaffSession({ capability: 'leads.read' });
+    const leads = await listLeads(auth.gymId);
+    return { ok: true, data: leads };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
 export async function createLeadAction(input: {
   firstName: string;
   lastName: string;
@@ -112,12 +122,12 @@ export async function createLeadAction(input: {
   phone?: string;
   source?: string;
   interestedIn?: string;
-}): Promise<ActionResult> {
+}): Promise<ActionResult<LeadSummary>> {
   try {
     const auth = await requireStaffSession({ capability: 'leads.write' });
-    await createLead({ ...input, gymId: auth.gymId });
+    const lead = await createLead({ ...input, gymId: auth.gymId });
     revalidatePath('/leads');
-    return { ok: true };
+    return { ok: true, data: lead };
   } catch (error) {
     return toActionError(error);
   }
