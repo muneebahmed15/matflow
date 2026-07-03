@@ -8,6 +8,7 @@ import { Dumbbell, Plus } from 'lucide-react'
 import {
   createClassAction,
   deleteClassAction,
+  getClassAttendanceReportAction,
   getEnrollmentCountsAction,
   listClassesAction,
   listStaffAction,
@@ -45,6 +46,7 @@ export default function ClassesPage() {
   const { confirm, error: showError } = useAppUi()
   const [classes, setClasses] = useState<Class[]>([])
   const [enrollCounts, setEnrollCounts] = useState<Record<string, number>>({})
+  const [attendanceStats, setAttendanceStats] = useState<Record<string, { sessions: number; avg: number }>>({})
   const [members, setMembers] = useState<MemberOption[]>([])
   const [staff, setStaff] = useState<StaffOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -75,10 +77,11 @@ export default function ClassesPage() {
       setGymId(info.gymId)
       setCanManageClasses(hasCapability(info.role, 'classes.manage'))
 
-      const [classResult, staffResult, countsResult, { data: membersData }] = await Promise.all([
+      const [classResult, staffResult, countsResult, reportResult, { data: membersData }] = await Promise.all([
         listClassesAction(),
         listStaffAction(),
         getEnrollmentCountsAction(),
+        getClassAttendanceReportAction(30),
         supabase.from('members').select('id, first_name, last_name').eq('gym_id', info.gymId).eq('status', 'active').order('first_name'),
       ])
 
@@ -86,6 +89,14 @@ export default function ClassesPage() {
       else if (!classResult.ok) showError(classResult.error)
 
       if (countsResult.ok && countsResult.data) setEnrollCounts(countsResult.data)
+
+      if (reportResult.ok && reportResult.data) {
+        const stats: Record<string, { sessions: number; avg: number }> = {}
+        for (const r of reportResult.data) {
+          stats[r.classId] = { sessions: r.sessions, avg: r.avgPerSession }
+        }
+        setAttendanceStats(stats)
+      }
 
       if (staffResult.ok && staffResult.data) {
         setStaff(staffResult.data.map((s) => ({
@@ -299,6 +310,9 @@ export default function ClassesPage() {
                           <span className={(enrollCounts[cls.id] ?? 0) >= cls.capacity ? 'text-red-400' : ''}>
                             {enrollCounts[cls.id] ?? 0}/{cls.capacity} enrolled
                           </span>
+                          {attendanceStats[cls.id] && attendanceStats[cls.id].sessions > 0 && (
+                            <> · avg {attendanceStats[cls.id].avg}/session (30d)</>
+                          )}
                         </p>
                       </div>
                     </div>

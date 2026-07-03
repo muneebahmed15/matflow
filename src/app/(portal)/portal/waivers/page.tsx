@@ -26,6 +26,12 @@ const STATUS_STYLES: Record<WaiverSignatureStatus, { label: string; className: s
   expired: { label: 'Expired', className: 'bg-red-500/15 text-red-300 border-red-500/30' },
 };
 
+function isMinorDob(dob: string | null | undefined, now: number): boolean {
+  if (!dob) return false;
+  const age = (now - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+  return age < 18;
+}
+
 function StatusBadge({ status }: { status: WaiverSignatureStatus }) {
   const style = STATUS_STYLES[status];
   return (
@@ -49,6 +55,7 @@ export default function PortalWaiversPage() {
   const [signedAt, setSignedAt] = useState<string | undefined>()
   const [loading, setLoading] = useState(true)
   const [success, setSuccess] = useState(false)
+  const [now] = useState(() => Date.now())
 
   const memberId = activeMember?.id
   const gymId = activeMember?.gym_id
@@ -100,7 +107,7 @@ export default function PortalWaiversPage() {
     setSignedAt(isSigned ? info?.signedAt : undefined)
   }
 
-  const handleSign = async (typedName: string) => {
+  const handleSign = async (typedName: string, guardianName?: string) => {
     if (!selected || !memberId) return
     const res = await fetch('/api/portal/waivers/sign', {
       method: 'POST',
@@ -109,9 +116,13 @@ export default function PortalWaiversPage() {
         waiver_id: selected.id,
         member_id: memberId,
         signed_name: typedName,
+        guardian_name: guardianName,
       }),
     })
-    if (!res.ok) return
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      throw new Error(data?.error ?? 'Failed to sign waiver.')
+    }
     setSuccess(true)
     const sigs = await getMemberSignatures(memberId)
     setSigned(sigs as SignedWaiver[])
@@ -128,6 +139,8 @@ export default function PortalWaiversPage() {
   })
 
   const selectedStatus = selected ? statusByWaiver.get(selected.id)?.status : undefined
+
+  const isMinor = isMinorDob(activeMember.date_of_birth, now)
 
   return (
     <div className="space-y-6">
@@ -248,6 +261,7 @@ export default function PortalWaiversPage() {
                 onSign={handleSign}
                 alreadySigned={alreadySigned}
                 signedAt={signedAt}
+                requireGuardian={isMinor}
               />
             </div>
           )}

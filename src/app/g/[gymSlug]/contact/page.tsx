@@ -49,6 +49,18 @@ export default async function GymContactPage({ params }: Props) {
         <ContactForm gym={gym} />
       </div>
 
+      {address && (
+        <div className="rounded-2xl overflow-hidden border border-white/10 mb-8">
+          <iframe
+            title={`Map of ${gym.name}`}
+            src={`https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`}
+            className="w-full h-72 border-0"
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        </div>
+      )}
+
       {locations.length > 0 && (
         <div className="mt-8">
           <h2 className="text-lg font-semibold text-white mb-4">Locations</h2>

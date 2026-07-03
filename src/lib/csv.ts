@@ -77,6 +77,12 @@ John,Doe,john@example.com,555-0100,white,active,EXT001`;
 export const LEAD_IMPORT_TEMPLATE = `first_name,last_name,email,phone,source,notes
 Jane,Doe,jane@example.com,555-0100,referral,Interested in BJJ`;
 
+export const ATTENDANCE_IMPORT_TEMPLATE = `email,external_id,checked_in_at,notes
+john@example.com,EXT001,2024-03-15,Evening class`;
+
+export const BELT_HISTORY_IMPORT_TEMPLATE = `email,external_id,from_belt,to_belt,promoted_at,notes
+john@example.com,EXT001,white,blue,2023-06-10,Promoted by Prof. Silva`;
+
 function escapeCsvField(value: string): string {
   if (/[",\n\r]/.test(value)) {
     return `"${value.replace(/"/g, '""')}"`;

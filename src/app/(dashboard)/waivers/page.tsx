@@ -136,6 +136,7 @@ export default function WaiversPage() {
                 <button onClick={() => handleToggle(waiver)} disabled={toggling === waiver.id} className="text-white/40 hover:text-white transition disabled:opacity-50">
                   {waiver.is_active ? <ToggleRight size={22} className="text-green-400" /> : <ToggleLeft size={22} />}
                 </button>
+                <Link href={`/waivers/${waiver.id}/print`} className="text-sm text-white/40 hover:text-white">Print</Link>
                 <Link href={`/waivers/${waiver.id}`} className="text-sm text-blue-400 hover:underline">View</Link>
               </div>
             </div>

@@ -53,6 +53,68 @@ export async function createWaiver(input: {
   return data;
 }
 
+/**
+ * Update a waiver's content. Bumps the version so existing signatures become
+ * stale and members must re-sign (6.6 / 6.8), and audit-logs the edit (6.51).
+ */
+export async function updateWaiver(input: {
+  gymId: string;
+  waiverId: string;
+  title: string;
+  body: string;
+  expiresAfterDays?: number | null;
+  actorId?: string | null;
+}): Promise<WaiverRow> {
+  const admin = getAdminClient();
+
+  const { data: current } = await admin
+    .from('waivers')
+    .select('id, version, title, body')
+    .eq('id', input.waiverId)
+    .eq('gym_id', input.gymId)
+    .maybeSingle();
+
+  if (!current) throw new ServiceError(404, 'Waiver not found');
+
+  const contentChanged =
+    current.title !== input.title.trim() || current.body !== input.body.trim();
+  const nextVersion = contentChanged
+    ? ((current as { version?: number }).version ?? 1) + 1
+    : ((current as { version?: number }).version ?? 1);
+
+  const { data, error } = await admin
+    .from('waivers')
+    .update({
+      title: input.title.trim(),
+      body: input.body.trim(),
+      expires_after_days: input.expiresAfterDays ?? null,
+      version: nextVersion,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', input.waiverId)
+    .eq('gym_id', input.gymId)
+    .select()
+    .single();
+
+  if (error) throw new ServiceError(500, error.message);
+
+  try {
+    const { logAuditEvent } = await import('@/services/audit');
+    await logAuditEvent({
+      gymId: input.gymId,
+      actorId: input.actorId ?? null,
+      action: contentChanged ? 'waiver.updated_new_version' : 'waiver.updated',
+      entityType: 'waiver',
+      entityId: input.waiverId,
+      payload: { version: nextVersion },
+    });
+  } catch {
+    // Audit is best-effort
+  }
+
+  return data;
+}
+
 export async function toggleWaiverStatus(
   gymId: string,
   waiverId: string,
@@ -104,6 +166,7 @@ export async function signWaiver(input: {
   memberId: string;
   gymId: string;
   signedName: string;
+  guardianName?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
 }): Promise<{ signatureId: string; pdfStoragePath: string | null }> {
@@ -111,19 +174,33 @@ export async function signWaiver(input: {
 
   const { data: waiver } = await admin
     .from('waivers')
-    .select('id, title, body, expires_after_days')
+    .select('id, title, body, expires_after_days, version')
     .eq('id', input.waiverId)
     .eq('gym_id', input.gymId)
     .maybeSingle();
 
   if (!waiver) throw new ServiceError(404, 'Waiver not found');
 
+  const waiverVersion = (waiver as { version?: number }).version ?? 1;
+
   const { data: member } = await admin
     .from('members')
-    .select('first_name, last_name, email')
+    .select('first_name, last_name, email, date_of_birth')
     .eq('id', input.memberId)
     .eq('gym_id', input.gymId)
     .maybeSingle();
+
+  // Minors need a parent/guardian signature (6.15 / 6.48).
+  const dob = (member as { date_of_birth?: string | null } | null)?.date_of_birth;
+  if (dob) {
+    const age = (Date.now() - new Date(dob).getTime()) / (365.25 * 86_400_000);
+    if (age < 18 && !input.guardianName?.trim()) {
+      throw new ServiceError(
+        400,
+        'This member is a minor. A parent or guardian must sign — provide the guardian name.'
+      );
+    }
+  }
 
   const { data: gym } = await admin
     .from('gyms')
@@ -138,15 +215,17 @@ export async function signWaiver(input: {
 
   const { data: existing } = await admin
     .from('waiver_signatures')
-    .select('id, expires_at')
+    .select('id, expires_at, waiver_version')
     .eq('waiver_id', input.waiverId)
     .eq('member_id', input.memberId)
     .maybeSingle();
 
   if (existing) {
-    const stillValid =
+    const notExpired =
       !existing.expires_at || new Date(existing.expires_at) > new Date();
-    if (stillValid) {
+    const currentVersion =
+      ((existing as { waiver_version?: number }).waiver_version ?? 1) === waiverVersion;
+    if (notExpired && currentVersion) {
       throw new ServiceError(409, 'This waiver is already signed and still valid.');
     }
   }
@@ -158,8 +237,10 @@ export async function signWaiver(input: {
       .from('waiver_signatures')
       .update({
         signed_name: input.signedName.trim(),
+        guardian_name: input.guardianName?.trim() || null,
         signed_at: signedAt,
         expires_at: expiresAt,
+        waiver_version: waiverVersion,
         ip_address: input.ipAddress ?? null,
         user_agent: input.userAgent ?? null,
         pdf_storage_path: null,
@@ -178,8 +259,10 @@ export async function signWaiver(input: {
         member_id: input.memberId,
         gym_id: input.gymId,
         signed_name: input.signedName.trim(),
+        guardian_name: input.guardianName?.trim() || null,
         signed_at: signedAt,
         expires_at: expiresAt,
+        waiver_version: waiverVersion,
         ip_address: input.ipAddress ?? null,
         user_agent: input.userAgent ?? null,
       })
@@ -218,6 +301,34 @@ export async function signWaiver(input: {
     // PDF storage is best-effort; signature row is still valid.
   }
 
+  // Optional per-gym webhook on signature completion (best-effort, 6.42).
+  try {
+    const { data: gymHook } = await admin
+      .from('gyms')
+      .select('signature_webhook_url')
+      .eq('id', input.gymId)
+      .maybeSingle();
+
+    const webhookUrl = (gymHook as { signature_webhook_url?: string | null })
+      ?.signature_webhook_url;
+    if (webhookUrl && /^https:\/\//.test(webhookUrl)) {
+      void fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'waiver.signature.completed',
+          signature_id: signatureId,
+          waiver_id: input.waiverId,
+          member_id: input.memberId,
+          gym_id: input.gymId,
+          signed_at: signedAt,
+        }),
+      }).catch(() => undefined);
+    }
+  } catch {
+    // Webhook is best-effort
+  }
+
   return { signatureId, pdfStoragePath };
 }
 
@@ -238,17 +349,21 @@ export async function assertMemberWaiverCompliance(
 
   const { data: activeWaivers, error: waiverError } = await admin
     .from('waivers')
-    .select('id, title')
+    .select('id, title, version')
     .eq('gym_id', gymId)
     .eq('is_active', true);
 
   if (waiverError) throw new ServiceError(500, waiverError.message);
   if (!activeWaivers?.length) return;
 
+  const versionByWaiver = new Map(
+    activeWaivers.map((w) => [w.id, (w as { version?: number }).version ?? 1])
+  );
+
   const waiverIds = activeWaivers.map((w) => w.id);
   const { data: signatures, error: sigError } = await admin
     .from('waiver_signatures')
-    .select('waiver_id, expires_at, signed_at')
+    .select('waiver_id, expires_at, signed_at, waiver_version')
     .eq('member_id', memberId)
     .in('waiver_id', waiverIds);
 
@@ -257,7 +372,11 @@ export async function assertMemberWaiverCompliance(
   const now = new Date();
   const validSigned = new Set(
     (signatures ?? [])
-      .filter((s) => !s.expires_at || new Date(s.expires_at) > now)
+      .filter((s) => {
+        const notExpired = !s.expires_at || new Date(s.expires_at) > now;
+        const sigVersion = (s as { waiver_version?: number }).waiver_version ?? 1;
+        return notExpired && sigVersion === versionByWaiver.get(s.waiver_id);
+      })
       .map((s) => s.waiver_id)
   );
 

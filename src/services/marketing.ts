@@ -1,6 +1,8 @@
 import { getAdminClient } from '@/lib/supabase/admin';
 import { ServiceError } from '@/services/errors';
 import { sendTransactionalEmail } from '@/lib/email/resend';
+import { unsubscribeUrl } from '@/lib/unsubscribe';
+import { getPublicEnv } from '@/lib/env';
 
 export type EmailCampaign = {
   id: string;
@@ -51,27 +53,53 @@ export async function createCampaign(input: {
   return data as EmailCampaign;
 }
 
-async function resolveAudienceEmails(
+/** Map an audience key to the members.status filter it implies (null = no status filter). */
+export function audienceStatusFilter(audience: string): string | null {
+  if (audience === 'active_members') return 'active';
+  if (audience === 'inactive_members') return 'inactive';
+  if (audience === 'past_due') return 'past_due';
+  return null;
+}
+
+/** Dedupe emails and drop empty/opted-out entries. Pure, for unit testing. */
+export function dedupeAudience(
+  rows: { email: string | null; email_opt_out?: boolean | null }[]
+): string[] {
+  return [
+    ...new Set(
+      rows
+        .filter((r) => r.email && !r.email_opt_out)
+        .map((r) => r.email as string)
+    ),
+  ];
+}
+
+export async function resolveAudienceEmails(
   gymId: string,
   audience: string
 ): Promise<string[]> {
   const admin = getAdminClient();
-  let query = admin.from('members').select('email').eq('gym_id', gymId).not('email', 'is', null);
 
-  if (audience === 'active_members') query = query.eq('status', 'active');
-  else if (audience === 'inactive_members') query = query.eq('status', 'inactive');
-  else if (audience === 'past_due') query = query.eq('status', 'past_due');
-  else if (audience === 'leads') {
+  if (audience === 'leads') {
     const { data: leads } = await admin
       .from('leads')
-      .select('email')
+      .select('email, email_opt_out')
       .eq('gym_id', gymId)
       .not('email', 'is', null);
-    return [...new Set((leads ?? []).map((l) => l.email).filter(Boolean) as string[])];
+    return dedupeAudience(leads ?? []);
   }
 
+  let query = admin
+    .from('members')
+    .select('email, email_opt_out')
+    .eq('gym_id', gymId)
+    .not('email', 'is', null);
+
+  const status = audienceStatusFilter(audience);
+  if (status) query = query.eq('status', status);
+
   const { data } = await query;
-  return [...new Set((data ?? []).map((m) => m.email).filter(Boolean) as string[])];
+  return dedupeAudience(data ?? []);
 }
 
 export async function sendCampaign(gymId: string, campaignId: string): Promise<{ sent: number }> {
@@ -92,21 +120,24 @@ export async function sendCampaign(gymId: string, campaignId: string): Promise<{
 
   const { data: gym } = await admin.from('gyms').select('name, contact_email').eq('id', gymId).maybeSingle();
   const gymName = gym?.name ?? 'Gym';
-  const footer = `
-    <hr style="margin-top:24px;border:none;border-top:1px solid #eee" />
-    <p style="font-size:12px;color:#666;margin-top:16px">
-      You received this email because you are a member or lead of ${gymName}.
-      ${gym?.contact_email ? `Contact us at <a href="mailto:${gym.contact_email}">${gym.contact_email}</a>.` : ''}
-    </p>
-  `;
+  const appUrl = getPublicEnv().NEXT_PUBLIC_APP_URL;
 
   for (const to of emails) {
+    const optOutLink = unsubscribeUrl(appUrl, gymId, to);
+    const footer = `
+      <hr style="margin-top:24px;border:none;border-top:1px solid #eee" />
+      <p style="font-size:12px;color:#666;margin-top:16px">
+        You received this email because you are a member or lead of ${gymName}.
+        ${gym?.contact_email ? `Contact us at <a href="mailto:${gym.contact_email}">${gym.contact_email}</a>.` : ''}
+        <a href="${optOutLink}">Unsubscribe</a>
+      </p>
+    `;
     try {
       await sendTransactionalEmail({
         to,
         subject: campaign.subject,
         html: `${campaign.body_html}${footer}`,
-        text: `${campaign.body_html.replace(/<[^>]+>/g, '')}\n\nYou received this email from ${gymName}.`,
+        text: `${campaign.body_html.replace(/<[^>]+>/g, '')}\n\nYou received this email from ${gymName}. Unsubscribe: ${optOutLink}`,
       });
       sent++;
     } catch {
@@ -120,6 +151,71 @@ export async function sendCampaign(gymId: string, campaignId: string): Promise<{
     .eq('id', campaignId);
 
   return { sent };
+}
+
+/** Schedule a draft campaign to send at a future time. */
+export async function scheduleCampaign(
+  gymId: string,
+  campaignId: string,
+  scheduledAt: string
+): Promise<void> {
+  if (new Date(scheduledAt).getTime() <= Date.now()) {
+    throw new ServiceError(400, 'Scheduled time must be in the future.');
+  }
+
+  const admin = getAdminClient();
+  const { data: campaign } = await admin
+    .from('email_campaigns')
+    .select('id, status')
+    .eq('id', campaignId)
+    .eq('gym_id', gymId)
+    .maybeSingle();
+
+  if (!campaign) throw new ServiceError(404, 'Campaign not found');
+  if (campaign.status === 'sent') throw new ServiceError(400, 'Campaign already sent');
+
+  const { error } = await admin
+    .from('email_campaigns')
+    .update({ status: 'scheduled', scheduled_at: scheduledAt })
+    .eq('id', campaignId)
+    .eq('gym_id', gymId);
+
+  if (error) throw new ServiceError(500, error.message);
+}
+
+/** Cancel a scheduled campaign back to draft. */
+export async function cancelScheduledCampaign(gymId: string, campaignId: string): Promise<void> {
+  const admin = getAdminClient();
+  const { error } = await admin
+    .from('email_campaigns')
+    .update({ status: 'draft', scheduled_at: null })
+    .eq('id', campaignId)
+    .eq('gym_id', gymId)
+    .eq('status', 'scheduled');
+
+  if (error) throw new ServiceError(500, error.message);
+}
+
+/** Send all scheduled campaigns that are due (called from cron). */
+export async function sendDueCampaigns(): Promise<{ processed: number }> {
+  const admin = getAdminClient();
+  const { data: due } = await admin
+    .from('email_campaigns')
+    .select('id, gym_id')
+    .eq('status', 'scheduled')
+    .lte('scheduled_at', new Date().toISOString())
+    .limit(20);
+
+  let processed = 0;
+  for (const campaign of due ?? []) {
+    try {
+      await sendCampaign(campaign.gym_id, campaign.id);
+      processed++;
+    } catch {
+      // Leave failed campaigns scheduled; next cron run retries.
+    }
+  }
+  return { processed };
 }
 
 export function googleReviewUrl(placeId: string | null): string | null {

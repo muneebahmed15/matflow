@@ -6,6 +6,8 @@ import {
   createCampaignAction,
   listCampaignsAction,
   sendCampaignAction,
+  scheduleCampaignAction,
+  cancelScheduledCampaignAction,
   getMarketingFunnelAction,
   getLeadSourceStatsAction,
 } from '@/app/(dashboard)/actions';
@@ -56,6 +58,20 @@ export default function MarketingPage() {
 
   const send = async (id: string) => {
     await sendCampaignAction(id);
+    void load();
+  };
+
+  const schedule = async (id: string) => {
+    const when = window.prompt('Send at (YYYY-MM-DD HH:MM, local time):');
+    if (!when) return;
+    const date = new Date(when);
+    if (Number.isNaN(date.getTime())) return;
+    await scheduleCampaignAction(id, date.toISOString());
+    void load();
+  };
+
+  const cancelSchedule = async (id: string) => {
+    await cancelScheduledCampaignAction(id);
     void load();
   };
 
@@ -159,8 +175,18 @@ export default function MarketingPage() {
                 <p className="text-white/40 text-xs">{c.status} · {c.sent_count} sent</p>
               </div>
               {c.status === 'draft' && (
-                <button onClick={() => void send(c.id)} className="flex items-center gap-1 text-blue-400 text-sm hover:text-blue-300">
-                  <Send size={14} /> Send
+                <div className="flex items-center gap-3">
+                  <button onClick={() => void schedule(c.id)} className="text-white/40 text-sm hover:text-white">
+                    Schedule
+                  </button>
+                  <button onClick={() => void send(c.id)} className="flex items-center gap-1 text-blue-400 text-sm hover:text-blue-300">
+                    <Send size={14} /> Send now
+                  </button>
+                </div>
+              )}
+              {c.status === 'scheduled' && (
+                <button onClick={() => void cancelSchedule(c.id)} className="text-yellow-400 text-sm hover:text-yellow-300">
+                  Cancel schedule
                 </button>
               )}
             </div>

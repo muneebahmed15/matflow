@@ -82,6 +82,7 @@ Secure with `Authorization: Bearer $CRON_SECRET`:
 | `GET /api/cron/daily-digest` | Owner daily business digest |
 | `GET /api/cron/lead-reminders` | Stale lead follow-ups |
 | `GET /api/cron/waiver-expiry-reminders` | Email members 7 days before waiver expiry |
+| `GET /api/cron/campaigns` | Send scheduled marketing campaigns that are due |
 
 In development, if `.env.local` still has placeholder values, the app falls back to standard local Supabase keys (`http://127.0.0.1:54321`).
 

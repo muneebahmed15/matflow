@@ -6,9 +6,25 @@ import { useParams, useRouter } from 'next/navigation'
 import { getMemberSignatures } from '@/lib/waivers'
 import { redirectTo } from '@/lib/navigation'
 import { getCurrentStaffInfo } from '@/lib/permissions'
-import { inviteMemberToPortalAction, sendWaiverLinkAction, archiveMemberAction, updateMemberStripesAction } from '@/app/(dashboard)/actions'
+import { inviteMemberToPortalAction, sendWaiverLinkAction, archiveMemberAction, updateMemberStripesAction, getMemberTimelineAction } from '@/app/(dashboard)/actions'
 import MemberNotesPanel from '@/components/members/MemberNotesPanel'
 import MemberEmergencyContactsPanel from '@/components/members/MemberEmergencyContactsPanel'
+
+type TimelineEvent = {
+  id: string
+  type: string
+  at: string
+  title: string
+  detail: string | null
+}
+
+const TIMELINE_COLORS: Record<string, string> = {
+  note: 'bg-yellow-400',
+  attendance: 'bg-green-400',
+  promotion: 'bg-blue-400',
+  waiver: 'bg-purple-400',
+  subscription: 'bg-pink-400',
+}
 
 interface Member {
   id: string; first_name: string; last_name: string
@@ -41,7 +57,9 @@ export default function MemberDetailPage() {
   const [waiverLinkMsg, setWaiverLinkMsg] = useState('')
   const [archiving, setArchiving] = useState(false)
   const [stripeUpdating, setStripeUpdating] = useState(false)
-  const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'waivers' | 'notes' | 'contacts'>('info')
+  const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'waivers' | 'notes' | 'contacts' | 'timeline'>('info')
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([])
+  const [timelineLoaded, setTimelineLoaded] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -77,6 +95,15 @@ export default function MemberDetailPage() {
     void loadMember()
     return () => { cancelled = true }
   }, [id])
+
+  useEffect(() => {
+    if (activeTab !== 'timeline' || timelineLoaded) return
+    void (async () => {
+      const result = await getMemberTimelineAction(id)
+      if (result.ok && result.data) setTimeline(result.data)
+      setTimelineLoaded(true)
+    })()
+  }, [activeTab, timelineLoaded, id])
 
   async function handleSubscribe(stripePriceId: string) {
     if (!member || !gymId) return
@@ -128,11 +155,13 @@ export default function MemberDetailPage() {
 
   const tabs: { key: typeof activeTab; label: string }[] = [
     { key: 'info', label: 'Info' },
+    { key: 'timeline', label: 'Timeline' },
     { key: 'notes', label: 'Notes' },
     { key: 'contacts', label: 'Contacts' },
     { key: 'attendance', label: `Attendance (${attendance.length})` },
     { key: 'waivers', label: `Waivers (${signatures.length})` },
   ]
+
 
   const stripeCount = member.stripe_count ?? 0
 
@@ -276,6 +305,35 @@ export default function MemberDetailPage() {
                   <span className="text-white/30 text-xs">
                     {new Date(a.checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'timeline' && (
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
+          <h2 className="font-semibold text-white mb-4">Activity Timeline</h2>
+          {!timelineLoaded ? (
+            <p className="text-white/30 text-sm">Loading...</p>
+          ) : timeline.length === 0 ? (
+            <p className="text-white/30 text-sm">No activity recorded yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {timeline.map((e) => (
+                <div key={e.id} className="flex gap-3">
+                  <div className="flex flex-col items-center pt-1.5">
+                    <div className={`w-2 h-2 rounded-full ${TIMELINE_COLORS[e.type] ?? 'bg-white/40'}`} />
+                    <div className="flex-1 w-px bg-white/10 mt-1" />
+                  </div>
+                  <div className="pb-3 min-w-0">
+                    <p className="text-white text-sm">{e.title}</p>
+                    {e.detail && <p className="text-white/40 text-xs mt-0.5 whitespace-pre-wrap">{e.detail}</p>}
+                    <p className="text-white/20 text-xs mt-0.5">
+                      {new Date(e.at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>

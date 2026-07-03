@@ -46,11 +46,11 @@
 
 ## Attendance Import
 
-- [ ] 8.16 Historical attendance CSV format
+- [x] 8.16 Historical attendance CSV format
 
-- [ ] 8.17 Map member by email or external_id
+- [x] 8.17 Map member by email or external_id
 
-- [ ] 8.18 Date parsing validation
+- [x] 8.18 Date parsing validation
 
 
 
@@ -86,9 +86,9 @@
 
 ## Belt History
 
-- [ ] 8.28 Import promotion history CSV
+- [x] 8.28 Import promotion history CSV
 
-- [ ] 8.29 Validate belt ranks against gym config
+- [x] 8.29 Validate belt ranks against gym config
 
 
 

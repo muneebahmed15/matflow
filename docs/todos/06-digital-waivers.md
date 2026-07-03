@@ -6,10 +6,10 @@
 - [x] 6.3 Toggle active/inactive (done)
 - [x] 6.4 Waiver list page (done)
 - [ ] 6.5 Waiver rich text editor
-- [ ] 6.6 Waiver version numbering
+- [x] 6.6 Waiver version numbering (`waivers.version`, bumped on content edit)
 - [x] 6.7 Waiver expires_at field (Wave 1)
-- [ ] 6.8 Require re-sign on template update
-- [ ] 6.9 Waiver templates library (MMA, BJJ presets)
+- [x] 6.8 Require re-sign on template update (compliance checks signed version)
+- [x] 6.9 Waiver templates library (General, BJJ, MMA presets)
 - [ ] 6.10 Multi-language waiver support
 
 ## Signing
@@ -17,7 +17,7 @@
 - [x] 6.12 Staff-assisted signing (done)
 - [x] 6.13 Member portal signing (done)
 - [ ] 6.14 Canvas signature capture (draw)
-- [ ] 6.15 Parent signs for minor
+- [x] 6.15 Parent signs for minor (guardian_name required when member is under 18)
 - [x] 6.16 IP address + user agent on signature
 - [ ] 6.17 Signature timestamp timezone-aware display
 
@@ -49,16 +49,16 @@
 - [x] 6.34 Waiver detail with signatures (done)
 - [x] 6.35 Member profile waivers tab (done)
 - [x] 6.36 Export signatures CSV
-- [ ] 6.37 Print-friendly waiver view
+- [x] 6.37 Print-friendly waiver view (`/waivers/[id]/print`)
 
 ## Kiosk / Onboarding
 - [x] 6.38 Kiosk waiver sign before first check-in (inline modal when check-in blocked)
-- [ ] 6.39 New member auto-assigned active waivers
+- [x] 6.39 New member auto-assigned active waivers (active waivers show as pending for all members)
 - [ ] 6.40 Trial member waiver flow
 
 ## API
 - [x] 6.41 Public API: get active waivers for gym (anon, kiosk-gated)
-- [ ] 6.42 Webhook on signature completed
+- [x] 6.42 Webhook on signature completed (`gyms.signature_webhook_url`)
 
 ## Testing
 - [x] 6.43 Unit test signWaiver idempotency
@@ -67,8 +67,8 @@
 ## Integrations
 - [ ] 6.45 DocuSign export path (enterprise)
 - [ ] 6.46 Import signed waivers from PDF upload
-- [ ] 6.47 Waiver merge fields (member name, date)
-- [ ] 6.48 Minor age verification field
+- [x] 6.47 Waiver merge fields (member name, date)
+- [x] 6.48 Minor age verification field (`members.date_of_birth`)
 - [ ] 6.49 Witness signature field
 - [ ] 6.50 State-specific waiver templates
-- [ ] 6.51 Audit log on waiver template edits
+- [x] 6.51 Audit log on waiver template edits

@@ -26,11 +26,13 @@ export function buildGymPageMetadata(
       type: 'website',
       url,
       siteName: gym.name,
+      images: gym.logo_url ? [{ url: gym.logo_url, alt: gym.name }] : undefined,
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
+      images: gym.logo_url ? [gym.logo_url] : undefined,
     },
     robots: { index: true, follow: true },
   };

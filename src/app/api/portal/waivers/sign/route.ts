@@ -10,6 +10,7 @@ const schema = z.object({
   waiver_id: z.string().uuid(),
   member_id: z.string().uuid(),
   signed_name: z.string().min(2).max(200),
+  guardian_name: z.string().min(2).max(200).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest) {
       memberId: auth.memberId,
       gymId: auth.gymId,
       signedName: parsed.data.signed_name,
+      guardianName: parsed.data.guardian_name ?? null,
       ipAddress: ip,
       userAgent: req.headers.get('user-agent'),
     });

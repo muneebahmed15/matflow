@@ -14,6 +14,7 @@ export type Capability =
   | 'classes.manage'
   | 'classes.manage_own'
   | 'checkin.write'
+  | 'belts.promote'
   | 'reports.read'
   | 'shop.read'
   | 'shop.write';
@@ -32,6 +33,7 @@ export const CAPABILITIES: Record<Capability, StaffRole[]> = {
   'classes.manage': ['admin', 'supervisor'],
   'classes.manage_own': ['coach'],
   'checkin.write': ['admin', 'supervisor', 'coach'],
+  'belts.promote': ['admin', 'supervisor'],
   'reports.read': ['admin', 'supervisor'],
   'shop.read': ['admin', 'supervisor'],
   'shop.write': ['admin'],

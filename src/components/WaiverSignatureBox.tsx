@@ -4,13 +4,21 @@ import { useState } from 'react';
 
 type Props = {
   memberName: string;
-  onSign: (typedName: string) => Promise<void>;
+  onSign: (typedName: string, guardianName?: string) => Promise<void>;
   alreadySigned?: boolean;
   signedAt?: string;
+  requireGuardian?: boolean;
 };
 
-export default function WaiverSignatureBox({ memberName, onSign, alreadySigned, signedAt }: Props) {
+export default function WaiverSignatureBox({
+  memberName,
+  onSign,
+  alreadySigned,
+  signedAt,
+  requireGuardian,
+}: Props) {
   const [typedName, setTypedName] = useState('');
+  const [guardianName, setGuardianName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -19,10 +27,14 @@ export default function WaiverSignatureBox({ memberName, onSign, alreadySigned, 
       setError('Name must match exactly as shown above.');
       return;
     }
+    if (requireGuardian && !guardianName.trim()) {
+      setError('A parent or guardian name is required for members under 18.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      await onSign(typedName.trim());
+      await onSign(typedName.trim(), guardianName.trim() || undefined);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to sign waiver.');
     } finally {
@@ -61,6 +73,20 @@ export default function WaiverSignatureBox({ memberName, onSign, alreadySigned, 
           className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
+      {requireGuardian && (
+        <div>
+          <p className="text-sm text-gray-400 mb-1">
+            Parent / guardian full name (required for members under 18):
+          </p>
+          <input
+            type="text"
+            placeholder="Parent or guardian full name"
+            value={guardianName}
+            onChange={(e) => setGuardianName(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      )}
       {error && <p className="text-red-400 text-sm">{error}</p>}
       <button
         onClick={handleSign}

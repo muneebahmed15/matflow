@@ -22,6 +22,7 @@ export type PortalMember = {
   family_id: string | null;
   portal_role: string;
   stripe_count?: number;
+  date_of_birth?: string | null;
 };
 
 type PortalMemberContextValue = {
@@ -50,7 +51,7 @@ export function PortalMemberProvider({ children }: { children: ReactNode }) {
 
     const { data: member } = await supabase
       .from('members')
-      .select('id, first_name, last_name, email, gym_id, belt_rank, status, family_id, portal_role, stripe_count')
+      .select('id, first_name, last_name, email, gym_id, belt_rank, status, family_id, portal_role, stripe_count, date_of_birth')
       .eq('email', user.email)
       .maybeSingle();
 
@@ -65,7 +66,7 @@ export function PortalMemberProvider({ children }: { children: ReactNode }) {
     if (member.family_id) {
       const { data: family } = await supabase
         .from('members')
-        .select('id, first_name, last_name, email, gym_id, belt_rank, status, family_id, portal_role, stripe_count')
+        .select('id, first_name, last_name, email, gym_id, belt_rank, status, family_id, portal_role, stripe_count, date_of_birth')
         .eq('family_id', member.family_id)
         .eq('gym_id', member.gym_id)
         .order('first_name');

@@ -224,6 +224,8 @@ export async function updateGymSettingsAction(input: {
   reviewCheckinThreshold?: number;
   requireWaiverForCheckin?: boolean;
   timezone?: string;
+  beltSystem?: string;
+  bookingCancelHours?: number;
 }): Promise<ActionResult<GymSettings>> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });
@@ -303,6 +305,7 @@ export async function signWaiverAction(input: {
   waiverId: string;
   memberId: string;
   signedName: string;
+  guardianName?: string | null;
 }): Promise<ActionResult> {
   try {
     const auth = await requireStaffSession();
@@ -313,6 +316,7 @@ export async function signWaiverAction(input: {
       memberId: input.memberId,
       gymId: auth.gymId,
       signedName: input.signedName,
+      guardianName: input.guardianName ?? null,
     });
     try {
       await sendMemberNotification({
@@ -415,6 +419,85 @@ export async function getEnrollmentCountsAction(): Promise<
     const { getEnrollmentCounts } = await import('@/services/class-enrollment');
     const counts = await getEnrollmentCounts(auth.gymId);
     return { ok: true, data: counts };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function getMemberTimelineAction(
+  memberId: string
+): Promise<ActionResult<import('@/services/member-timeline').TimelineEvent[]>> {
+  try {
+    const auth = await requireStaffSession({ capability: 'members.read' });
+    const { getMemberTimeline } = await import('@/services/member-timeline');
+    const events = await getMemberTimeline(auth.gymId, memberId);
+    return { ok: true, data: events };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function getRevenueMetricsAction(): Promise<
+  ActionResult<import('@/services/revenue').RevenueMetrics>
+> {
+  try {
+    const auth = await requireStaffSession({ capability: 'billing.read' });
+    const { getRevenueMetrics } = await import('@/services/revenue');
+    const metrics = await getRevenueMetrics(auth.gymId);
+    return { ok: true, data: metrics };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function listPastDueMembersAction(): Promise<
+  ActionResult<import('@/services/revenue').PastDueMember[]>
+> {
+  try {
+    const auth = await requireStaffSession({ capability: 'billing.read' });
+    const { listPastDueMembers } = await import('@/services/revenue');
+    const rows = await listPastDueMembers(auth.gymId);
+    return { ok: true, data: rows };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function exportSubscriptionsCsvAction(): Promise<ActionResult<string>> {
+  try {
+    const auth = await requireStaffSession({ capability: 'billing.read' });
+    const { exportSubscriptionsCsv } = await import('@/services/revenue');
+    const csv = await exportSubscriptionsCsv(auth.gymId);
+    return { ok: true, data: csv };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function createManualSubscriptionAction(input: {
+  memberId: string;
+  planId: string;
+  paymentMethod: 'cash' | 'check' | 'other';
+}): Promise<ActionResult<{ id: string }>> {
+  try {
+    const auth = await requireStaffSession({ capability: 'billing.write' });
+    const { createManualSubscription } = await import('@/services/revenue');
+    const result = await createManualSubscription({ ...input, gymId: auth.gymId });
+    revalidatePath('/subscriptions');
+    return { ok: true, data: result };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function getClassAttendanceReportAction(days = 30): Promise<
+  ActionResult<import('@/services/class-dropin').ClassAttendanceReport[]>
+> {
+  try {
+    const auth = await requireStaffSession();
+    const { getClassAttendanceReport } = await import('@/services/class-dropin');
+    const report = await getClassAttendanceReport(auth.gymId, days);
+    return { ok: true, data: report };
   } catch (error) {
     return toActionError(error);
   }
@@ -536,13 +619,99 @@ export async function promoteMemberAction(input: {
   fromBelt: string;
   toBelt: string;
   notes?: string;
+  ceremonyDate?: string | null;
 }): Promise<ActionResult> {
   try {
-    const auth = await requireStaffSession();
-    await promoteMember({ ...input, gymId: auth.gymId });
+    const auth = await requireStaffSession({ capability: 'belts.promote' });
+    await promoteMember({
+      ...input,
+      gymId: auth.gymId,
+      actorId: auth.user.id,
+      allowDemotion: auth.role === 'admin',
+    });
     revalidatePath('/belts');
     revalidatePath('/members');
     return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function undoPromotionAction(promotionId: string): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { undoPromotion } = await import('@/services/belts');
+    await undoPromotion(auth.gymId, promotionId, auth.user.id);
+    revalidatePath('/belts');
+    revalidatePath('/members');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function listBeltRequirementsAction(): Promise<
+  ActionResult<import('@/services/belts').BeltRequirementRow[]>
+> {
+  try {
+    const auth = await requireStaffSession();
+    const { listBeltRequirements } = await import('@/services/belts');
+    const rows = await listBeltRequirements(auth.gymId);
+    return { ok: true, data: rows };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function saveBeltRequirementAction(input: {
+  belt: string;
+  minAttendance: number;
+  minDaysAtRank: number;
+  techniquesChecklist?: string | null;
+}): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ capability: 'settings.write' });
+    const { upsertBeltRequirement } = await import('@/services/belts');
+    await upsertBeltRequirement({ ...input, gymId: auth.gymId });
+    revalidatePath('/belts');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function getPromotionReadinessAction(): Promise<
+  ActionResult<import('@/services/belts').MemberReadiness[]>
+> {
+  try {
+    const auth = await requireStaffSession({ capability: 'members.read' });
+    const { getPromotionReadiness } = await import('@/services/belts');
+    const rows = await getPromotionReadiness(auth.gymId);
+    return { ok: true, data: rows };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function getGymBeltSystemAction(): Promise<
+  ActionResult<import('@/lib/belt-systems').BeltSystem>
+> {
+  try {
+    const auth = await requireStaffSession();
+    const { getGymBeltSystem } = await import('@/services/belts');
+    const system = await getGymBeltSystem(auth.gymId);
+    return { ok: true, data: system };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function exportMembersByBeltCsvAction(): Promise<ActionResult<string>> {
+  try {
+    const auth = await requireStaffSession({ capability: 'reports.read' });
+    const { exportMembersByBeltCsv } = await import('@/services/belts');
+    const csv = await exportMembersByBeltCsv(auth.gymId);
+    return { ok: true, data: csv };
   } catch (error) {
     return toActionError(error);
   }
@@ -561,6 +730,24 @@ export async function createWaiverAction(input: {
       expiresAfterDays: input.expiresAfterDays,
     });
     revalidatePath('/waivers');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function updateWaiverAction(input: {
+  waiverId: string;
+  title: string;
+  body: string;
+  expiresAfterDays?: number | null;
+}): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ capability: 'settings.write' });
+    const { updateWaiver } = await import('@/services/waivers');
+    await updateWaiver({ ...input, gymId: auth.gymId, actorId: auth.user.id });
+    revalidatePath('/waivers');
+    revalidatePath(`/waivers/${input.waiverId}`);
     return { ok: true };
   } catch (error) {
     return toActionError(error);
@@ -920,6 +1107,60 @@ export async function importLeadsCsvAction(input: {
   }
 }
 
+export async function importAttendanceCsvAction(input: {
+  rows: {
+    email?: string;
+    external_id?: string;
+    checked_in_at: string;
+    notes?: string;
+  }[];
+  fileName?: string;
+  dryRun?: boolean;
+}) {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { importAttendanceFromRows } = await import('@/services/migration');
+    const result = await importAttendanceFromRows(auth.gymId, input.rows, {
+      fileName: input.fileName,
+      createdBy: auth.user.id,
+      dryRun: input.dryRun,
+    });
+    revalidatePath('/migration');
+    revalidatePath('/attendance');
+    return { ok: true as const, data: result };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function importBeltHistoryCsvAction(input: {
+  rows: {
+    email?: string;
+    external_id?: string;
+    from_belt?: string;
+    to_belt: string;
+    promoted_at: string;
+    notes?: string;
+  }[];
+  fileName?: string;
+  dryRun?: boolean;
+}) {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { importBeltHistoryFromRows } = await import('@/services/migration');
+    const result = await importBeltHistoryFromRows(auth.gymId, input.rows, {
+      fileName: input.fileName,
+      createdBy: auth.user.id,
+      dryRun: input.dryRun,
+    });
+    revalidatePath('/migration');
+    revalidatePath('/belts');
+    return { ok: true as const, data: result };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
 export async function getImportErrorsAction(jobId: string) {
   try {
     const auth = await requireStaffSession({ adminOnly: true });
@@ -979,6 +1220,33 @@ export async function sendCampaignAction(campaignId: string) {
   try {
     const auth = await requireStaffSession({ adminOnly: true });
     return { ok: true as const, data: await sendCampaign(auth.gymId, campaignId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function scheduleCampaignAction(
+  campaignId: string,
+  scheduledAt: string
+): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { scheduleCampaign } = await import('@/services/marketing');
+    await scheduleCampaign(auth.gymId, campaignId, scheduledAt);
+    revalidatePath('/marketing');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function cancelScheduledCampaignAction(campaignId: string): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { cancelScheduledCampaign } = await import('@/services/marketing');
+    await cancelScheduledCampaign(auth.gymId, campaignId);
+    revalidatePath('/marketing');
+    return { ok: true };
   } catch (error) {
     return toActionError(error);
   }

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import type { PublicGymProfile } from '@/lib/gym-public';
 import { formatGymAddress, gymPrimaryColor } from '@/lib/gym-public';
+import NewsletterSignup from '@/components/gym-public/NewsletterSignup';
 
 const BASE_NAV = [
   { href: '', label: 'Home' },
@@ -91,6 +92,10 @@ export default function GymPublicShell({ gym, children }: Props) {
             <p className="font-semibold text-white">{gym.name}</p>
             {gym.tagline && <p className="mt-1">{gym.tagline}</p>}
             {address && <p className="mt-2">{address}</p>}
+          </div>
+          <div className="max-w-xs">
+            <p className="font-semibold text-white mb-2">Stay in the loop</p>
+            <NewsletterSignup gymSlug={gym.slug} accent={accent} />
           </div>
           <div className="flex flex-col gap-1">
             {gym.contact_phone && (

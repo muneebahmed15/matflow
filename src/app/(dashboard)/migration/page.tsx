@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { Upload, Download, FileWarning } from 'lucide-react';
 import {
   getImportErrorsAction,
+  importAttendanceCsvAction,
+  importBeltHistoryCsvAction,
   importLeadsCsvAction,
   importMembersCsvAction,
   listImportJobsAction,
@@ -14,10 +16,53 @@ import {
   csvRowsToObjects,
   MEMBER_IMPORT_TEMPLATE,
   LEAD_IMPORT_TEMPLATE,
+  ATTENDANCE_IMPORT_TEMPLATE,
+  BELT_HISTORY_IMPORT_TEMPLATE,
 } from '@/lib/csv';
 import type { ImportJob } from '@/services/migration';
 
-type ImportType = 'members' | 'leads';
+type ImportType = 'members' | 'leads' | 'attendance' | 'belt_history';
+
+const COLUMN_MAPS: Record<ImportType, Record<string, string>> = {
+  members: {
+    first_name: 'first_name',
+    last_name: 'last_name',
+    email: 'email',
+    phone: 'phone',
+    belt_rank: 'belt_rank',
+    status: 'status',
+    external_id: 'external_id',
+  },
+  leads: {
+    first_name: 'first_name',
+    last_name: 'last_name',
+    email: 'email',
+    phone: 'phone',
+    source: 'source',
+    notes: 'notes',
+  },
+  attendance: {
+    email: 'email',
+    external_id: 'external_id',
+    checked_in_at: 'checked_in_at',
+    notes: 'notes',
+  },
+  belt_history: {
+    email: 'email',
+    external_id: 'external_id',
+    from_belt: 'from_belt',
+    to_belt: 'to_belt',
+    promoted_at: 'promoted_at',
+    notes: 'notes',
+  },
+};
+
+const TEMPLATES: Record<ImportType, string> = {
+  members: MEMBER_IMPORT_TEMPLATE,
+  leads: LEAD_IMPORT_TEMPLATE,
+  attendance: ATTENDANCE_IMPORT_TEMPLATE,
+  belt_history: BELT_HISTORY_IMPORT_TEMPLATE,
+};
 
 export default function MigrationPage() {
   const [jobs, setJobs] = useState<ImportJob[]>([]);
@@ -39,61 +84,29 @@ export default function MigrationPage() {
     void load();
   }, []);
 
-  const columnMap: Record<string, string> =
-    importType === 'members'
-      ? {
-          first_name: 'first_name',
-          last_name: 'last_name',
-          email: 'email',
-          phone: 'phone',
-          belt_rank: 'belt_rank',
-          status: 'status',
-          external_id: 'external_id',
-        }
-      : {
-          first_name: 'first_name',
-          last_name: 'last_name',
-          email: 'email',
-          phone: 'phone',
-          source: 'source',
-          notes: 'notes',
-        };
-
   const handleFile = async (file: File, commit: boolean) => {
     setImporting(true);
     setResult(null);
     const text = await file.text();
     const rows = parseCsv(text);
-    const { objects } = csvRowsToObjects(rows, columnMap);
+    const { objects } = csvRowsToObjects(rows, COLUMN_MAPS[importType]);
     setPreview(objects.slice(0, 10) as Record<string, string>[]);
 
+    const payload = {
+      fileName: file.name,
+      dryRun: commit ? false : dryRun,
+    };
+
+    /* eslint-disable @typescript-eslint/no-explicit-any */
     const action =
       importType === 'members'
-        ? importMembersCsvAction({
-            rows: objects as {
-              first_name: string;
-              last_name: string;
-              email?: string;
-              phone?: string;
-              belt_rank?: string;
-              status?: string;
-              external_id?: string;
-            }[],
-            fileName: file.name,
-            dryRun: commit ? false : dryRun,
-          })
-        : importLeadsCsvAction({
-            rows: objects as {
-              first_name: string;
-              last_name: string;
-              email?: string;
-              phone?: string;
-              source?: string;
-              notes?: string;
-            }[],
-            fileName: file.name,
-            dryRun: commit ? false : dryRun,
-          });
+        ? importMembersCsvAction({ rows: objects as any, ...payload })
+        : importType === 'leads'
+          ? importLeadsCsvAction({ rows: objects as any, ...payload })
+          : importType === 'attendance'
+            ? importAttendanceCsvAction({ rows: objects as any, ...payload })
+            : importBeltHistoryCsvAction({ rows: objects as any, ...payload });
+    /* eslint-enable @typescript-eslint/no-explicit-any */
 
     const res = await action;
     setImporting(false);
@@ -109,7 +122,7 @@ export default function MigrationPage() {
   };
 
   const downloadTemplate = () => {
-    const tpl = importType === 'members' ? MEMBER_IMPORT_TEMPLATE : LEAD_IMPORT_TEMPLATE;
+    const tpl = TEMPLATES[importType];
     const blob = new Blob([tpl], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -148,10 +161,12 @@ export default function MigrationPage() {
   return (
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
       <h1 className="text-3xl font-extrabold mb-2">Migration Center</h1>
-      <p className="text-white/40 text-sm mb-6">Import members or leads from CSV.</p>
+      <p className="text-white/40 text-sm mb-6">
+        Import members, leads, attendance history, or belt history from CSV.
+      </p>
 
-      <div className="flex gap-2 mb-6">
-        {(['members', 'leads'] as ImportType[]).map((t) => (
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {(['members', 'leads', 'attendance', 'belt_history'] as ImportType[]).map((t) => (
           <button
             key={t}
             onClick={() => { setImportType(t); setPreview([]); }}
@@ -159,7 +174,7 @@ export default function MigrationPage() {
               importType === t ? 'bg-blue-600 text-white' : 'bg-white/5 text-white/50'
             }`}
           >
-            {t}
+            {t.replace('_', ' ')}
           </button>
         ))}
       </div>

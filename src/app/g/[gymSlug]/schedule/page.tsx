@@ -58,11 +58,19 @@ export default async function GymSchedulePage({ params }: Props) {
                       <p className="font-medium text-white">{cls.name}</p>
                       <p className="text-xs text-white/30">{cls.instructor}</p>
                     </div>
-                    <div className="text-right text-sm text-white/50">
-                      <p>
-                        {cls.start_time} – {cls.end_time}
-                      </p>
-                      <p className="text-xs text-white/25">{cls.capacity} spots</p>
+                    <div className="text-right text-sm text-white/50 flex items-center gap-4">
+                      <div>
+                        <p>
+                          {cls.start_time} – {cls.end_time}
+                        </p>
+                        <p className="text-xs text-white/25">{cls.capacity} spots</p>
+                      </div>
+                      <a
+                        href={`/g/${gym.slug}/trial?class=${encodeURIComponent(cls.name)}`}
+                        className="text-xs font-semibold text-blue-400 hover:text-blue-300 border border-blue-400/30 rounded-lg px-3 py-1.5 shrink-0"
+                      >
+                        Book trial
+                      </a>
                     </div>
                   </div>
                 ))}

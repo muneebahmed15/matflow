@@ -30,18 +30,41 @@ type Enrollment = {
   classes: { name: string; day_of_week: string | null; start_time: string | null } | null;
 };
 
+type DropIn = {
+  id: string;
+  session_id: string;
+  class_sessions: {
+    session_date: string;
+    class_id: string;
+    classes: { name: string; start_time: string | null } | null;
+  } | null;
+};
+
+/** Next calendar date (YYYY-MM-DD) for a weekday name, today included. */
+function nextDateForDay(dayName: string | null): string | null {
+  if (!dayName) return null;
+  const target = DAYS.indexOf(dayName);
+  if (target < 0) return null;
+  const now = new Date();
+  const diff = (target - now.getDay() + 7) % 7;
+  const date = new Date(now.getTime() + diff * 86_400_000);
+  return date.toISOString().slice(0, 10);
+}
+
 export default function PortalClassesPage() {
   const { activeMember, loading: memberLoading } = usePortalMember();
   const [classes, setClasses] = useState<GymClass[]>([]);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [dropIns, setDropIns] = useState<DropIn[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const load = async () => {
     if (!activeMember) return;
-    const [{ data: classData }, { data: wl }, { data: enr }] = await Promise.all([
+    const today = new Date().toISOString().slice(0, 10);
+    const [{ data: classData }, { data: wl }, { data: enr }, { data: di }] = await Promise.all([
       supabase
         .from('classes')
         .select('id, name, instructor, day_of_week, start_time, end_time')
@@ -58,11 +81,18 @@ export default function PortalClassesPage() {
         .select('id, class_id, classes(name, day_of_week, start_time)')
         .eq('member_id', activeMember.id)
         .eq('status', 'active'),
+      supabase
+        .from('class_session_bookings')
+        .select('id, session_id, class_sessions!inner(session_date, class_id, classes(name, start_time))')
+        .eq('member_id', activeMember.id)
+        .eq('status', 'booked')
+        .gte('class_sessions.session_date', today),
     ]);
 
     setClasses((classData as GymClass[]) ?? []);
     setWaitlist((wl as unknown as WaitlistEntry[]) ?? []);
     setEnrollments((enr as unknown as Enrollment[]) ?? []);
+    setDropIns((di as unknown as DropIn[]) ?? []);
     setLoading(false);
   };
 
@@ -103,6 +133,38 @@ export default function PortalClassesPage() {
     if (!res.ok) {
       const data = (await res.json()) as { error?: string };
       setError(data.error || 'Booking failed.');
+    }
+    await load();
+    setBusy(null);
+  };
+
+  const toggleDropIn = async (
+    payload: { classId: string; dayOfWeek: string | null } | { sessionId: string }
+  ) => {
+    if (!activeMember) return;
+    setError('');
+    let body: Record<string, string>;
+    if ('sessionId' in payload) {
+      body = { action: 'cancel', session_id: payload.sessionId, member_id: activeMember.id };
+    } else {
+      const date = nextDateForDay(payload.dayOfWeek);
+      if (!date) return;
+      body = {
+        action: 'book',
+        class_id: payload.classId,
+        session_date: date,
+        member_id: activeMember.id,
+      };
+      setBusy(payload.classId);
+    }
+    const res = await fetch('/api/portal/dropin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const data = (await res.json()) as { error?: string };
+      setError(data.error || 'Drop-in booking failed.');
     }
     await load();
     setBusy(null);
@@ -164,6 +226,29 @@ export default function PortalClassesPage() {
         </div>
       )}
 
+      {dropIns.length > 0 && (
+        <div>
+          <h2 className="font-semibold text-white mb-2">My Drop-ins</h2>
+          <div className="space-y-2">
+            {dropIns.map((d) => (
+              <div key={d.id} className="bg-blue-500/5 border border-blue-500/20 rounded-xl px-4 py-3 flex justify-between text-sm">
+                <span>
+                  {d.class_sessions?.classes?.name}
+                  {d.class_sessions?.session_date ? ` · ${d.class_sessions.session_date}` : ''}
+                  {d.class_sessions?.classes?.start_time ? ` · ${d.class_sessions.classes.start_time}` : ''}
+                </span>
+                <button
+                  onClick={() => void toggleDropIn({ sessionId: d.session_id })}
+                  className="text-red-400 text-xs hover:underline"
+                >
+                  Cancel
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {waitlist.length > 0 && (
         <div>
           <h2 className="font-semibold text-white mb-2">My Waitlist</h2>
@@ -214,6 +299,15 @@ export default function PortalClassesPage() {
                   >
                     {booked ? 'Booked ✓' : 'Book'}
                   </button>
+                  {!booked && (
+                    <button
+                      disabled={busy === c.id}
+                      onClick={() => void toggleDropIn({ classId: c.id, dayOfWeek: c.day_of_week })}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-500/15 text-blue-300 hover:bg-blue-500/25"
+                    >
+                      Drop-in
+                    </button>
+                  )}
                   {!booked && (
                     <button
                       disabled={busy === c.id}

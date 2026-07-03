@@ -64,7 +64,7 @@
 
 - [x] 12.22 Download signed PDF
 
-- [ ] 12.23 Minor parent signing flow
+- [x] 12.23 Minor parent signing flow (guardian name required when under 18)
 
 
 
@@ -148,7 +148,7 @@
 
 - [ ] 12.48 E2E golden path: login → view attendance
 
-- [ ] 12.49 Component tests for SubscriptionActions
+- [x] 12.49 Component tests for SubscriptionActions
 
 - [ ] 12.50 Portal RLS integration tests
 

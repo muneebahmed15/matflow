@@ -73,6 +73,8 @@ export default function SettingsPage() {
       reviewCheckinThreshold: settings.review_checkin_threshold,
       requireWaiverForCheckin: settings.require_waiver_for_checkin,
       timezone: settings.timezone ?? 'America/New_York',
+      beltSystem: settings.belt_system ?? 'bjj_adult',
+      bookingCancelHours: settings.booking_cancel_hours ?? 2,
     })
     setSaving(false)
     if (!result.ok) {
@@ -147,6 +149,31 @@ export default function SettingsPage() {
               <option value="America/Los_Angeles" className="bg-gray-900">Pacific (America/Los_Angeles)</option>
               <option value="America/Phoenix" className="bg-gray-900">Arizona (America/Phoenix)</option>
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Belt system</label>
+            <select
+              value={settings.belt_system ?? 'bjj_adult'}
+              onChange={(e) => update({ belt_system: e.target.value })}
+              className={inputClass}
+            >
+              <option value="bjj_adult" className="bg-gray-900">BJJ (Adult)</option>
+              <option value="bjj_kids" className="bg-gray-900">BJJ (Kids)</option>
+              <option value="karate" className="bg-gray-900">Karate</option>
+              <option value="tkd" className="bg-gray-900">Taekwondo</option>
+            </select>
+            <p className="text-white/20 text-xs mt-1">Controls belt order and valid ranks for promotions.</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Booking cancellation window (hours)</label>
+            <input
+              type="number"
+              min={0}
+              value={settings.booking_cancel_hours ?? 2}
+              onChange={(e) => update({ booking_cancel_hours: parseInt(e.target.value, 10) || 0 })}
+              className={inputClass}
+            />
+            <p className="text-white/20 text-xs mt-1">Members must cancel drop-in bookings at least this many hours before class.</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Tagline</label>

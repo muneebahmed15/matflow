@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createWaiverAction } from '@/app/(dashboard)/actions';
+import { WAIVER_TEMPLATES } from '@/lib/waiver-templates';
 
 const DEFAULT_BODY = `I, the undersigned, acknowledge and agree to the following:
 
@@ -54,6 +55,24 @@ export default function NewWaiverPage() {
         <p className="text-gray-400 text-sm mb-8">This waiver will be available for members to sign digitally.</p>
 
         <div className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Start from a template</label>
+            <div className="flex flex-wrap gap-2">
+              {WAIVER_TEMPLATES.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => { setTitle(t.title); setBody(t.body); }}
+                  className="text-xs border border-white/10 text-white/60 hover:text-white hover:bg-white/5 px-3 py-1.5 rounded-lg transition"
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-white/20 text-xs mt-1">
+              Templates support merge fields: {'{{member_name}}'}, {'{{gym_name}}'}, {'{{date}}'}.
+            </p>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Waiver Title</label>
             <input

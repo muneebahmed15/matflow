@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const admin = getAdminClient();
   const { data: plan } = await admin
     .from('plans')
-    .select('id')
+    .select('id, trial_days')
     .eq('gym_id', gym_id)
     .eq('stripe_price_id', stripe_price_id)
     .eq('is_active', true)
@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       : '/subscriptions?cancelled=true';
 
   try {
+    const trialDays = (plan as { trial_days?: number | null }).trial_days ?? 0;
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
@@ -50,6 +51,8 @@ export async function POST(req: NextRequest) {
       success_url: `${NEXT_PUBLIC_APP_URL}${successPath}`,
       cancel_url: `${NEXT_PUBLIC_APP_URL}${cancelPath}`,
       metadata: { member_id, gym_id },
+      allow_promotion_codes: true,
+      ...(trialDays > 0 ? { subscription_data: { trial_period_days: trialDays } } : {}),
     });
     return NextResponse.json({ url: session.url });
   } catch (err: unknown) {

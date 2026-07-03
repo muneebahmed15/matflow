@@ -30,13 +30,13 @@
 
 - [x] 3.11 Instructor as text field (done)
 
-- [ ] 3.12 `instructor_id` FK to staff_roles
+- [x] 3.12 `instructor_staff_id` FK to staff_roles + staff picker UI
 
 - [ ] 3.13 Substitute instructor field
 
 - [ ] 3.14 Instructor conflict detection
 
-- [ ] 3.15 Public site shows instructor bios
+- [x] 3.15 Public site shows instructor bios (coaches page)
 
 
 
@@ -78,7 +78,7 @@
 
 - [x] 3.29 Staff marks attendance for a class session
 
-- [ ] 3.30 Attendance report per class
+- [x] 3.30 Attendance report per class (30-day avg on classes page)
 
 - [ ] 3.31 Link kiosk check-in to optional class_id
 
@@ -88,11 +88,11 @@
 
 - [x] 3.32 Member enrolls in recurring class (`class_enrollments` + portal booking)
 
-- [ ] 3.33 Drop-in booking for single session
+- [x] 3.33 Drop-in booking for single session (portal + `class_session_bookings`)
 
-- [ ] 3.34 Booking cancellation policy
+- [x] 3.34 Booking cancellation policy (`gyms.booking_cancel_hours`)
 
-- [ ] 3.35 Trial class booking from public site
+- [x] 3.35 Trial class booking from public site (schedule → trial link with class pre-fill)
 
 
 
@@ -128,7 +128,7 @@
 
 - [ ] 3.46 Seasonal schedule templates
 
-- [ ] 3.47 Class analytics: avg attendance
+- [x] 3.47 Class analytics: avg attendance
 
 - [ ] 3.48 Class analytics: revenue attribution
 

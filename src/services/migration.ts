@@ -234,6 +234,295 @@ export async function importLeadsFromRows(
   return { jobId: job.id, success, errors };
 }
 
+/** Build lookup maps (by lowercased email and by external_id) for member matching. */
+export function buildMemberLookup(
+  members: { id: string; email: string | null; external_id: string | null }[]
+): { byEmail: Map<string, string>; byExternalId: Map<string, string> } {
+  const byEmail = new Map<string, string>();
+  const byExternalId = new Map<string, string>();
+  for (const m of members) {
+    if (m.email) byEmail.set(m.email.toLowerCase(), m.id);
+    if (m.external_id) byExternalId.set(m.external_id, m.id);
+  }
+  return { byEmail, byExternalId };
+}
+
+/** Resolve a row to a member id via external_id first, then email. Null when unmatched. */
+export function resolveMemberId(
+  lookup: { byEmail: Map<string, string>; byExternalId: Map<string, string> },
+  row: { email?: string; external_id?: string }
+): string | null {
+  if (row.external_id) {
+    const id = lookup.byExternalId.get(row.external_id.trim());
+    if (id) return id;
+  }
+  if (row.email) {
+    const id = lookup.byEmail.get(row.email.trim().toLowerCase());
+    if (id) return id;
+  }
+  return null;
+}
+
+/** Parse a date (YYYY-MM-DD) or datetime string to an ISO timestamp. Null when invalid. */
+export function parseImportTimestamp(value: string | undefined): string | null {
+  if (!value?.trim()) return null;
+  const raw = value.trim();
+  // Date-only values are pinned to noon local time to avoid timezone day-shift
+  const candidate = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T12:00:00` : raw;
+  const parsed = new Date(candidate);
+  if (Number.isNaN(parsed.getTime())) return null;
+  if (parsed.getTime() > Date.now()) return null;
+  return parsed.toISOString();
+}
+
+async function fetchMemberLookup(gymId: string) {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('members')
+    .select('id, email, external_id')
+    .eq('gym_id', gymId);
+  if (error) throw new ServiceError(500, error.message);
+  return buildMemberLookup(data ?? []);
+}
+
+export type AttendanceImportRow = {
+  email?: string;
+  external_id?: string;
+  checked_in_at: string;
+  notes?: string;
+};
+
+export async function importAttendanceFromRows(
+  gymId: string,
+  rows: AttendanceImportRow[],
+  options: { fileName?: string; createdBy?: string; dryRun?: boolean }
+): Promise<{ jobId: string; success: number; errors: { row: number; message: string }[] }> {
+  if (rows.length > MAX_IMPORT_ROWS) {
+    throw new ServiceError(400, `Import limited to ${MAX_IMPORT_ROWS} rows per job.`);
+  }
+  const admin = getAdminClient();
+  const lookup = await fetchMemberLookup(gymId);
+
+  const { data: job, error: jobErr } = await admin
+    .from('import_jobs')
+    .insert({
+      gym_id: gymId,
+      import_type: 'attendance',
+      status: 'processing',
+      file_name: options.fileName ?? null,
+      total_rows: rows.length,
+      created_by: options.createdBy ?? null,
+    })
+    .select('id')
+    .single();
+
+  if (jobErr || !job) throw new ServiceError(500, jobErr?.message ?? 'Failed to create import job');
+
+  const errors: { row: number; message: string }[] = [];
+  const inserts: {
+    gym_id: string;
+    member_id: string;
+    checked_in_at: string;
+    notes: string | null;
+    import_job_id: string;
+  }[] = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 2;
+
+    const memberId = resolveMemberId(lookup, row);
+    if (!memberId) {
+      errors.push({ row: rowNum, message: 'No member matched by external_id or email' });
+      continue;
+    }
+
+    const checkedInAt = parseImportTimestamp(row.checked_in_at);
+    if (!checkedInAt) {
+      errors.push({ row: rowNum, message: `Invalid or future date: ${row.checked_in_at ?? ''}` });
+      continue;
+    }
+
+    inserts.push({
+      gym_id: gymId,
+      member_id: memberId,
+      checked_in_at: checkedInAt,
+      notes: row.notes?.trim() || null,
+      import_job_id: job.id,
+    });
+  }
+
+  let success = 0;
+  if (!options.dryRun && inserts.length > 0) {
+    const { error } = await admin.from('attendance').insert(inserts);
+    if (error) {
+      errors.push({ row: 0, message: error.message });
+    } else {
+      success = inserts.length;
+    }
+  } else {
+    success = inserts.length;
+  }
+
+  if (errors.length > 0 && !options.dryRun) {
+    await admin.from('import_row_errors').insert(
+      errors
+        .filter((e) => e.row > 0)
+        .map((e) => ({
+          job_id: job.id,
+          row_number: e.row,
+          row_data: rows[e.row - 2] ?? {},
+          error_message: e.message,
+        }))
+    );
+  }
+
+  await admin
+    .from('import_jobs')
+    .update({
+      status: success === 0 && errors.length > 0 ? 'failed' : 'completed',
+      success_rows: success,
+      error_rows: errors.length,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', job.id);
+
+  return { jobId: job.id, success, errors };
+}
+
+export type BeltHistoryImportRow = {
+  email?: string;
+  external_id?: string;
+  from_belt?: string;
+  to_belt: string;
+  promoted_at: string;
+  notes?: string;
+};
+
+export async function importBeltHistoryFromRows(
+  gymId: string,
+  rows: BeltHistoryImportRow[],
+  options: { fileName?: string; createdBy?: string; dryRun?: boolean }
+): Promise<{ jobId: string; success: number; errors: { row: number; message: string }[] }> {
+  if (rows.length > MAX_IMPORT_ROWS) {
+    throw new ServiceError(400, `Import limited to ${MAX_IMPORT_ROWS} rows per job.`);
+  }
+  const admin = getAdminClient();
+  const lookup = await fetchMemberLookup(gymId);
+
+  const { getGymBeltSystem } = await import('@/services/belts');
+  const { isValidBelt } = await import('@/lib/belt-systems');
+  const beltSystem = await getGymBeltSystem(gymId);
+
+  const { data: job, error: jobErr } = await admin
+    .from('import_jobs')
+    .insert({
+      gym_id: gymId,
+      import_type: 'belt_history',
+      status: 'processing',
+      file_name: options.fileName ?? null,
+      total_rows: rows.length,
+      created_by: options.createdBy ?? null,
+    })
+    .select('id')
+    .single();
+
+  if (jobErr || !job) throw new ServiceError(500, jobErr?.message ?? 'Failed to create import job');
+
+  const errors: { row: number; message: string }[] = [];
+  const inserts: {
+    gym_id: string;
+    member_id: string;
+    from_belt: string;
+    to_belt: string;
+    promoted_at: string;
+    notes: string | null;
+    import_job_id: string;
+  }[] = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 2;
+
+    const memberId = resolveMemberId(lookup, row);
+    if (!memberId) {
+      errors.push({ row: rowNum, message: 'No member matched by external_id or email' });
+      continue;
+    }
+
+    const toBelt = row.to_belt?.trim().toLowerCase();
+    if (!toBelt || !isValidBelt(beltSystem, toBelt)) {
+      errors.push({
+        row: rowNum,
+        message: `Invalid belt "${row.to_belt ?? ''}" for this gym's belt system`,
+      });
+      continue;
+    }
+
+    const fromBelt = row.from_belt?.trim().toLowerCase() || '';
+    if (fromBelt && !isValidBelt(beltSystem, fromBelt)) {
+      errors.push({
+        row: rowNum,
+        message: `Invalid belt "${row.from_belt}" for this gym's belt system`,
+      });
+      continue;
+    }
+
+    const promotedAt = parseImportTimestamp(row.promoted_at);
+    if (!promotedAt) {
+      errors.push({ row: rowNum, message: `Invalid or future date: ${row.promoted_at ?? ''}` });
+      continue;
+    }
+
+    inserts.push({
+      gym_id: gymId,
+      member_id: memberId,
+      from_belt: fromBelt || 'unknown',
+      to_belt: toBelt,
+      promoted_at: promotedAt,
+      notes: row.notes?.trim() || null,
+      import_job_id: job.id,
+    });
+  }
+
+  let success = 0;
+  if (!options.dryRun && inserts.length > 0) {
+    const { error } = await admin.from('belt_promotions').insert(inserts);
+    if (error) {
+      errors.push({ row: 0, message: error.message });
+    } else {
+      success = inserts.length;
+    }
+  } else {
+    success = inserts.length;
+  }
+
+  if (errors.length > 0 && !options.dryRun) {
+    await admin.from('import_row_errors').insert(
+      errors
+        .filter((e) => e.row > 0)
+        .map((e) => ({
+          job_id: job.id,
+          row_number: e.row,
+          row_data: rows[e.row - 2] ?? {},
+          error_message: e.message,
+        }))
+    );
+  }
+
+  await admin
+    .from('import_jobs')
+    .update({
+      status: success === 0 && errors.length > 0 ? 'failed' : 'completed',
+      success_rows: success,
+      error_rows: errors.length,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', job.id);
+
+  return { jobId: job.id, success, errors };
+}
+
 export async function getImportJobErrors(jobId: string, gymId: string) {
   const admin = getAdminClient();
   const { data: job } = await admin
@@ -297,6 +586,20 @@ export async function rollbackImportJob(gymId: string, jobId: string): Promise<{
     const ids = (leads ?? []).map((l) => l.id);
     if (ids.length > 0) {
       const { error } = await admin.from('leads').delete().in('id', ids);
+      if (error) throw new ServiceError(500, error.message);
+      removed = ids.length;
+    }
+  } else if (job.import_type === 'attendance' || job.import_type === 'belt_history') {
+    const table = job.import_type === 'attendance' ? 'attendance' : 'belt_promotions';
+    const { data: recs } = await admin
+      .from(table)
+      .select('id')
+      .eq('gym_id', gymId)
+      .eq('import_job_id', jobId);
+
+    const ids = (recs ?? []).map((r) => r.id);
+    if (ids.length > 0) {
+      const { error } = await admin.from(table).delete().in('id', ids);
       if (error) throw new ServiceError(500, error.message);
       removed = ids.length;
     }

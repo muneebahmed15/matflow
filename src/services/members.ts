@@ -56,6 +56,12 @@ export async function createMember(input: CreateMemberInput): Promise<MemberRow>
 
   const normalizedEmail = input.email?.trim().toLowerCase();
   if (normalizedEmail) {
+    const { isValidEmail } = await import('@/lib/contact-validation');
+    if (!isValidEmail(normalizedEmail)) {
+      throw new ServiceError(400, 'Invalid email address.');
+    }
+  }
+  if (normalizedEmail) {
     const { data: duplicate } = await admin
       .from('members')
       .select('id')
@@ -91,6 +97,7 @@ export async function createMember(input: CreateMemberInput): Promise<MemberRow>
     familyId = input.existingFamilyId;
   }
 
+  const { normalizePhone } = await import('@/lib/contact-validation');
   const { data, error } = await admin
     .from('members')
     .insert({
@@ -98,7 +105,7 @@ export async function createMember(input: CreateMemberInput): Promise<MemberRow>
       first_name: input.firstName.trim(),
       last_name: input.lastName.trim(),
       email: input.email?.trim() || null,
-      phone: input.phone?.trim() || null,
+      phone: input.phone?.trim() ? normalizePhone(input.phone) : null,
       belt_rank: input.beltRank ?? 'white',
       status: input.status ?? 'active',
       family_id: familyId,
@@ -137,9 +144,23 @@ export async function getMember(gymId: string, memberId: string): Promise<Member
 export async function updateMember(
   gymId: string,
   memberId: string,
-  fields: Partial<Pick<MemberRow, 'first_name' | 'last_name' | 'email' | 'phone' | 'belt_rank' | 'status'>>
+  fields: Partial<Pick<MemberRow, 'first_name' | 'last_name' | 'email' | 'phone' | 'belt_rank' | 'status'>> & {
+    date_of_birth?: string | null;
+  },
+  actorId?: string | null
 ): Promise<MemberDetail> {
   const admin = getAdminClient();
+
+  if (fields.phone) {
+    const { normalizePhone } = await import('@/lib/contact-validation');
+    fields.phone = normalizePhone(fields.phone);
+  }
+  if (fields.email) {
+    const { isValidEmail } = await import('@/lib/contact-validation');
+    if (!isValidEmail(fields.email)) throw new ServiceError(400, 'Invalid email address.');
+    fields.email = fields.email.trim().toLowerCase();
+  }
+
   const { data, error } = await admin
     .from('members')
     .update(fields)
@@ -149,6 +170,27 @@ export async function updateMember(
     .single();
 
   if (error) throw new ServiceError(500, error.message);
+
+  // PII changes are audit-logged (field names only, not values).
+  const piiFields = ['first_name', 'last_name', 'email', 'phone', 'date_of_birth'].filter(
+    (f) => f in fields
+  );
+  if (piiFields.length > 0) {
+    try {
+      const { logAuditEvent } = await import('@/services/audit');
+      await logAuditEvent({
+        gymId,
+        actorId: actorId ?? null,
+        action: 'member.pii_updated',
+        entityType: 'member',
+        entityId: memberId,
+        payload: { fields: piiFields },
+      });
+    } catch {
+      // Audit is best-effort
+    }
+  }
+
   return data;
 }
 

@@ -3,9 +3,19 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentStaffInfo } from '@/lib/permissions'
-import { Award, Plus } from 'lucide-react'
-import { promoteMemberAction } from '@/app/(dashboard)/actions'
-import { BELT_RANKS, BELT_COLORS } from '@/lib/belt-colors'
+import { hasCapability } from '@/lib/permissions/capabilities'
+import { Award, Plus, Download, CheckCircle2 } from 'lucide-react'
+import {
+  promoteMemberAction,
+  undoPromotionAction,
+  getPromotionReadinessAction,
+  getGymBeltSystemAction,
+  listBeltRequirementsAction,
+  saveBeltRequirementAction,
+  exportMembersByBeltCsvAction,
+} from '@/app/(dashboard)/actions'
+import { BELT_COLORS } from '@/lib/belt-colors'
+import { useAppUi } from '@/components/ui/AppUiProvider'
 
 interface Member {
   id: string
@@ -25,65 +35,157 @@ interface BeltPromotion {
   members: { first_name: string; last_name: string }
 }
 
+interface Readiness {
+  memberId: string
+  firstName: string
+  lastName: string
+  belt: string
+  daysAtRank: number
+  attendanceSinceRank: number
+  ready: boolean
+  hasRequirement: boolean
+  missingAttendance: number
+  missingDays: number
+}
+
+interface RequirementRow {
+  id: string
+  belt: string
+  min_attendance: number
+  min_days_at_rank: number
+}
+
+const beltBadge = (belt: string) => BELT_COLORS[belt] ?? 'bg-white/10 text-white'
+
 export default function BeltsPage() {
+  const { confirm, error: showError, success: showSuccess } = useAppUi()
   const [members, setMembers] = useState<Member[]>([])
   const [promotions, setPromotions] = useState<BeltPromotion[]>([])
+  const [readiness, setReadiness] = useState<Readiness[]>([])
+  const [requirements, setRequirements] = useState<RequirementRow[]>([])
+  const [beltRanks, setBeltRanks] = useState<string[]>(['white', 'blue', 'purple', 'brown', 'black'])
   const [gymId, setGymId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [canPromote, setCanPromote] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [showRequirements, setShowRequirements] = useState(false)
   const [selectedMember, setSelectedMember] = useState('')
   const [toBelt, setToBelt] = useState('blue')
+  const [ceremonyDate, setCeremonyDate] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  // requirements editor state
+  const [reqBelt, setReqBelt] = useState('white')
+  const [reqAttendance, setReqAttendance] = useState('50')
+  const [reqDays, setReqDays] = useState('365')
+
+  const reload = async (gid: string) => {
+    const [{ data: membersData }, { data: promoData }, readyResult, reqResult] = await Promise.all([
+      supabase.from('members').select('id, first_name, last_name, belt_rank, email').eq('gym_id', gid).eq('status', 'active').order('first_name'),
+      supabase.from('belt_promotions').select('*, members(first_name, last_name)').eq('gym_id', gid).order('promoted_at', { ascending: false }).limit(20),
+      getPromotionReadinessAction(),
+      listBeltRequirementsAction(),
+    ])
+    setMembers(membersData || [])
+    setPromotions(promoData || [])
+    if (readyResult.ok && readyResult.data) setReadiness(readyResult.data)
+    if (reqResult.ok && reqResult.data) setRequirements(reqResult.data)
+  }
 
   useEffect(() => {
     const load = async () => {
       const info = await getCurrentStaffInfo()
       if (!info.gymId) return
       setGymId(info.gymId)
-      const [{ data: membersData }, { data: promoData }] = await Promise.all([
-        supabase.from('members').select('id, first_name, last_name, belt_rank, email').eq('gym_id', info.gymId).order('first_name'),
-        supabase.from('belt_promotions').select('*, members(first_name, last_name)').eq('gym_id', info.gymId).order('promoted_at', { ascending: false }).limit(20),
-      ])
-      setMembers(membersData || [])
-      setPromotions(promoData || [])
+      setIsAdmin(info.role === 'admin')
+      setCanPromote(hasCapability(info.role, 'belts.promote'))
+
+      const systemResult = await getGymBeltSystemAction()
+      if (systemResult.ok && systemResult.data) {
+        setBeltRanks(systemResult.data.belts)
+        setToBelt(systemResult.data.belts[1] ?? systemResult.data.belts[0])
+      }
+
+      await reload(info.gymId)
       setLoading(false)
     }
-    load()
+    void load()
   }, [])
 
   const handlePromote = async () => {
     if (!selectedMember || !gymId) return
     setSubmitting(true)
     const member = members.find(m => m.id === selectedMember)
-    if (!member) {
-      setSubmitting(false)
-      return
-    }
+    if (!member) { setSubmitting(false); return }
+
     const result = await promoteMemberAction({
       memberId: selectedMember,
       fromBelt: member.belt_rank,
       toBelt,
       notes,
+      ceremonyDate: ceremonyDate || null,
     })
     if (!result.ok) {
+      showError(result.error)
       setSubmitting(false)
       return
     }
-    const [{ data: membersData }, { data: promoData }] = await Promise.all([
-      supabase.from('members').select('id, first_name, last_name, belt_rank, email').eq('gym_id', gymId).order('first_name'),
-      supabase.from('belt_promotions').select('*, members(first_name, last_name)').eq('gym_id', gymId).order('promoted_at', { ascending: false }).limit(20),
-    ])
-    setMembers(membersData || [])
-    setPromotions(promoData || [])
+    await reload(gymId)
     setSelectedMember('')
     setNotes('')
+    setCeremonyDate('')
     setShowForm(false)
     setSubmitting(false)
+    showSuccess('Promotion logged')
+  }
+
+  const handleUndo = async (promotionId: string) => {
+    if (!gymId) return
+    const ok = await confirm({
+      title: 'Undo promotion',
+      message: 'This deletes the promotion record and reverts the member to their previous belt.',
+      confirmLabel: 'Undo',
+      destructive: true,
+    })
+    if (!ok) return
+    const result = await undoPromotionAction(promotionId)
+    if (!result.ok) { showError(result.error); return }
+    await reload(gymId)
+    showSuccess('Promotion undone')
+  }
+
+  const handleSaveRequirement = async () => {
+    if (!gymId) return
+    const result = await saveBeltRequirementAction({
+      belt: reqBelt,
+      minAttendance: parseInt(reqAttendance, 10) || 0,
+      minDaysAtRank: parseInt(reqDays, 10) || 0,
+    })
+    if (!result.ok) { showError(result.error); return }
+    await reload(gymId)
+    showSuccess('Requirement saved')
+  }
+
+  const handleExport = async () => {
+    const result = await exportMembersByBeltCsvAction()
+    if (!result.ok || !result.data) {
+      showError(!result.ok ? result.error : 'Export failed')
+      return
+    }
+    const blob = new Blob([result.data], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'members-by-belt.csv'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const selectedMemberData = members.find(m => m.id === selectedMember)
   const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+  const readyMembers = readiness.filter(r => r.ready)
 
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
 
@@ -94,12 +196,40 @@ export default function BeltsPage() {
           <h1 className="text-3xl font-extrabold">Belt Promotions</h1>
           <p className="text-white/40 text-sm mt-1">Track and log member belt promotions.</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
-          <Plus size={16} /> Promote Member
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => void handleExport()} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+            <Download size={16} /> Export CSV
+          </button>
+          {canPromote && (
+            <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+              <Plus size={16} /> Promote Member
+            </button>
+          )}
+        </div>
       </div>
 
-      {showForm && (
+      {readyMembers.length > 0 && (
+        <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-5 mb-6">
+          <p className="text-green-300 font-semibold text-sm flex items-center gap-2 mb-3">
+            <CheckCircle2 size={16} /> Ready for promotion ({readyMembers.length})
+          </p>
+          <div className="space-y-2">
+            {readyMembers.map(r => (
+              <div key={r.memberId} className="flex items-center justify-between text-sm">
+                <span className="text-white">
+                  {r.firstName} {r.lastName}
+                  <span className={`ml-2 px-1.5 py-0.5 rounded text-xs capitalize ${beltBadge(r.belt)}`}>{r.belt}</span>
+                </span>
+                <span className="text-white/40 text-xs">
+                  {r.attendanceSinceRank} classes · {r.daysAtRank} days at rank
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showForm && canPromote && (
         <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-6 space-y-4">
           <h2 className="font-semibold text-white">Log Belt Promotion</h2>
           <div>
@@ -117,26 +247,32 @@ export default function BeltsPage() {
             <div className="flex items-center gap-4 p-3 bg-white/5 rounded-xl">
               <div>
                 <p className="text-white/40 text-xs mb-1">Current Belt</p>
-                <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${BELT_COLORS[selectedMemberData.belt_rank]}`}>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${beltBadge(selectedMemberData.belt_rank)}`}>
                   {selectedMemberData.belt_rank}
                 </span>
               </div>
               <div className="text-white/20 text-lg">→</div>
               <div>
                 <p className="text-white/40 text-xs mb-1">Promoting To</p>
-                <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${BELT_COLORS[toBelt]}`}>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${beltBadge(toBelt)}`}>
                   {toBelt}
                 </span>
               </div>
             </div>
           )}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Promote To</label>
-            <select value={toBelt} onChange={(e) => setToBelt(e.target.value)} className={inputClass}>
-              {BELT_RANKS.map(b => (
-                <option key={b} value={b} className="bg-gray-900 capitalize">{b}</option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Promote To</label>
+              <select value={toBelt} onChange={(e) => setToBelt(e.target.value)} className={inputClass}>
+                {beltRanks.map(b => (
+                  <option key={b} value={b} className="bg-gray-900 capitalize">{b}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Ceremony date (optional)</label>
+              <input type="date" value={ceremonyDate} onChange={(e) => setCeremonyDate(e.target.value)} className={inputClass} />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Notes (optional)</label>
@@ -155,11 +291,11 @@ export default function BeltsPage() {
       <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-6">
         <h2 className="font-semibold text-white mb-4">Current Belt Rankings</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {BELT_RANKS.map(belt => {
+          {beltRanks.map(belt => {
             const count = members.filter(m => m.belt_rank === belt).length
             return (
               <div key={belt} className={`rounded-xl p-3 border border-white/10 ${count > 0 ? '' : 'opacity-30'}`}>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${BELT_COLORS[belt]}`}>{belt}</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${beltBadge(belt)}`}>{belt}</span>
                 <p className="text-2xl font-bold text-white mt-2">{count}</p>
                 <p className="text-white/30 text-xs">members</p>
               </div>
@@ -167,6 +303,49 @@ export default function BeltsPage() {
           })}
         </div>
       </div>
+
+      {/* Promotion requirements (admin) */}
+      {isAdmin && (
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-white">Promotion Requirements</h2>
+            <button onClick={() => setShowRequirements(!showRequirements)} className="text-white/40 hover:text-white text-xs">
+              {showRequirements ? 'Hide' : 'Edit'}
+            </button>
+          </div>
+          {requirements.length > 0 && (
+            <div className="mt-3 space-y-1">
+              {requirements.map(r => (
+                <p key={r.id} className="text-white/50 text-xs">
+                  <span className={`px-1.5 py-0.5 rounded text-xs capitalize mr-2 ${beltBadge(r.belt)}`}>{r.belt}</span>
+                  {r.min_attendance} classes · {r.min_days_at_rank} days at rank before next promotion
+                </p>
+              ))}
+            </div>
+          )}
+          {showRequirements && (
+            <div className="mt-4 grid grid-cols-4 gap-3 items-end">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Belt</label>
+                <select value={reqBelt} onChange={(e) => setReqBelt(e.target.value)} className={inputClass}>
+                  {beltRanks.map(b => <option key={b} value={b} className="bg-gray-900 capitalize">{b}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Min classes</label>
+                <input type="number" value={reqAttendance} onChange={(e) => setReqAttendance(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Min days at rank</label>
+                <input type="number" value={reqDays} onChange={(e) => setReqDays(e.target.value)} className={inputClass} />
+              </div>
+              <button onClick={() => void handleSaveRequirement()} className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 rounded-xl transition">
+                Save
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Promotion History */}
       <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
@@ -187,15 +366,20 @@ export default function BeltsPage() {
                   <div>
                     <p className="text-white font-medium">{p.members.first_name} {p.members.last_name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`px-1.5 py-0.5 rounded text-xs capitalize ${BELT_COLORS[p.from_belt]}`}>{p.from_belt}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-xs capitalize ${beltBadge(p.from_belt)}`}>{p.from_belt}</span>
                       <span className="text-white/20 text-xs">→</span>
-                      <span className={`px-1.5 py-0.5 rounded text-xs capitalize ${BELT_COLORS[p.to_belt]}`}>{p.to_belt}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-xs capitalize ${beltBadge(p.to_belt)}`}>{p.to_belt}</span>
                     </div>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className="text-white/30 text-xs">{new Date(p.promoted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                   {p.notes && <p className="text-white/20 text-xs mt-0.5 max-w-32 truncate">{p.notes}</p>}
+                  {isAdmin && (
+                    <button onClick={() => void handleUndo(p.id)} className="text-white/20 hover:text-red-400 text-xs mt-1 transition">
+                      Undo
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
