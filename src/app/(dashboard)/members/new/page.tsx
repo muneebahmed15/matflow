@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import { getCurrentStaffInfo } from '@/lib/permissions'
 import { useRouter } from 'next/navigation'
+import { getCurrentStaffInfo } from '@/lib/permissions'
+import { createMemberAction, listFamiliesAction } from '@/app/(dashboard)/actions'
 
 interface Family {
   id: string
@@ -13,7 +13,6 @@ interface Family {
 export default function AddMemberPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [gymId, setGymId] = useState<string | null>(null)
   const [first_name, setFirstName] = useState('')
   const [last_name, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -22,7 +21,6 @@ export default function AddMemberPage() {
   const [status, setStatus] = useState('active')
   const [error, setError] = useState('')
 
-  // Family billing
   const [families, setFamilies] = useState<Family[]>([])
   const [familyOption, setFamilyOption] = useState<'none' | 'existing' | 'new'>('none')
   const [selectedFamilyId, setSelectedFamilyId] = useState('')
@@ -30,14 +28,12 @@ export default function AddMemberPage() {
   const [newFamilyEmail, setNewFamilyEmail] = useState('')
 
   useEffect(() => {
-    const load = async () => {
+    void (async () => {
       const info = await getCurrentStaffInfo()
       if (!info.gymId) return
-      setGymId(info.gymId)
-      const { data } = await supabase.from('families').select('id, family_name').eq('gym_id', info.gymId).order('family_name')
-      setFamilies(data || [])
-    }
-    load()
+      const result = await listFamiliesAction()
+      if (result.ok && result.data) setFamilies(result.data)
+    })()
   }, [])
 
   const handleSubmit = async () => {
@@ -48,25 +44,25 @@ export default function AddMemberPage() {
     setLoading(true)
     setError('')
 
-    let familyId: string | null = null
-
-    if (familyOption === 'new') {
-      const { data: newFamily, error: famErr } = await supabase.from('families').insert({
-        gym_id: gymId,
-        family_name: newFamilyName,
-        primary_email: newFamilyEmail || email,
-      }).select().single()
-      if (famErr) { setError(famErr.message); setLoading(false); return }
-      familyId = newFamily.id
-    } else if (familyOption === 'existing') {
-      familyId = selectedFamilyId
-    }
-
-    const { error: err } = await supabase.from('members').insert({
-      first_name, last_name, email, phone, belt_rank, status, gym_id: gymId, family_id: familyId
+    const result = await createMemberAction({
+      firstName: first_name,
+      lastName: last_name,
+      email: email || undefined,
+      phone: phone || undefined,
+      beltRank: belt_rank,
+      status,
+      familyOption,
+      existingFamilyId: familyOption === 'existing' ? selectedFamilyId : undefined,
+      newFamilyName: familyOption === 'new' ? newFamilyName : undefined,
+      newFamilyEmail: familyOption === 'new' ? newFamilyEmail || email : undefined,
     })
+
     setLoading(false)
-    if (err) { setError(err.message) } else { router.push('/members') }
+    if (!result.ok) {
+      setError(result.error)
+      return
+    }
+    router.push('/members')
   }
 
   const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -113,7 +109,6 @@ export default function AddMemberPage() {
           </div>
         </div>
 
-        {/* Family Billing Section */}
         <div className="pt-4 border-t border-white/10">
           <label className={labelClass}>Family Billing</label>
           <p className="text-white/20 text-xs mb-3">Link this member to a family for shared billing (e.g. parent + kids).</p>
@@ -151,7 +146,7 @@ export default function AddMemberPage() {
         </div>
 
         {error && <p className="text-red-400 text-sm">{error}</p>}
-        <button onClick={handleSubmit} disabled={loading || !first_name || !last_name} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
+        <button onClick={() => void handleSubmit()} disabled={loading || !first_name || !last_name} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
           {loading ? 'Adding...' : 'Add Member'}
         </button>
       </div>

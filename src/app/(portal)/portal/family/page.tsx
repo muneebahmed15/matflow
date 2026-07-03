@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePortalMember } from '@/lib/portal-member-context';
+import { ListSkeleton } from '@/components/LoadingSkeleton';
 
 type FamilyBilling = {
   family: { family_name: string; primary_email: string | null };
@@ -24,7 +25,7 @@ export default function PortalFamilyPage() {
     })();
   }, []);
 
-  if (loading) return <p className="text-white/40 py-12 text-center">Loading...</p>;
+  if (loading) return <ListSkeleton count={3} />;
 
   return (
     <div className="space-y-6">

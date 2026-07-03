@@ -87,7 +87,13 @@ export default function PortalAttendancePage() {
       {records.length === 0 ? (
         <div className="bg-[#111] border border-white/10 rounded-2xl p-12 text-center">
           <UserCheck size={40} className="text-white/20 mx-auto mb-4" />
-          <p className="text-white/30">No check-ins yet.</p>
+          <p className="text-white/30 mb-4">No check-ins yet.</p>
+          <Link
+            href="/portal/classes"
+            className="inline-block text-sm font-medium text-blue-400 hover:underline"
+          >
+            Browse classes to get started →
+          </Link>
         </div>
       ) : (
         <div className="space-y-2">

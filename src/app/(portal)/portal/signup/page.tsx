@@ -29,22 +29,16 @@ export default function PortalSignupPage() {
     const { error: err } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { first_name: member.first_name } }
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/portal')}`,
+        data: { first_name: member.first_name },
+      },
     })
 
     if (err) {
       setError(err.message)
       setLoading(false)
       return
-    }
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      await supabase
-        .from('members')
-        .update({ auth_user_id: user.id })
-        .eq('id', member.id)
-        .eq('email', email)
     }
 
     setSuccess(true)

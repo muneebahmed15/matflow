@@ -74,9 +74,8 @@
 
 - [x] 12.25 Edit emergency contacts
 
-- [ ] 12.26 Upload profile photo
-
-- [ ] 12.27 Notification preferences
+- [x] 12.26 Upload profile photo
+- [x] 12.27 Notification preferences
 
 
 
@@ -116,7 +115,7 @@
 
 - [x] 12.38 PWA manifest for portal
 
-- [ ] 12.39 Add to home screen prompt
+- [x] 12.39 Add to home screen prompt
 
 - [ ] 12.40 Push notifications (future)
 
@@ -126,7 +125,7 @@
 
 - [x] 12.41 Portal shell layout (done)
 
-- [ ] 12.42 Consistent loading skeletons
+- [x] 12.42 Consistent loading skeletons
 
 - [ ] 12.43 Error boundaries per section
 

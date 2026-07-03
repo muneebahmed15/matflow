@@ -23,7 +23,7 @@
 - [x] 7.16 Gym content tables/columns (gym_programs, gym_coaches, gym_gallery, tagline, about_text)
 - [x] 7.17 Admin CMS (`/website-content` page)
 - [~] 7.18 Logo URL upload (no dedicated hero image)
-- [~] 7.19 Programs list create/delete (no edit)
+- [x] 7.19 Programs list create/delete (no edit)
 - [~] 7.20 Coach bios CRUD (not linked to staff_roles)
 
 ## Branding
@@ -77,5 +77,5 @@
 - [ ] 7.52 A/B test hero variants
 - [x] 7.53 Online class booking from schedule (book-trial links + portal drop-ins)
 - [x] 7.54 Member login link in header
-- [ ] 7.55 Privacy policy page template
-- [ ] 7.56 Terms of service page template
+- [x] 7.55 Privacy policy page template
+- [x] 7.56 Terms of service page template

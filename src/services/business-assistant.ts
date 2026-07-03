@@ -8,6 +8,8 @@ export type BusinessMetrics = {
   failedPayments: number;
   readyForPromotion: number;
   lowAttendanceClasses: number;
+  waiverGapMembers: number;
+  trialLeadsOpen: number;
 };
 
 export type BusinessRecommendation = {
@@ -88,13 +90,30 @@ export async function computeGymMetrics(gymId: string): Promise<BusinessMetrics>
     }
   }
 
+  const { getClassAttendanceReport } = await import('@/services/class-dropin');
+  const classReport = await getClassAttendanceReport(gymId, 30);
+  const lowAttendanceClasses = classReport.filter(
+    (r) => r.sessions >= 2 && r.avgPerSession < 3
+  ).length;
+
+  const { listMembersWithWaiverGaps } = await import('@/services/waivers');
+  const waiverGaps = await listMembersWithWaiverGaps(gymId);
+
+  const { count: trialLeadsOpen } = await admin
+    .from('leads')
+    .select('*', { count: 'exact', head: true })
+    .eq('gym_id', gymId)
+    .in('status', ['new', 'contacted', 'trial_scheduled']);
+
   return {
     newLeads7d: newLeads7d ?? 0,
     pastDueMembers: pastDueMembers ?? 0,
     inactiveMembers14d,
     failedPayments: failedPayments ?? 0,
     readyForPromotion,
-    lowAttendanceClasses: 0,
+    lowAttendanceClasses,
+    waiverGapMembers: waiverGaps.length,
+    trialLeadsOpen: trialLeadsOpen ?? 0,
   };
 }
 
@@ -134,6 +153,33 @@ export function metricsToRecommendations(metrics: BusinessMetrics): BusinessReco
       title: `${metrics.readyForPromotion} member(s) may be ready for promotion`,
       description: '8+ check-ins in 14 days with no recent promotion.',
       actionHref: '/belts',
+    });
+  }
+
+  if (metrics.waiverGapMembers > 0) {
+    recs.push({
+      priority: 'P2',
+      title: `${metrics.waiverGapMembers} member(s) missing waivers`,
+      description: 'Send waiver links or review compliance before check-in blocks.',
+      actionHref: '/waivers',
+    });
+  }
+
+  if (metrics.lowAttendanceClasses > 0) {
+    recs.push({
+      priority: 'P3',
+      title: `${metrics.lowAttendanceClasses} class(es) with low attendance`,
+      description: 'Average below 3 per session over the last 30 days.',
+      actionHref: '/classes',
+    });
+  }
+
+  if (metrics.trialLeadsOpen > 0) {
+    recs.push({
+      priority: 'P3',
+      title: `${metrics.trialLeadsOpen} open trial lead(s)`,
+      description: 'Confirm trials and follow up while interest is fresh.',
+      actionHref: '/leads',
     });
   }
 

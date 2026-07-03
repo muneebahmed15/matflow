@@ -19,11 +19,11 @@
 - [ ] 6.14 Canvas signature capture (draw)
 - [x] 6.15 Parent signs for minor (guardian_name required when member is under 18)
 - [x] 6.16 IP address + user agent on signature
-- [ ] 6.17 Signature timestamp timezone-aware display
+- [x] 6.17 Signature timestamp timezone-aware display
 
 ## Storage & Compliance
 - [x] 6.18 Store signed PDF in Supabase Storage
-- [ ] 6.19 Immutable signature record (no delete)
+- [x] 6.19 Immutable signature record (no delete)
 - [ ] 6.20 GDPR export member waiver history
 - [ ] 6.21 Retention policy config per gym
 - [ ] 6.22 Legal hold flag on signature
@@ -54,7 +54,7 @@
 ## Kiosk / Onboarding
 - [x] 6.38 Kiosk waiver sign before first check-in (inline modal when check-in blocked)
 - [x] 6.39 New member auto-assigned active waivers (active waivers show as pending for all members)
-- [ ] 6.40 Trial member waiver flow
+- [x] 6.40 Trial member waiver flow
 
 ## API
 - [x] 6.41 Public API: get active waivers for gym (anon, kiosk-gated)

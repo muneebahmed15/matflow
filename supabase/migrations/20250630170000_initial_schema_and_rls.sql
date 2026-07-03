@@ -4,6 +4,9 @@
 -- Extensions
 create extension if not exists "pgcrypto";
 
+-- Helper functions below reference tables created later in this file
+set check_function_bodies = off;
+
 -- ---------------------------------------------------------------------------
 -- Helper functions
 -- ---------------------------------------------------------------------------

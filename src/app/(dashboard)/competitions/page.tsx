@@ -1,113 +1,93 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
-import { Trophy, Plus } from 'lucide-react'
-import EmptyState from '@/components/EmptyState'
-
-interface Member {
-  id: string
-  first_name: string
-  last_name: string
-}
-
-interface Competition {
-  id: string
-  name: string
-  event_date: string | null
-  division: string | null
-  result: string | null
-  notes: string | null
-  members: { first_name: string; last_name: string } | null
-}
+import { useCallback, useEffect, useState } from 'react';
+import { Trophy, Plus } from 'lucide-react';
+import EmptyState from '@/components/EmptyState';
+import {
+  createCompetitionAction,
+  deleteCompetitionAction,
+  listCompetitionMembersAction,
+  listCompetitionsAction,
+} from '@/app/(dashboard)/actions';
+import type { Competition } from '@/services/competitions';
 
 export default function CompetitionsPage() {
-  const [competitions, setCompetitions] = useState<Competition[]>([])
-  const [members, setMembers] = useState<Member[]>([])
-  const [gymId, setGymId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-  const [name, setName] = useState('')
-  const [memberId, setMemberId] = useState('')
-  const [eventDate, setEventDate] = useState('')
-  const [division, setDivision] = useState('')
-  const [result, setResult] = useState('')
-  const [notes, setNotes] = useState('')
+  const [competitions, setCompetitions] = useState<Competition[]>([]);
+  const [members, setMembers] = useState<{ id: string; first_name: string; last_name: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [name, setName] = useState('');
+  const [memberId, setMemberId] = useState('');
+  const [eventDate, setEventDate] = useState('');
+  const [division, setDivision] = useState('');
+  const [result, setResult] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const loadData = useCallback(async () => {
+    const [comps, memberResult] = await Promise.all([
+      listCompetitionsAction(),
+      listCompetitionMembersAction(),
+    ]);
+    if (comps.ok && comps.data) setCompetitions(comps.data);
+    if (memberResult.ok && memberResult.data) {
+      setMembers(
+        memberResult.data.map((m) => ({
+          id: m.id,
+          first_name: m.first_name,
+          last_name: m.last_name,
+        }))
+      );
+    }
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: gym } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
-      if (!gym) return
-      setGymId(gym.id)
-
-      const [{ data: memberData }, { data: compData }] = await Promise.all([
-        supabase.from('members').select('id, first_name, last_name').eq('gym_id', gym.id).order('first_name'),
-        supabase
-          .from('competitions')
-          .select('id, name, event_date, division, result, notes, members(first_name, last_name)')
-          .eq('gym_id', gym.id)
-          .order('event_date', { ascending: false }),
-      ])
-
-      setMembers(memberData || [])
-      setCompetitions((compData ?? []) as unknown as Competition[])
-      setLoading(false)
-    }
-    load()
-  }, [])
+    void loadData();
+  }, [loadData]);
 
   const handleSubmit = async () => {
-    if (!gymId || !name.trim()) {
-      setError('Tournament name is required.')
-      return
+    if (!name.trim()) {
+      setError('Tournament name is required.');
+      return;
     }
-    setSubmitting(true)
-    setError('')
-    const { error: insertError } = await supabase.from('competitions').insert({
-      gym_id: gymId,
-      member_id: memberId || null,
+    setSubmitting(true);
+    setError('');
+    const createResult = await createCompetitionAction({
       name: name.trim(),
-      event_date: eventDate || null,
+      memberId: memberId || null,
+      eventDate: eventDate || null,
       division: division || null,
       result: result || null,
       notes: notes || null,
-    })
-    if (insertError) {
-      setError(insertError.message)
-      setSubmitting(false)
-      return
+    });
+    if (!createResult.ok) {
+      setError(createResult.error);
+      setSubmitting(false);
+      return;
     }
-    const { data } = await supabase
-      .from('competitions')
-      .select('id, name, event_date, division, result, notes, members(first_name, last_name)')
-      .eq('gym_id', gymId)
-      .order('event_date', { ascending: false })
-    setCompetitions((data ?? []) as unknown as Competition[])
-    setName('')
-    setMemberId('')
-    setEventDate('')
-    setDivision('')
-    setResult('')
-    setNotes('')
-    setShowForm(false)
-    setSubmitting(false)
-  }
+    await loadData();
+    setName('');
+    setMemberId('');
+    setEventDate('');
+    setDivision('');
+    setResult('');
+    setNotes('');
+    setShowForm(false);
+    setSubmitting(false);
+  };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this competition record?')) return
-    await supabase.from('competitions').delete().eq('id', id)
-    setCompetitions((prev) => prev.filter((c) => c.id !== id))
-  }
+    if (!confirm('Delete this competition record?')) return;
+    const deleteResult = await deleteCompetitionAction(id);
+    if (deleteResult.ok) setCompetitions((prev) => prev.filter((c) => c.id !== id));
+  };
 
   const inputClass =
-    'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500'
+    'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500';
 
-  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
+  if (loading) return <div className="p-8 text-gray-400">Loading...</div>;
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">
@@ -209,5 +189,5 @@ export default function CompetitionsPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

@@ -8,6 +8,8 @@ import type { PublicGymProfile } from '@/lib/gym-public';
 
 type Props = { gym: PublicGymProfile };
 
+type ActiveWaiver = { id: string; title: string; body: string };
+
 function getUtmParams(): { utm_source?: string; utm_medium?: string; utm_campaign?: string } {
   if (typeof window === 'undefined') return {};
   const params = new URLSearchParams(window.location.search);
@@ -25,13 +27,16 @@ export default function TrialBookingForm({ gym }: Props) {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  // Pre-filled from ?class= when arriving from the schedule page
   const [interestedIn, setInterestedIn] = useState(() => searchParams.get('class') ?? '');
   const [smsConsent, setSmsConsent] = useState(false);
   const [trialDate, setTrialDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [leadId, setLeadId] = useState<string | null>(null);
+  const [waivers, setWaivers] = useState<ActiveWaiver[]>([]);
+  const [waiverIndex, setWaiverIndex] = useState(0);
+  const [signedName, setSignedName] = useState('');
+  const [waiverComplete, setWaiverComplete] = useState(false);
 
   const inputClass =
     'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -66,17 +71,64 @@ export default function TrialBookingForm({ gym }: Props) {
     });
 
     const data = await res.json();
-    setSubmitting(false);
-
     if (!res.ok) {
+      setSubmitting(false);
       setError(data.error || 'Something went wrong. Please try again.');
       return;
     }
 
-    setSuccess(true);
+    setLeadId(data.lead_id);
+    setSignedName(`${firstName.trim()} ${lastName.trim()}`);
+
+    const waiverRes = await fetch(`/api/public/trial-waivers?gym_slug=${encodeURIComponent(gym.slug)}`);
+    const waiverData = await waiverRes.json();
+    const activeWaivers: ActiveWaiver[] = waiverRes.ok ? (waiverData.waivers ?? []) : [];
+
+    setSubmitting(false);
+
+    if (activeWaivers.length === 0) {
+      setWaiverComplete(true);
+    } else {
+      setWaivers(activeWaivers);
+    }
   };
 
-  if (success) {
+  const signCurrentWaiver = async () => {
+    if (!leadId || !signedName.trim()) {
+      setError('Please type your full name to sign.');
+      return;
+    }
+    const waiver = waivers[waiverIndex];
+    setSubmitting(true);
+    setError('');
+
+    const res = await fetch('/api/public/trial-waiver', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        gym_slug: gym.slug,
+        lead_id: leadId,
+        waiver_id: waiver.id,
+        signed_name: signedName.trim(),
+      }),
+    });
+
+    const data = await res.json();
+    setSubmitting(false);
+
+    if (!res.ok) {
+      setError(data.error || 'Could not sign waiver. Please try again.');
+      return;
+    }
+
+    if (waiverIndex + 1 >= waivers.length) {
+      setWaiverComplete(true);
+    } else {
+      setWaiverIndex((i) => i + 1);
+    }
+  };
+
+  if (waiverComplete) {
     return (
       <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-8 text-center">
         <p className="text-green-400 font-semibold text-lg">You&apos;re booked!</p>
@@ -89,6 +141,35 @@ export default function TrialBookingForm({ gym }: Props) {
         >
           ← Back to {gym.name}
         </Link>
+      </div>
+    );
+  }
+
+  if (leadId && waivers.length > 0) {
+    const waiver = waivers[waiverIndex];
+    return (
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-8 space-y-4">
+        <p className="text-white/50 text-sm">
+          Step 2 of 2 — Sign waiver {waiverIndex + 1} of {waivers.length}
+        </p>
+        <h2 className="text-xl font-bold text-white">{waiver.title}</h2>
+        <div className="bg-black/30 rounded-xl p-4 max-h-48 overflow-y-auto text-sm text-white/70 whitespace-pre-wrap">
+          {waiver.body}
+        </div>
+        <div>
+          <label className="block text-sm text-white/50 mb-1">Type your full name to sign *</label>
+          <input value={signedName} onChange={(e) => setSignedName(e.target.value)} className={inputClass} />
+        </div>
+        {error && <p className="text-red-400 text-sm">{error}</p>}
+        <button
+          type="button"
+          onClick={() => void signCurrentWaiver()}
+          disabled={submitting}
+          className="w-full py-3 rounded-xl font-semibold text-white disabled:opacity-50 transition hover:opacity-90"
+          style={{ backgroundColor: accent }}
+        >
+          {submitting ? 'Signing...' : 'I Agree & Sign'}
+        </button>
       </div>
     );
   }
@@ -183,4 +264,3 @@ export function TrialBookingPageClient({ gym }: Props) {
     </div>
   );
 }
-

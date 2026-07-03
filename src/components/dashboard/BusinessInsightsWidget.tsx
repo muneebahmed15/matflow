@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getBusinessInsightsAction, refreshBusinessSnapshotAction } from '@/app/(dashboard)/actions';
 import Link from 'next/link';
+import { StatsSkeleton } from '@/components/LoadingSkeleton';
 
 export default function BusinessInsightsWidget() {
   const [data, setData] = useState<{
@@ -27,11 +28,22 @@ export default function BusinessInsightsWidget() {
     await load();
   };
 
-  if (loading) return <p className="text-white/30 text-sm">Loading insights...</p>;
+  if (loading) return <StatsSkeleton />;
   if (!data) return null;
 
   const metrics = data.metrics ?? {};
   const recs = data.recommendations ?? [];
+
+  const metricCards = [
+    { label: 'New leads (7d)', value: metrics.newLeads7d ?? 0 },
+    { label: 'Past due', value: metrics.pastDueMembers ?? 0 },
+    { label: 'Inactive 14d', value: metrics.inactiveMembers14d ?? 0 },
+    { label: 'Ready to promote', value: metrics.readyForPromotion ?? 0 },
+    { label: 'Waiver gaps', value: metrics.waiverGapMembers ?? 0 },
+    { label: 'Low-attendance classes', value: metrics.lowAttendanceClasses ?? 0 },
+    { label: 'Open trial leads', value: metrics.trialLeadsOpen ?? 0 },
+    { label: 'Failed payments', value: metrics.failedPayments ?? 0 },
+  ];
 
   return (
     <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
@@ -43,12 +55,7 @@ export default function BusinessInsightsWidget() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        {[
-          { label: 'New leads (7d)', value: metrics.newLeads7d ?? 0 },
-          { label: 'Past due', value: metrics.pastDueMembers ?? 0 },
-          { label: 'Inactive 14d', value: metrics.inactiveMembers14d ?? 0 },
-          { label: 'Ready to promote', value: metrics.readyForPromotion ?? 0 },
-        ].map((m) => (
+        {metricCards.map((m) => (
           <div key={m.label} className="bg-white/5 rounded-xl p-3">
             <p className="text-2xl font-bold text-white">{m.value}</p>
             <p className="text-white/30 text-xs">{m.label}</p>

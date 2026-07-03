@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { getPublicGymBySlug } from '@/lib/gym-public';
+import { formatClassTime } from '@/lib/gym-public-time';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -12,6 +13,13 @@ export default async function GymSchedulePage({ params }: Props) {
   if (!gym) notFound();
 
   const admin = getAdminClient();
+  const { data: gymRow } = await admin
+    .from('gyms')
+    .select('timezone')
+    .eq('id', gym.id)
+    .maybeSingle();
+  const timezone = gymRow?.timezone ?? 'America/New_York';
+
   const { data: classes } = await admin
     .from('classes')
     .select('name, instructor, day_of_week, start_time, end_time, capacity')
@@ -31,7 +39,9 @@ export default async function GymSchedulePage({ params }: Props) {
   return (
     <div className="max-w-3xl mx-auto px-4 py-12">
       <h1 className="text-3xl font-extrabold mb-2">Class Schedule</h1>
-      <p className="text-white/40 text-sm mb-4">Weekly training schedule at {gym.name}.</p>
+      <p className="text-white/40 text-sm mb-4">
+        Weekly training schedule at {gym.name} ({timezone.replace('_', ' ')}).
+      </p>
       <a
         href={`/g/${gym.slug}/schedule.ics`}
         className="inline-block text-sm text-blue-400 hover:underline mb-8"
@@ -61,7 +71,8 @@ export default async function GymSchedulePage({ params }: Props) {
                     <div className="text-right text-sm text-white/50 flex items-center gap-4">
                       <div>
                         <p>
-                          {cls.start_time} – {cls.end_time}
+                          {formatClassTime(cls.start_time, timezone)} –{' '}
+                          {formatClassTime(cls.end_time, timezone)}
                         </p>
                         <p className="text-xs text-white/25">{cls.capacity} spots</p>
                       </div>

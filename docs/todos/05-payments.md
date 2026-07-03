@@ -29,7 +29,7 @@
 - [x] 5.22 Pause subscription API (done)
 - [x] 5.23 Refund API (done)
 - [x] 5.24 Subscriptions dashboard uses getCurrentStaffInfo
-- [ ] 5.25 Subscription detail drawer
+- [x] 5.25 Subscription detail drawer
 - [x] 5.26 Manual subscription (cash/check) without Stripe
 
 ## Failed Payments

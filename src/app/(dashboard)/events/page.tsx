@@ -1,112 +1,94 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { Calendar, Plus } from 'lucide-react'
-import EmptyState from '@/components/EmptyState'
+import { useCallback, useEffect, useState } from 'react';
+import { Calendar, Plus } from 'lucide-react';
+import EmptyState from '@/components/EmptyState';
+import {
+  createGymEventAction,
+  deleteGymEventAction,
+  listGymEventsAction,
+} from '@/app/(dashboard)/actions';
+import type { GymEvent } from '@/services/gym-events';
 
 const EVENT_TYPES = [
   { value: 'open_mat', label: 'Open Mat' },
   { value: 'seminar', label: 'Seminar' },
   { value: 'tournament', label: 'In-House Tournament' },
   { value: 'belt_ceremony', label: 'Belt Ceremony' },
-] as const
-
-interface GymEvent {
-  id: string
-  title: string
-  event_type: string
-  event_date: string
-  start_time: string | null
-  end_time: string | null
-  location: string | null
-  description: string | null
-  capacity: number | null
-}
+] as const;
 
 export default function EventsPage() {
-  const [events, setEvents] = useState<GymEvent[]>([])
-  const [gymId, setGymId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-  const [title, setTitle] = useState('')
-  const [eventType, setEventType] = useState<string>('open_mat')
-  const [eventDate, setEventDate] = useState('')
-  const [startTime, setStartTime] = useState('18:00')
-  const [endTime, setEndTime] = useState('20:00')
-  const [location, setLocation] = useState('')
-  const [description, setDescription] = useState('')
-  const [capacity, setCapacity] = useState('30')
+  const [events, setEvents] = useState<GymEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [title, setTitle] = useState('');
+  const [eventType, setEventType] = useState<string>('open_mat');
+  const [eventDate, setEventDate] = useState('');
+  const [startTime, setStartTime] = useState('18:00');
+  const [endTime, setEndTime] = useState('20:00');
+  const [location, setLocation] = useState('');
+  const [description, setDescription] = useState('');
+  const [capacity, setCapacity] = useState('30');
+
+  const loadEvents = useCallback(async () => {
+    const result = await listGymEventsAction();
+    if (result.ok && result.data) setEvents(result.data);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: gym } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
-      if (!gym) return
-      setGymId(gym.id)
-      const { data } = await supabase
-        .from('gym_events')
-        .select('*')
-        .eq('gym_id', gym.id)
-        .order('event_date', { ascending: true })
-      setEvents(data || [])
-      setLoading(false)
-    }
-    load()
-  }, [])
+    void loadEvents();
+  }, [loadEvents]);
 
   const handleSubmit = async () => {
-    if (!gymId || !title.trim() || !eventDate) {
-      setError('Title and date are required.')
-      return
+    if (!title.trim() || !eventDate) {
+      setError('Title and date are required.');
+      return;
     }
-    setSubmitting(true)
-    setError('')
-    const { error: insertError } = await supabase.from('gym_events').insert({
-      gym_id: gymId,
+    setSubmitting(true);
+    setError('');
+    const result = await createGymEventAction({
       title: title.trim(),
-      event_type: eventType,
-      event_date: eventDate,
-      start_time: startTime || null,
-      end_time: endTime || null,
+      eventType,
+      eventDate,
+      startTime: startTime || null,
+      endTime: endTime || null,
       location: location || null,
       description: description || null,
       capacity: capacity ? parseInt(capacity, 10) : null,
-    })
-    if (insertError) {
-      setError(insertError.message)
-      setSubmitting(false)
-      return
+    });
+    if (!result.ok) {
+      setError(result.error);
+      setSubmitting(false);
+      return;
     }
-    const { data } = await supabase.from('gym_events').select('*').eq('gym_id', gymId).order('event_date', { ascending: true })
-    setEvents(data || [])
-    setTitle('')
-    setEventType('open_mat')
-    setEventDate('')
-    setStartTime('18:00')
-    setEndTime('20:00')
-    setLocation('')
-    setDescription('')
-    setCapacity('30')
-    setShowForm(false)
-    setSubmitting(false)
-  }
+    await loadEvents();
+    setTitle('');
+    setEventType('open_mat');
+    setEventDate('');
+    setStartTime('18:00');
+    setEndTime('20:00');
+    setLocation('');
+    setDescription('');
+    setCapacity('30');
+    setShowForm(false);
+    setSubmitting(false);
+  };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this event?')) return
-    await supabase.from('gym_events').delete().eq('id', id)
-    setEvents((prev) => prev.filter((e) => e.id !== id))
-  }
+    if (!confirm('Delete this event?')) return;
+    const result = await deleteGymEventAction(id);
+    if (result.ok) setEvents((prev) => prev.filter((e) => e.id !== id));
+  };
 
-  const typeLabel = (value: string) => EVENT_TYPES.find((t) => t.value === value)?.label ?? value
+  const typeLabel = (value: string) => EVENT_TYPES.find((t) => t.value === value)?.label ?? value;
 
   const inputClass =
-    'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500'
+    'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500';
 
-  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
+  if (loading) return <div className="p-8 text-gray-400">Loading...</div>;
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">
@@ -218,5 +200,5 @@ export default function EventsPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

@@ -6,6 +6,7 @@ import { UserCheck, FileText, CreditCard, User, Award, Package, Calendar } from 
 import Link from 'next/link'
 import { usePortalMember } from '@/lib/portal-member-context'
 import { countUnsignedActiveWaivers } from '@/lib/waivers'
+import { ListSkeleton } from '@/components/LoadingSkeleton'
 
 export default function PortalPage() {
   const { activeMember, loading: memberLoading } = usePortalMember()
@@ -47,7 +48,7 @@ export default function PortalPage() {
   }, [activeMember])
 
   if (memberLoading || loading || !activeMember) {
-    return <div className="text-gray-400 py-12 text-center">Loading...</div>
+    return <ListSkeleton count={4} />
   }
 
   const member = activeMember

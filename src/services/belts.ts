@@ -199,8 +199,11 @@ export async function updateMemberStripes(input: {
   stripeCount: number;
   notes?: string;
 }): Promise<void> {
-  if (input.stripeCount < 0 || input.stripeCount > 4) {
-    throw new ServiceError(400, 'Stripe count must be 0–4');
+  const system = await getGymBeltSystem(input.gymId);
+  const max = system.maxStripes;
+
+  if (input.stripeCount < 0 || input.stripeCount > max) {
+    throw new ServiceError(400, `Stripe count must be 0–${max} for ${system.label}`);
   }
 
   const admin = getAdminClient();

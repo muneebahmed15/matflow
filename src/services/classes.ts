@@ -29,6 +29,7 @@ export async function listClassesForStaff(
 export type CreateClassInput = {
   gymId: string;
   name: string;
+  description?: string | null;
   instructor: string;
   instructorStaffId?: string | null;
   dayOfWeek: string;
@@ -44,6 +45,7 @@ export async function createClass(input: CreateClassInput): Promise<ClassRow> {
     .insert({
       gym_id: input.gymId,
       name: input.name.trim(),
+      description: input.description?.trim() || null,
       instructor: input.instructor.trim(),
       instructor_staff_id: input.instructorStaffId ?? null,
       day_of_week: input.dayOfWeek,
@@ -78,6 +80,7 @@ export async function updateClass(
   const updates: Record<string, unknown> = {};
 
   if (input.name !== undefined) updates.name = input.name.trim();
+  if (input.description !== undefined) updates.description = input.description?.trim() || null;
   if (input.instructor !== undefined) updates.instructor = input.instructor.trim();
   if (input.instructorStaffId !== undefined) {
     updates.instructor_staff_id = input.instructorStaffId;
@@ -97,4 +100,33 @@ export async function updateClass(
 
   if (error) throw new ServiceError(500, error.message);
   return data;
+}
+
+export async function duplicateClass(
+  gymId: string,
+  classId: string,
+  targetDayOfWeek: string
+): Promise<ClassRow> {
+  const admin = getAdminClient();
+  const { data: source, error } = await admin
+    .from('classes')
+    .select('*')
+    .eq('id', classId)
+    .eq('gym_id', gymId)
+    .maybeSingle();
+
+  if (error) throw new ServiceError(500, error.message);
+  if (!source) throw new ServiceError(404, 'Class not found');
+
+  return createClass({
+    gymId,
+    name: source.name,
+    description: (source as { description?: string | null }).description ?? null,
+    instructor: source.instructor ?? '',
+    instructorStaffId: source.instructor_staff_id,
+    dayOfWeek: targetDayOfWeek,
+    startTime: source.start_time ?? '09:00',
+    endTime: source.end_time ?? '10:00',
+    capacity: source.capacity ?? 20,
+  });
 }

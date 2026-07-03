@@ -96,5 +96,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: staffError.message }, { status: 500 });
   }
 
+  await admin.from('gym_locations').insert({
+    gym_id: gym.id,
+    name: requestedName,
+    is_primary: true,
+  });
+
   return NextResponse.json({ gym });
 }

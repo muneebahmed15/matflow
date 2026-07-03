@@ -46,6 +46,7 @@ function SubscriptionsContent() {
   const [manualPlan, setManualPlan] = useState('')
   const [manualMethod, setManualMethod] = useState<'cash' | 'check' | 'other'>('cash')
   const [submitting, setSubmitting] = useState(false)
+  const [selectedSub, setSelectedSub] = useState<Subscription | null>(null)
 
   const load = async () => {
     const info = await getCurrentStaffInfo()
@@ -240,7 +241,12 @@ function SubscriptionsContent() {
       ) : (
         <div className="space-y-3">
           {subscriptions.map((sub) => (
-            <div key={sub.id} className="bg-[#111] border border-white/10 rounded-2xl p-5 flex items-center justify-between gap-4">
+            <button
+              key={sub.id}
+              type="button"
+              onClick={() => setSelectedSub(sub)}
+              className="w-full bg-[#111] border border-white/10 rounded-2xl p-5 flex items-center justify-between gap-4 text-left hover:border-white/20 transition"
+            >
               <div className="flex items-center gap-4 min-w-0">
                 <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center flex-shrink-0">
                   <CreditCard size={18} className="text-white/40" />
@@ -264,8 +270,83 @@ function SubscriptionsContent() {
                   {sub.status}
                 </span>
               </div>
-            </div>
+            </button>
           ))}
+        </div>
+      )}
+
+      {selectedSub && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            aria-label="Close"
+            onClick={() => setSelectedSub(null)}
+          />
+          <div className="relative w-full max-w-md bg-[#111] border-l border-white/10 p-6 overflow-y-auto">
+            <div className="flex items-start justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Subscription details</h2>
+              <button type="button" onClick={() => setSelectedSub(null)} className="text-white/40 hover:text-white text-sm">
+                Close
+              </button>
+            </div>
+            <div className="space-y-4 text-sm">
+              <div>
+                <p className="text-white/40 text-xs uppercase tracking-wide mb-1">Member</p>
+                <p className="text-white font-medium">
+                  {selectedSub.members
+                    ? `${selectedSub.members.first_name} ${selectedSub.members.last_name}`
+                    : 'Unknown'}
+                </p>
+                <p className="text-white/40">{selectedSub.members?.email}</p>
+              </div>
+              <div>
+                <p className="text-white/40 text-xs uppercase tracking-wide mb-1">Plan</p>
+                <p className="text-white">{selectedSub.plans?.name ?? '—'}</p>
+                <p className="text-white/40">
+                  ${selectedSub.plans?.price?.toFixed(2)} / {selectedSub.plans?.interval}
+                </p>
+              </div>
+              <div>
+                <p className="text-white/40 text-xs uppercase tracking-wide mb-1">Status</p>
+                <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${statusColor(selectedSub.status)}`}>
+                  {selectedSub.status}
+                </span>
+              </div>
+              {selectedSub.current_period_end && (
+                <div>
+                  <p className="text-white/40 text-xs uppercase tracking-wide mb-1">Current period ends</p>
+                  <p className="text-white">
+                    {new Date(selectedSub.current_period_end).toLocaleDateString('en-US', {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </p>
+                </div>
+              )}
+              {selectedSub.payment_method && (
+                <div>
+                  <p className="text-white/40 text-xs uppercase tracking-wide mb-1">Payment method</p>
+                  <p className="text-white capitalize">{selectedSub.payment_method}</p>
+                </div>
+              )}
+              {selectedSub.stripe_subscription_id && (
+                <div>
+                  <p className="text-white/40 text-xs uppercase tracking-wide mb-1">Stripe ID</p>
+                  <p className="text-white/60 font-mono text-xs break-all">{selectedSub.stripe_subscription_id}</p>
+                </div>
+              )}
+              {selectedSub.members && (
+                <Link
+                  href={`/members?search=${encodeURIComponent(selectedSub.members.email)}`}
+                  className="inline-block text-blue-400 hover:underline"
+                >
+                  View member profile →
+                </Link>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

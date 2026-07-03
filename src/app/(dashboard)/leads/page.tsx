@@ -8,6 +8,9 @@ import {
   convertLeadAction,
   createLeadAction,
   updateLeadStatusAction,
+  updateLeadNotesAction,
+  assignLeadAction,
+  listStaffAction,
 } from '@/app/(dashboard)/actions'
 import { useAppUi } from '@/components/ui/AppUiProvider'
 import { ListSkeleton } from '@/components/LoadingSkeleton'
@@ -23,6 +26,12 @@ interface Lead {
   notes: string
   interested_in: string
   created_at: string
+  assigned_staff_id: string | null
+}
+
+interface StaffOption {
+  id: string
+  full_name: string
 }
 
 const STATUSES = ['new', 'contacted', 'trial_scheduled', 'trial_completed', 'converted', 'lost']
@@ -56,14 +65,24 @@ export default function LeadsPage() {
   const [source, setSource] = useState('walk-in')
   const [interestedIn, setInterestedIn] = useState('')
   const [error, setError] = useState('')
+  const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null)
+  const [notesDraft, setNotesDraft] = useState('')
+  const [notesSaving, setNotesSaving] = useState(false)
+  const [staff, setStaff] = useState<StaffOption[]>([])
 
   useEffect(() => {
     const load = async () => {
       const info = await getCurrentStaffInfo()
       if (!info.gymId) return
       setGymId(info.gymId)
-      const { data } = await supabase.from('leads').select('*').eq('gym_id', info.gymId).order('created_at', { ascending: false })
+      const [{ data }, staffResult] = await Promise.all([
+        supabase.from('leads').select('*').eq('gym_id', info.gymId).order('created_at', { ascending: false }),
+        listStaffAction(),
+      ])
       setLeads(data || [])
+      if (staffResult.ok && staffResult.data) {
+        setStaff(staffResult.data.map((s) => ({ id: s.id, full_name: s.full_name })))
+      }
       setLoading(false)
     }
     load()
@@ -97,6 +116,25 @@ export default function LeadsPage() {
     const result = await updateLeadStatusAction(id, status)
     if (result.ok) {
       setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l))
+    }
+  }
+
+  const handleSaveNotes = async (leadId: string) => {
+    setNotesSaving(true)
+    const result = await updateLeadNotesAction(leadId, notesDraft)
+    setNotesSaving(false)
+    if (result.ok) {
+      setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, notes: notesDraft } : l)))
+      setExpandedLeadId(null)
+    }
+  }
+
+  const handleAssign = async (leadId: string, staffId: string) => {
+    const result = await assignLeadAction(leadId, staffId || null)
+    if (result.ok) {
+      setLeads((prev) =>
+        prev.map((l) => (l.id === leadId ? { ...l, assigned_staff_id: staffId || null } : l))
+      )
     }
   }
 
@@ -232,11 +270,55 @@ export default function LeadsPage() {
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-white/5 text-xs text-white/20">
+              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-white/5 text-xs text-white/20 flex-wrap">
                 <span className="capitalize">{lead.source}</span>
                 <span>&middot;</span>
                 <span>{new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                {staff.length > 0 && (
+                  <>
+                    <span>&middot;</span>
+                    <select
+                      value={lead.assigned_staff_id ?? ''}
+                      onChange={(e) => void handleAssign(lead.id, e.target.value)}
+                      className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white/60 text-xs"
+                    >
+                      <option value="" className="bg-gray-900">Unassigned</option>
+                      {staff.map((s) => (
+                        <option key={s.id} value={s.id} className="bg-gray-900">{s.full_name}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExpandedLeadId(expandedLeadId === lead.id ? null : lead.id)
+                    setNotesDraft(lead.notes ?? '')
+                  }}
+                  className="ml-auto text-blue-400 hover:underline"
+                >
+                  {lead.notes ? 'Edit notes' : 'Add notes'}
+                </button>
               </div>
+              {expandedLeadId === lead.id && (
+                <div className="mt-3 space-y-2">
+                  <textarea
+                    value={notesDraft}
+                    onChange={(e) => setNotesDraft(e.target.value)}
+                    rows={3}
+                    placeholder="Notes about this lead..."
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveNotes(lead.id)}
+                    disabled={notesSaving}
+                    className="text-xs font-medium text-blue-400 hover:underline disabled:opacity-50"
+                  >
+                    {notesSaving ? 'Saving...' : 'Save notes'}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

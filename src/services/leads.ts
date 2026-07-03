@@ -143,6 +143,21 @@ export async function updateLeadStatus(
   if (error) throw new ServiceError(500, error.message);
 }
 
+export async function updateLeadNotes(
+  gymId: string,
+  leadId: string,
+  notes: string
+): Promise<void> {
+  const admin = getAdminClient();
+  const { error } = await admin
+    .from('leads')
+    .update({ notes: notes.trim() || null })
+    .eq('id', leadId)
+    .eq('gym_id', gymId);
+
+  if (error) throw new ServiceError(500, error.message);
+}
+
 export async function convertLeadToMember(
   gymId: string,
   leadId: string
@@ -183,5 +198,23 @@ export async function convertLeadToMember(
 
   if (updateErr) throw new ServiceError(500, updateErr.message);
 
+  const { transferLeadWaiversToMember } = await import('@/services/waivers');
+  await transferLeadWaiversToMember(gymId, leadId, newMember.id).catch(() => undefined);
+
   return { memberId: newMember.id };
+}
+
+export async function assignLead(
+  gymId: string,
+  leadId: string,
+  staffId: string | null
+): Promise<void> {
+  const admin = getAdminClient();
+  const { error } = await admin
+    .from('leads')
+    .update({ assigned_staff_id: staffId })
+    .eq('id', leadId)
+    .eq('gym_id', gymId);
+
+  if (error) throw new ServiceError(500, error.message);
 }

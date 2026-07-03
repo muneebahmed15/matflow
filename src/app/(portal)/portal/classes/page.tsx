@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { Calendar } from 'lucide-react';
 import { usePortalMember } from '@/lib/portal-member-context';
+import { ListSkeleton } from '@/components/LoadingSkeleton';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -174,7 +175,7 @@ export default function PortalClassesPage() {
   const upcoming = classes.filter((c) => c.day_of_week === todayName);
 
   if (memberLoading || loading || !activeMember) {
-    return <p className="text-white/40 py-12 text-center">Loading...</p>;
+    return <ListSkeleton count={5} />;
   }
 
   return (

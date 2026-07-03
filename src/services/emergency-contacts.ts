@@ -88,3 +88,35 @@ export async function deleteEmergencyContact(
 
   if (error) throw new ServiceError(500, error.message);
 }
+
+export async function countEmergencyContacts(
+  gymId: string,
+  memberId: string
+): Promise<number> {
+  const admin = getAdminClient();
+  const { count, error } = await admin
+    .from('emergency_contacts')
+    .select('id', { count: 'exact', head: true })
+    .eq('gym_id', gymId)
+    .eq('member_id', memberId);
+
+  if (error) throw new ServiceError(500, error.message);
+  return count ?? 0;
+}
+
+export async function assertMinorHasEmergencyContact(
+  gymId: string,
+  memberId: string,
+  dateOfBirth: string | null | undefined
+): Promise<void> {
+  const { isMinor } = await import('@/lib/member-age');
+  if (!isMinor(dateOfBirth)) return;
+
+  const count = await countEmergencyContacts(gymId, memberId);
+  if (count === 0) {
+    throw new ServiceError(
+      400,
+      'Members under 18 must have at least one emergency contact before check-in or activation.'
+    );
+  }
+}

@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { LogOut, Users } from 'lucide-react'
 import Logo from '@/components/Logo'
 import { usePortalMember } from '@/lib/portal-member-context'
+import PortalInstallPrompt from '@/components/portal/PortalInstallPrompt'
 
 const PORTAL_PUBLIC_ROUTES = ['/portal/login', '/portal/signup'] as const
 
@@ -21,6 +22,7 @@ export default function PortalShell({ children }: { children: React.ReactNode })
     white_label_enabled: boolean;
   } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [sessionWarning, setSessionWarning] = useState(false)
 
   useEffect(() => {
     const check = async () => {
@@ -49,6 +51,34 @@ export default function PortalShell({ children }: { children: React.ReactNode })
     }
     check()
   }, [router, pathname])
+
+  useEffect(() => {
+    if (PORTAL_PUBLIC_ROUTES.includes(pathname as typeof PORTAL_PUBLIC_ROUTES[number])) return
+
+    let warningTimer: ReturnType<typeof setTimeout> | undefined
+    let logoutTimer: ReturnType<typeof setTimeout> | undefined
+
+    const resetTimers = () => {
+      setSessionWarning(false)
+      if (warningTimer) clearTimeout(warningTimer)
+      if (logoutTimer) clearTimeout(logoutTimer)
+      warningTimer = setTimeout(() => setSessionWarning(true), 25 * 60 * 1000)
+      logoutTimer = setTimeout(async () => {
+        await supabase.auth.signOut()
+        router.push('/portal/login')
+      }, 30 * 60 * 1000)
+    }
+
+    const events = ['mousedown', 'keydown', 'touchstart'] as const
+    events.forEach((event) => window.addEventListener(event, resetTimers))
+    resetTimers()
+
+    return () => {
+      if (warningTimer) clearTimeout(warningTimer)
+      if (logoutTimer) clearTimeout(logoutTimer)
+      events.forEach((event) => window.removeEventListener(event, resetTimers))
+    }
+  }, [pathname, router])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -109,8 +139,14 @@ export default function PortalShell({ children }: { children: React.ReactNode })
         </div>
       </header>
       <main className="max-w-2xl mx-auto p-6">
+        {sessionWarning && (
+          <div className="mb-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
+            Your session will expire soon due to inactivity. Move your mouse or tap to stay signed in.
+          </div>
+        )}
         {children}
       </main>
+      <PortalInstallPrompt />
     </div>
   )
 }

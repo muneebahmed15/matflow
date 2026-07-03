@@ -165,6 +165,26 @@ export default function MigrationPage() {
         Import members, leads, attendance history, or belt history from CSV.
       </p>
 
+      <ol className="flex gap-2 mb-6 text-xs">
+        {['Choose type', 'Upload CSV', 'Preview', 'Commit'].map((label, i) => {
+          const active =
+            (i === 0) ||
+            (i === 1 && preview.length === 0 && !result) ||
+            (i === 2 && preview.length > 0 && !result) ||
+            (i === 3 && Boolean(result));
+          return (
+            <li
+              key={label}
+              className={`flex-1 rounded-lg px-2 py-2 text-center border ${
+                active ? 'border-blue-500/40 bg-blue-500/10 text-white' : 'border-white/10 text-white/30'
+              }`}
+            >
+              {i + 1}. {label}
+            </li>
+          );
+        })}
+      </ol>
+
       <div className="flex gap-2 mb-6 flex-wrap">
         {(['members', 'leads', 'attendance', 'belt_history'] as ImportType[]).map((t) => (
           <button

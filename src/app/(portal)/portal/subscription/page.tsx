@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { CreditCard } from 'lucide-react'
 import { usePortalMember } from '@/lib/portal-member-context'
 import { canManageBilling } from '@/lib/portal/billing-access'
+import { ListSkeleton } from '@/components/LoadingSkeleton'
 
 interface Subscription {
   id: string
@@ -132,7 +133,7 @@ export default function PortalSubscriptionPage() {
   }
 
   if (memberLoading || loading || !activeMember) {
-    return <div className="text-gray-400 py-12 text-center">Loading...</div>
+    return <ListSkeleton count={4} />
   }
 
   return (

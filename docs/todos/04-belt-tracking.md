@@ -20,7 +20,7 @@
 ## Stripes
 - [x] 4.14 Add stripe on member profile
 - [x] 4.15 Stripe history log table (`belt_stripe_events`)
-- [ ] 4.16 Max stripes per belt rules
+- [x] 4.16 Max stripes per belt rules
 - [x] 4.17 Stripe increment/decrement UI
 - [x] 4.18 Stripes reset on belt promotion
 

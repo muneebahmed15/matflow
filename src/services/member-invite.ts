@@ -21,7 +21,7 @@ export async function inviteMemberToPortal(input: {
   if (!member?.email) throw new ServiceError(400, 'Member must have an email to invite.');
 
   const email = member.email.trim().toLowerCase();
-  const portalUrl = `${NEXT_PUBLIC_APP_URL}/portal/login`;
+  const portalUrl = `${NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent('/portal')}`;
 
   const { data: gym } = await admin
     .from('gyms')

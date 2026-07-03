@@ -49,22 +49,24 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
       if (!user) { router.push('/login'); return }
       setUser(user)
 
-      let staffInfo = await getCurrentStaffInfo()
+      const staffInfo = await getCurrentStaffInfo()
       if (!staffInfo.role) {
-        const res = await fetch('/api/gym/onboard', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        })
-        if (!res.ok) { router.push('/login'); return }
-        staffInfo = await getCurrentStaffInfo()
-        if (!staffInfo.role) { router.push('/login'); return }
+        router.push('/onboarding')
+        return
       }
       setRole(staffInfo.role)
 
       if (staffInfo.gymId) {
-        const { data: gym } = await supabase.from('gyms').select('name').eq('id', staffInfo.gymId).single()
+        const { data: gym } = await supabase
+          .from('gyms')
+          .select('name, setup_completed_at')
+          .eq('id', staffInfo.gymId)
+          .single()
         if (gym?.name) setGymName(gym.name)
+        if (!gym?.setup_completed_at) {
+          router.push('/setup')
+          return
+        }
       }
 
       if (!canAccessRoute(staffInfo.role, pathname)) {

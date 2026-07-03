@@ -75,7 +75,24 @@ export function isProduction(): boolean {
 export function validateRuntimeEnv(): { ok: true } | { ok: false; message: string } {
   try {
     getPublicEnv();
-    getServerEnv();
+    const server = getServerEnv();
+
+    if (isProduction()) {
+      const missing: string[] = [];
+      if (!server.RESEND_API_KEY) missing.push('RESEND_API_KEY');
+      if (!server.RESEND_FROM_EMAIL) missing.push('RESEND_FROM_EMAIL');
+      if (!process.env.CRON_SECRET) missing.push('CRON_SECRET');
+      if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+        missing.push('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN');
+      }
+      if (missing.length > 0) {
+        return {
+          ok: false,
+          message: `Missing production environment: ${missing.join(', ')}`,
+        };
+      }
+    }
+
     return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown env validation error';

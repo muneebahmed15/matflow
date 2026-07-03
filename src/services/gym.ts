@@ -11,6 +11,8 @@ export type GymSettings = Pick<GymRow, 'id' | 'name' | 'slug' | 'kiosk_enabled'>
   ai_front_desk_enabled: boolean;
   daily_digest_enabled: boolean;
   logo_url: string | null;
+  favicon_url: string | null;
+  setup_completed_at: string | null;
   primary_color: string | null;
   tagline: string | null;
   about_text: string | null;
@@ -34,7 +36,7 @@ export type GymSettings = Pick<GymRow, 'id' | 'name' | 'slug' | 'kiosk_enabled'>
 };
 
 const GYM_SETTINGS_COLUMNS =
-  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, review_checkin_threshold, require_waiver_for_checkin, timezone, belt_system, booking_cancel_hours';
+  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, review_checkin_threshold, require_waiver_for_checkin, timezone, belt_system, booking_cancel_hours';
 
 export async function getGymSettings(gymId: string): Promise<GymSettings> {
   const admin = getAdminClient();
@@ -57,6 +59,7 @@ export type UpdateGymSettingsInput = {
   aiFrontDeskEnabled?: boolean;
   dailyDigestEnabled?: boolean;
   logoUrl?: string | null;
+  faviconUrl?: string | null;
   primaryColor?: string | null;
   tagline?: string | null;
   aboutText?: string | null;
@@ -129,6 +132,7 @@ export async function updateGymSettings(
       ai_front_desk_enabled: input.aiFrontDeskEnabled ?? false,
       daily_digest_enabled: input.dailyDigestEnabled ?? true,
       logo_url: input.logoUrl?.trim() || null,
+      favicon_url: input.faviconUrl?.trim() || null,
       primary_color: primaryColor || '#2563eb',
       tagline: input.tagline?.trim() || null,
       about_text: input.aboutText?.trim() || null,
@@ -175,4 +179,17 @@ export async function getGymName(gymId: string): Promise<string | null> {
   const admin = getAdminClient();
   const { data } = await admin.from('gyms').select('name').eq('id', gymId).maybeSingle();
   return data?.name ?? null;
+}
+
+export async function completeGymSetup(gymId: string): Promise<GymSettings> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('gyms')
+    .update({ setup_completed_at: new Date().toISOString() })
+    .eq('id', gymId)
+    .select(GYM_SETTINGS_COLUMNS)
+    .single();
+
+  if (error) throw new ServiceError(500, error.message);
+  return data as GymSettings;
 }

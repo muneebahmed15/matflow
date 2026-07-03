@@ -108,7 +108,13 @@ export default function GymPublicShell({ gym, children }: Props) {
                 {gym.contact_email}
               </a>
             )}
-            <Link href="/portal/login" className="mt-2 text-white/30 hover:text-white text-xs">
+            <Link href={`${base}/privacy`} className="text-white/30 hover:text-white text-xs">
+              Privacy
+            </Link>
+            <Link href={`${base}/terms`} className="text-white/30 hover:text-white text-xs">
+              Terms
+            </Link>
+            <Link href="/portal/login" className="text-white/30 hover:text-white text-xs">
               Member login →
             </Link>
             {!gym.white_label_enabled && (

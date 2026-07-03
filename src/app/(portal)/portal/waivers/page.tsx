@@ -13,6 +13,7 @@ import type { MemberSignatureSummary } from '@/types/queries'
 import WaiverSignatureBox from '@/components/WaiverSignatureBox'
 import { AlertCircle, CheckCircle2, FileText, Download } from 'lucide-react'
 import { usePortalMember } from '@/lib/portal-member-context'
+import { ListSkeleton } from '@/components/LoadingSkeleton'
 
 type SignedWaiver = MemberSignatureSummary & {
   id?: string;
@@ -130,7 +131,7 @@ export default function PortalWaiversPage() {
   }
 
   if (loading || !activeMember) {
-    return <div className="text-gray-400 py-12 text-center">Loading...</div>
+    return <ListSkeleton count={4} />
   }
 
   const pendingWaivers = waivers.filter((w) => {

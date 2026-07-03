@@ -29,7 +29,12 @@ enabled = true
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["http://localhost:3000"]
+additional_redirect_urls = [
+  "http://localhost:3000/auth/callback",
+  "http://localhost:3000/auth/callback?next=/dashboard",
+  "http://localhost:3000/auth/callback?next=/portal",
+  "http://localhost:3000/auth/callback?next=/onboarding",
+]
 jwt_expiry = 3600
 enable_signup = true
 

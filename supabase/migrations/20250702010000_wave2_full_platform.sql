@@ -284,7 +284,7 @@ do $$
 declare tbl text;
 begin
   foreach tbl in array array[
-    'import_jobs', 'import_row_errors', 'email_campaigns', 'review_requests',
+    'import_jobs', 'email_campaigns', 'review_requests',
     'products', 'orders', 'business_snapshots', 'gym_locations', 'audit_events',
     'gym_knowledge'
   ]
@@ -296,6 +296,22 @@ begin
     );
   end loop;
 end $$;
+
+-- import_row_errors has no gym_id; scope through its parent job
+drop policy if exists "import_row_errors_admin_all" on public.import_row_errors;
+create policy "import_row_errors_admin_all" on public.import_row_errors
+  for all using (
+    exists (
+      select 1 from public.import_jobs j
+      where j.id = import_row_errors.job_id and public.is_gym_admin(j.gym_id)
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.import_jobs j
+      where j.id = import_row_errors.job_id and public.is_gym_admin(j.gym_id)
+    )
+  );
 
 -- Staff read/write for operational tables
 do $$

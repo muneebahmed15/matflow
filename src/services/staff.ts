@@ -86,7 +86,7 @@ export async function inviteStaffMember(
   const admin = getAdminClient();
   const { NEXT_PUBLIC_APP_URL } = getPublicEnv();
   const normalizedEmail = input.email.trim().toLowerCase();
-  const loginUrl = `${NEXT_PUBLIC_APP_URL}/login`;
+  const authCallbackUrl = `${NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent('/dashboard')}`;
 
   if (!normalizedEmail || !input.fullName.trim()) {
     throw new ServiceError(400, 'Email and full name are required.');
@@ -103,7 +103,7 @@ export async function inviteStaffMember(
     type: 'invite',
     email: normalizedEmail,
     options: {
-      redirectTo: loginUrl,
+      redirectTo: authCallbackUrl,
       data: { full_name: input.fullName.trim() },
     },
   });
@@ -147,14 +147,14 @@ export async function inviteStaffMember(
   const { data: magicLink, error: magicError } = await admin.auth.admin.generateLink({
     type: 'magiclink',
     email: normalizedEmail,
-    options: { redirectTo: loginUrl },
+    options: { redirectTo: authCallbackUrl },
   });
 
   if (magicError) {
     throw new ServiceError(500, magicError.message);
   }
 
-  const actionLink = magicLink.properties?.action_link ?? loginUrl;
+  const actionLink = magicLink.properties?.action_link ?? authCallbackUrl;
   const template = staffAddedEmail({
     fullName: input.fullName.trim(),
     gymName,

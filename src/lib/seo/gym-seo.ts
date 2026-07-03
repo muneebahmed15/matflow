@@ -20,6 +20,11 @@ export function buildGymPageMetadata(
     title,
     description,
     alternates: { canonical: url },
+    icons: gym.favicon_url
+      ? { icon: gym.favicon_url, shortcut: gym.favicon_url }
+      : gym.logo_url
+        ? { icon: gym.logo_url }
+        : undefined,
     openGraph: {
       title,
       description,

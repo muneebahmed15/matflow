@@ -11,6 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 import { seedFamilyWaiverFixture, signInPortalMember } from './fixtures/family-portal';
+import { seedPortalMemberFixture, signInPortalMember as signInPortalMemberRls } from './fixtures/portal-member';
 
 const testUrl = process.env.SUPABASE_TEST_URL;
 const testAnonKey = process.env.SUPABASE_TEST_ANON_KEY;
@@ -59,6 +60,32 @@ describe.skipIf(!enabled)('RLS integration', () => {
     } finally {
       await fixture.cleanup();
       await other.cleanup();
+    }
+  });
+
+  it('portal member can read own attendance but not another member in the same gym', async () => {
+    const fixture = await seedPortalMemberFixture();
+
+    try {
+      const portal = await signInPortalMemberRls(fixture.primaryEmail, fixture.primaryPassword);
+
+      const { data: own, error: ownError } = await portal
+        .from('attendance')
+        .select('id, member_id')
+        .eq('member_id', fixture.memberId);
+
+      expect(ownError).toBeNull();
+      expect((own?.length ?? 0) > 0).toBe(true);
+
+      const { data: other, error: otherError } = await portal
+        .from('attendance')
+        .select('id')
+        .eq('member_id', fixture.otherMemberId);
+
+      expect(otherError).toBeNull();
+      expect(other?.length ?? 0).toBe(0);
+    } finally {
+      await fixture.cleanup();
     }
   });
 });

@@ -28,6 +28,36 @@ export async function getGymIdForUser(userId: string): Promise<string | null> {
   return gym?.id ?? null;
 }
 
+export async function getGymSlug(gymId: string): Promise<string | null> {
+  const admin = adminClient();
+  const { data } = await admin.from('gyms').select('slug').eq('id', gymId).maybeSingle();
+  return data?.slug ?? null;
+}
+
+export async function setWebsiteEnabled(gymId: string, enabled: boolean): Promise<void> {
+  const admin = adminClient();
+  await admin.from('gyms').update({ website_enabled: enabled }).eq('id', gymId);
+}
+
+export async function completeGymSetupForE2E(gymId: string): Promise<void> {
+  const admin = adminClient();
+  await admin
+    .from('gyms')
+    .update({ setup_completed_at: new Date().toISOString(), website_enabled: true })
+    .eq('id', gymId);
+}
+
+export async function findLeadByEmail(gymId: string, email: string): Promise<{ id: string } | null> {
+  const admin = adminClient();
+  const { data } = await admin
+    .from('leads')
+    .select('id')
+    .eq('gym_id', gymId)
+    .eq('email', email)
+    .maybeSingle();
+  return data;
+}
+
 export async function ensureWaiverRequiredForCheckin(gymId: string): Promise<void> {
   const admin = adminClient();
   await admin

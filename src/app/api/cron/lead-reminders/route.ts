@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireCronSecret } from '@/lib/auth/cron';
 import { sendTrialReminders } from '@/services/lead-automation';
 import { logger } from '@/lib/logger';
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = requireCronSecret(req.headers.get('authorization'));
+  if (denied) return denied;
 
   try {
     const result = await sendTrialReminders();

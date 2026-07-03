@@ -5,12 +5,17 @@ import { supabase } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
+import { safeNextPath } from '@/lib/auth/safe-next-path'
 import { linkMemberAuthUser } from '@/lib/portal-auth'
+
+function authCallbackUrl(next: string): string {
+  return `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+}
 
 function PortalLoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const nextPath = searchParams.get('next') || '/portal'
+  const nextPath = safeNextPath(searchParams.get('next'), '/portal')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -18,15 +23,14 @@ function PortalLoginForm() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
-  const finishLogin = async (userEmail: string, userId: string) => {
-    const { data: member } = await supabase.from('members').select('id').eq('email', userEmail).single()
-    if (!member) {
+  const finishLogin = async (userEmail: string) => {
+    const linked = await linkMemberAuthUser(userEmail)
+    if (!linked) {
       setError('No member profile found for this email. Contact your gym admin.')
       await supabase.auth.signOut()
       return false
     }
-    await linkMemberAuthUser(supabase, userEmail, userId)
-    router.push(nextPath.startsWith('/') ? nextPath : '/portal')
+    router.push(nextPath)
     return true
   }
 
@@ -42,7 +46,7 @@ function PortalLoginForm() {
     if (mode === 'magic') {
       const { error: err } = await supabase.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: `${window.location.origin}/portal` },
+        options: { emailRedirectTo: authCallbackUrl('/portal') },
       })
       setLoading(false)
       if (err) setError(err.message)
@@ -62,7 +66,7 @@ function PortalLoginForm() {
       setLoading(false)
       return
     }
-    if (data.user) await finishLogin(email, data.user.id)
+    if (data.user) await finishLogin(email)
     setLoading(false)
   }
 
@@ -74,7 +78,7 @@ function PortalLoginForm() {
     setLoading(true)
     setError('')
     const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/portal/login`,
+      redirectTo: authCallbackUrl('/portal/login'),
     })
     setLoading(false)
     if (err) setError(err.message)

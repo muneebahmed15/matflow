@@ -14,7 +14,7 @@
 
 - [x] 3.5 Edit class (update action missing)
 
-- [ ] 3.6 Duplicate class to another day
+- [x] 3.6 Duplicate class to another day
 
 - [ ] 3.7 Recurring class series (RRULE or template)
 
@@ -22,7 +22,7 @@
 
 - [ ] 3.9 Class color/category tags
 
-- [ ] 3.10 Class description field
+- [x] 3.10 Class description field
 
 
 
@@ -104,7 +104,7 @@
 
 - [ ] 3.38 Embed widget for external websites
 
-- [ ] 3.39 Timezone-aware display
+- [x] 3.39 Timezone-aware display
 
 - [ ] 3.40 Mobile-friendly schedule grid
 

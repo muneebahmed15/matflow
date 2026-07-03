@@ -30,6 +30,7 @@ export default function SignupPage() {
       email: form.email,
       password: form.password,
       options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/onboarding')}`,
         data: {
           first_name: form.first_name,
           last_name: form.last_name,

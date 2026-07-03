@@ -8,7 +8,9 @@ export type PublicGymProfile = {
   tagline: string | null;
   about_text: string | null;
   logo_url: string | null;
+  favicon_url: string | null;
   primary_color: string | null;
+  timezone: string;
   contact_email: string | null;
   contact_phone: string | null;
   address_line1: string | null;
@@ -24,7 +26,7 @@ export type PublicGymProfile = {
 };
 
 const PUBLIC_GYM_COLUMNS =
-  'id, name, slug, tagline, about_text, logo_url, primary_color, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, website_enabled, store_enabled, ai_front_desk_enabled, white_label_enabled, ga4_measurement_id, meta_pixel_id';
+  'id, name, slug, tagline, about_text, logo_url, favicon_url, primary_color, timezone, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, website_enabled, store_enabled, ai_front_desk_enabled, white_label_enabled, ga4_measurement_id, meta_pixel_id';
 
 /** Load a gym for public website rendering. Returns null if not found or website disabled. */
 export async function getPublicGymBySlug(slug: string): Promise<PublicGymProfile | null> {

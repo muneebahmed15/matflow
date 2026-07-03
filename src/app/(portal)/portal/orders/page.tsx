@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { Package } from 'lucide-react';
 import { usePortalMember } from '@/lib/portal-member-context';
+import { ListSkeleton } from '@/components/LoadingSkeleton';
 
 type Order = {
   id: string;
@@ -33,7 +34,7 @@ export default function PortalOrdersPage() {
   }, [activeMember]);
 
   if (memberLoading || loading || !activeMember) {
-    return <p className="text-white/40 py-12 text-center">Loading...</p>;
+    return <ListSkeleton count={3} />;
   }
 
   return (

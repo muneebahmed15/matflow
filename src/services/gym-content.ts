@@ -97,6 +97,86 @@ export async function createCoach(input: {
   return data as GymCoach;
 }
 
+export async function updateProgram(input: {
+  gymId: string;
+  programId: string;
+  name?: string;
+  description?: string | null;
+  ageGroup?: string | null;
+  isActive?: boolean;
+}): Promise<GymProgram> {
+  const admin = getAdminClient();
+  const updates: Record<string, unknown> = {};
+  if (input.name !== undefined) updates.name = input.name.trim();
+  if (input.description !== undefined) updates.description = input.description?.trim() || null;
+  if (input.ageGroup !== undefined) updates.age_group = input.ageGroup?.trim() || null;
+  if (input.isActive !== undefined) updates.is_active = input.isActive;
+
+  const { data, error } = await admin
+    .from('gym_programs')
+    .update(updates)
+    .eq('id', input.programId)
+    .eq('gym_id', input.gymId)
+    .select('*')
+    .single();
+
+  if (error) throw new ServiceError(500, error.message);
+  return data as GymProgram;
+}
+
+export async function deleteProgram(gymId: string, programId: string): Promise<void> {
+  const admin = getAdminClient();
+  const { error } = await admin
+    .from('gym_programs')
+    .delete()
+    .eq('id', programId)
+    .eq('gym_id', gymId);
+
+  if (error) throw new ServiceError(500, error.message);
+}
+
+export async function updateCoach(input: {
+  gymId: string;
+  coachId: string;
+  name?: string;
+  bio?: string | null;
+  photoUrl?: string | null;
+  beltRank?: string | null;
+  specialties?: string | null;
+  isActive?: boolean;
+}): Promise<GymCoach> {
+  const admin = getAdminClient();
+  const updates: Record<string, unknown> = {};
+  if (input.name !== undefined) updates.name = input.name.trim();
+  if (input.bio !== undefined) updates.bio = input.bio?.trim() || null;
+  if (input.photoUrl !== undefined) updates.photo_url = input.photoUrl?.trim() || null;
+  if (input.beltRank !== undefined) updates.belt_rank = input.beltRank?.trim() || null;
+  if (input.specialties !== undefined) updates.specialties = input.specialties?.trim() || null;
+  if (input.isActive !== undefined) updates.is_active = input.isActive;
+
+  const { data, error } = await admin
+    .from('gym_coaches')
+    .update(updates)
+    .eq('id', input.coachId)
+    .eq('gym_id', input.gymId)
+    .select('*')
+    .single();
+
+  if (error) throw new ServiceError(500, error.message);
+  return data as GymCoach;
+}
+
+export async function deleteCoach(gymId: string, coachId: string): Promise<void> {
+  const admin = getAdminClient();
+  const { error } = await admin
+    .from('gym_coaches')
+    .delete()
+    .eq('id', coachId)
+    .eq('gym_id', gymId);
+
+  if (error) throw new ServiceError(500, error.message);
+}
+
 export async function listPublishedReviews(gymId: string) {
   const admin = getAdminClient();
   const { data, error } = await admin

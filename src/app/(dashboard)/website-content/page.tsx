@@ -5,6 +5,9 @@ import {
   createCoachAction,
   createProgramAction,
   listProgramsAction,
+  listCoachesAction,
+  deleteProgramAction,
+  deleteCoachAction,
   addGalleryImageAction,
   listBlogPostsAction,
   createBlogPostAction,
@@ -14,6 +17,7 @@ import {
 
 export default function WebsiteContentPage() {
   const [programs, setPrograms] = useState<{ id: string; name: string; description: string | null }[]>([]);
+  const [coaches, setCoaches] = useState<{ id: string; name: string; bio: string | null }[]>([]);
   const [blogPosts, setBlogPosts] = useState<
     { id: string; title: string; slug: string; status: string; seo_score: number | null }[]
   >([]);
@@ -28,8 +32,13 @@ export default function WebsiteContentPage() {
   const [blogBody, setBlogBody] = useState('');
 
   const load = async () => {
-    const [progRes, blogRes] = await Promise.all([listProgramsAction(), listBlogPostsAction()]);
+    const [progRes, coachRes, blogRes] = await Promise.all([
+      listProgramsAction(),
+      listCoachesAction(),
+      listBlogPostsAction(),
+    ]);
     if (progRes.ok && progRes.data) setPrograms(progRes.data);
+    if (coachRes.ok && coachRes.data) setCoaches(coachRes.data);
     if (blogRes.ok && blogRes.data) setBlogPosts(blogRes.data);
   };
 
@@ -62,9 +71,18 @@ export default function WebsiteContentPage() {
         >
           Add Program
         </button>
-        <ul className="text-sm text-white/50 space-y-1">
+        <ul className="text-sm text-white/50 space-y-2">
           {programs.map((p) => (
-            <li key={p.id}>• {p.name}</li>
+            <li key={p.id} className="flex justify-between items-start gap-2">
+              <span>• {p.name}{p.description ? ` — ${p.description}` : ''}</span>
+              <button
+                type="button"
+                onClick={() => void deleteProgramAction(p.id).then(load)}
+                className="text-red-400 text-xs shrink-0"
+              >
+                Delete
+              </button>
+            </li>
           ))}
         </ul>
       </section>
@@ -78,11 +96,26 @@ export default function WebsiteContentPage() {
             await createCoachAction({ name: coachName, bio: coachBio });
             setCoachName('');
             setCoachBio('');
+            void load();
           }}
           className="bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-xl"
         >
           Add Coach
         </button>
+        <ul className="text-sm text-white/50 space-y-2">
+          {coaches.map((c) => (
+            <li key={c.id} className="flex justify-between items-start gap-2">
+              <span>• {c.name}{c.bio ? ` — ${c.bio.slice(0, 60)}${c.bio.length > 60 ? '…' : ''}` : ''}</span>
+              <button
+                type="button"
+                onClick={() => void deleteCoachAction(c.id).then(load)}
+                className="text-red-400 text-xs shrink-0"
+              >
+                Delete
+              </button>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-3">

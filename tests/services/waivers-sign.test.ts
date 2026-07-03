@@ -18,13 +18,21 @@ import { signWaiver } from '@/services/waivers';
 
 function chain(result: { data?: unknown; error?: { message: string } | null }) {
   const builder: Record<string, unknown> = {};
-  for (const method of ['select', 'eq', 'insert', 'update']) {
+  for (const method of ['select', 'eq', 'insert', 'update', 'order', 'limit']) {
     builder[method] = vi.fn(() => builder);
   }
   builder.maybeSingle = vi.fn(async () => result);
   builder.single = vi.fn(async () => result);
   return builder;
 }
+
+const waiverRow = {
+  id: 'w1',
+  title: 'Waiver',
+  body: 'text',
+  expires_after_days: 30,
+  version: 1,
+};
 
 describe('signWaiver', () => {
   beforeEach(() => {
@@ -38,10 +46,15 @@ describe('signWaiver', () => {
   it('rejects when a valid signature already exists', async () => {
     const future = new Date(Date.now() + 86_400_000).toISOString();
     mockFrom
-      .mockReturnValueOnce(chain({ data: { id: 'w1', title: 'Waiver', body: 'text', expires_after_days: 30 }, error: null }))
+      .mockReturnValueOnce(chain({ data: waiverRow, error: null }))
       .mockReturnValueOnce(chain({ data: { email: 'm@example.com' }, error: null }))
       .mockReturnValueOnce(chain({ data: { name: 'Gym' }, error: null }))
-      .mockReturnValueOnce(chain({ data: { id: 'sig-1', expires_at: future }, error: null }));
+      .mockReturnValueOnce(
+        chain({
+          data: { id: 'sig-1', expires_at: future, waiver_version: 1, signed_at: new Date().toISOString() },
+          error: null,
+        })
+      );
 
     await expect(
       signWaiver({
@@ -53,14 +66,19 @@ describe('signWaiver', () => {
     ).rejects.toMatchObject({ status: 409 });
   });
 
-  it('updates an expired signature instead of inserting a duplicate', async () => {
+  it('inserts a new immutable signature when prior signature expired', async () => {
     const past = new Date(Date.now() - 86_400_000).toISOString();
     mockFrom
-      .mockReturnValueOnce(chain({ data: { id: 'w1', title: 'Waiver', body: 'text', expires_after_days: 30 }, error: null }))
+      .mockReturnValueOnce(chain({ data: waiverRow, error: null }))
       .mockReturnValueOnce(chain({ data: { email: 'm@example.com' }, error: null }))
       .mockReturnValueOnce(chain({ data: { name: 'Gym' }, error: null }))
-      .mockReturnValueOnce(chain({ data: { id: 'sig-1', expires_at: past }, error: null }))
-      .mockReturnValueOnce(chain({ data: { id: 'sig-1' }, error: null }))
+      .mockReturnValueOnce(
+        chain({
+          data: { id: 'sig-old', expires_at: past, waiver_version: 1, signed_at: past },
+          error: null,
+        })
+      )
+      .mockReturnValueOnce(chain({ error: null }))
       .mockReturnValueOnce(chain({ data: null, error: null }));
 
     const result = await signWaiver({
@@ -70,16 +88,19 @@ describe('signWaiver', () => {
       signedName: 'Ada Lovelace',
     });
 
-    expect(result.signatureId).toBe('sig-1');
+    expect(result.signatureId).toBeTruthy();
+    expect(result.signatureId).not.toBe('sig-old');
   });
 
   it('inserts a new signature when none exists', async () => {
     mockFrom
-      .mockReturnValueOnce(chain({ data: { id: 'w1', title: 'Waiver', body: 'text', expires_after_days: null }, error: null }))
+      .mockReturnValueOnce(
+        chain({ data: { ...waiverRow, expires_after_days: null }, error: null })
+      )
       .mockReturnValueOnce(chain({ data: { email: 'm@example.com' }, error: null }))
       .mockReturnValueOnce(chain({ data: { name: 'Gym' }, error: null }))
       .mockReturnValueOnce(chain({ data: null, error: null }))
-      .mockReturnValueOnce(chain({ data: { id: 'sig-new' }, error: null }))
+      .mockReturnValueOnce(chain({ error: null }))
       .mockReturnValueOnce(chain({ data: null, error: null }));
 
     const result = await signWaiver({
@@ -89,6 +110,6 @@ describe('signWaiver', () => {
       signedName: 'Ada Lovelace',
     });
 
-    expect(result.signatureId).toBe('sig-new');
+    expect(result.signatureId).toBeTruthy();
   });
 });

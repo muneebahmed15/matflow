@@ -32,7 +32,8 @@ describe('POST /api/gym/onboard', () => {
       .mockReturnValueOnce(chain({ data: null })) // userHasGym: gyms owner lookup
       .mockReturnValueOnce(chain({ data: null })) // slug availability check
       .mockReturnValueOnce(chain({ data: { id: 'gym-1', name: "Ada's Gym", slug: 'ada-s-gym' }, error: null })) // insert gym
-      .mockReturnValueOnce(chain({ error: null })); // insert staff_roles
+      .mockReturnValueOnce(chain({ error: null })) // insert staff_roles
+      .mockReturnValueOnce(chain({ error: null })); // insert gym_locations
 
     const res = await POST(jsonRequest('http://test/api/gym/onboard', {}) as unknown as NextRequest);
 

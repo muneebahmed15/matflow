@@ -3,16 +3,36 @@ import { z } from 'zod';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { startWebChatConversation, sendWebChatMessage, sendChatSmsFollowUp } from '@/services/ai-front-desk';
 import { checkRateLimit } from '@/lib/rate-limit';
+import {
+  signConversationToken,
+  verifyConversationToken,
+} from '@/lib/auth/conversation-token';
 
 const startSchema = z.object({ gym_id: z.string().uuid() });
 const messageSchema = z.object({
   conversation_id: z.string().uuid(),
+  conversation_token: z.string().min(1),
   message: z.string().min(1).max(2000),
 });
 const smsFollowupSchema = z.object({
   conversation_id: z.string().uuid(),
+  conversation_token: z.string().min(1),
   phone: z.string().min(10).max(30),
 });
+
+async function assertOpenConversation(conversationId: string, gymId: string) {
+  const admin = getAdminClient();
+  const { data: conversation } = await admin
+    .from('ai_conversations')
+    .select('id, gym_id, status')
+    .eq('id', conversationId)
+    .maybeSingle();
+
+  if (!conversation || conversation.gym_id !== gymId || conversation.status !== 'open') {
+    return false;
+  }
+  return true;
+}
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
@@ -46,7 +66,8 @@ export async function POST(req: NextRequest) {
     }
 
     const conversationId = await startWebChatConversation(parsed.data.gym_id);
-    return NextResponse.json({ conversation_id: conversationId });
+    const conversationToken = signConversationToken(conversationId, parsed.data.gym_id);
+    return NextResponse.json({ conversation_id: conversationId, conversation_token: conversationToken });
   }
 
   if (action === 'sms_followup') {
@@ -54,6 +75,27 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 
     const admin = getAdminClient();
+    const { data: conversation } = await admin
+      .from('ai_conversations')
+      .select('gym_id')
+      .eq('id', parsed.data.conversation_id)
+      .maybeSingle();
+
+    if (
+      !conversation ||
+      !verifyConversationToken(
+        parsed.data.conversation_id,
+        conversation.gym_id,
+        parsed.data.conversation_token
+      )
+    ) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    if (!(await assertOpenConversation(parsed.data.conversation_id, conversation.gym_id))) {
+      return NextResponse.json({ error: 'Conversation not available' }, { status: 403 });
+    }
+
     await admin
       .from('ai_conversations')
       .update({ visitor_phone: parsed.data.phone })
@@ -65,6 +107,28 @@ export async function POST(req: NextRequest) {
 
   const parsed = messageSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+
+  const admin = getAdminClient();
+  const { data: conversation } = await admin
+    .from('ai_conversations')
+    .select('gym_id')
+    .eq('id', parsed.data.conversation_id)
+    .maybeSingle();
+
+  if (
+    !conversation ||
+    !verifyConversationToken(
+      parsed.data.conversation_id,
+      conversation.gym_id,
+      parsed.data.conversation_token
+    )
+  ) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  if (!(await assertOpenConversation(parsed.data.conversation_id, conversation.gym_id))) {
+    return NextResponse.json({ error: 'Conversation not available' }, { status: 403 });
+  }
 
   const { reply, leadCaptured } = await sendWebChatMessage(parsed.data.conversation_id, parsed.data.message);
   return NextResponse.json({ reply, lead_captured: leadCaptured });

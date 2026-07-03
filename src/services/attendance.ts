@@ -70,7 +70,7 @@ export async function checkInMember(input: {
 
   const { data: member } = await admin
     .from('members')
-    .select('id')
+    .select('id, date_of_birth')
     .eq('id', input.memberId)
     .eq('gym_id', input.gymId)
     .maybeSingle();
@@ -78,6 +78,9 @@ export async function checkInMember(input: {
   if (!member) {
     throw new ServiceError(404, 'Member not found');
   }
+
+  const { assertMinorHasEmergencyContact } = await import('@/services/emergency-contacts');
+  await assertMinorHasEmergencyContact(input.gymId, input.memberId, member.date_of_birth);
 
   const { assertMemberWaiverCompliance } = await import('@/services/waivers');
   await assertMemberWaiverCompliance(input.gymId, input.memberId);

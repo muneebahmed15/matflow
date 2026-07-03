@@ -1,14 +1,7 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
-
-/** Link Supabase auth user to members row on portal login/signup. */
-export async function linkMemberAuthUser(
-  supabase: SupabaseClient,
-  email: string,
-  userId: string
-): Promise<void> {
-  await supabase
-    .from('members')
-    .update({ auth_user_id: userId })
-    .eq('email', email)
-    .is('auth_user_id', null);
+/** Link Supabase auth user to members row via server API (portal login/signup). */
+export async function linkMemberAuthUser(email: string): Promise<boolean> {
+  const res = await fetch('/api/auth/link-member', { method: 'POST' });
+  if (res.ok) return true;
+  if (res.status === 403) return false;
+  throw new Error('Failed to link member account');
 }

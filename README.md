@@ -37,6 +37,10 @@ Open [http://localhost:3000](http://localhost:3000).
 | `NEXT_PUBLIC_APP_URL` | Yes | App URL for redirects (e.g. `http://localhost:3000`) |
 | `RESEND_API_KEY` | Prod | Resend API key for transactional email |
 | `RESEND_FROM_EMAIL` | Prod | Verified sender (e.g. `MatsFlow <onboarding@yourdomain.com>`) |
+| `CRON_SECRET` | Prod | Bearer token for `/api/cron/*` routes |
+| `UPSTASH_REDIS_REST_URL` | Prod | Upstash Redis REST URL for distributed rate limiting |
+| `UPSTASH_REDIS_REST_TOKEN` | Prod | Upstash Redis REST token |
+| `UNSUBSCRIBE_SECRET` | Prod | HMAC secret for marketing unsubscribe links |
 
 Optional: `SUPABASE_TEST_*` vars for RLS integration tests (`npm run test:rls`).
 

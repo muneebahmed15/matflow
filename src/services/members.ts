@@ -144,7 +144,12 @@ export async function getMember(gymId: string, memberId: string): Promise<Member
 export async function updateMember(
   gymId: string,
   memberId: string,
-  fields: Partial<Pick<MemberRow, 'first_name' | 'last_name' | 'email' | 'phone' | 'belt_rank' | 'status'>> & {
+  fields: Partial<
+    Pick<
+      MemberRow,
+      'first_name' | 'last_name' | 'email' | 'phone' | 'belt_rank' | 'status' | 'email_opt_out' | 'profile_photo_url'
+    >
+  > & {
     date_of_birth?: string | null;
   },
   actorId?: string | null
@@ -159,6 +164,16 @@ export async function updateMember(
     const { isValidEmail } = await import('@/lib/contact-validation');
     if (!isValidEmail(fields.email)) throw new ServiceError(400, 'Invalid email address.');
     fields.email = fields.email.trim().toLowerCase();
+  }
+
+  const existing = await getMember(gymId, memberId);
+  const nextDob =
+    fields.date_of_birth !== undefined ? fields.date_of_birth : existing.date_of_birth;
+  const nextStatus = fields.status ?? existing.status;
+
+  if (nextStatus === 'active') {
+    const { assertMinorHasEmergencyContact } = await import('@/services/emergency-contacts');
+    await assertMinorHasEmergencyContact(gymId, memberId, nextDob);
   }
 
   const { data, error } = await admin

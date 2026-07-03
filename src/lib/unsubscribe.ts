@@ -1,11 +1,12 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 
 function secret(): string {
-  return (
-    process.env.UNSUBSCRIBE_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    'dev-unsubscribe-secret'
-  );
+  const dedicated = process.env.UNSUBSCRIBE_SECRET;
+  if (dedicated) return dedicated;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('UNSUBSCRIBE_SECRET is required in production');
+  }
+  return process.env.SUPABASE_SERVICE_ROLE_KEY || 'dev-unsubscribe-secret';
 }
 
 export function unsubscribeToken(gymId: string, email: string): string {

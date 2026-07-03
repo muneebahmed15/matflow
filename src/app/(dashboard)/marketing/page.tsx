@@ -11,10 +11,11 @@ import {
   getMarketingFunnelAction,
   getLeadSourceStatsAction,
 } from '@/app/(dashboard)/actions';
+import { CAMPAIGN_TEMPLATES } from '@/lib/campaign-templates';
 
 export default function MarketingPage() {
   const [campaigns, setCampaigns] = useState<
-    { id: string; name: string; subject: string; audience: string; status: string; sent_count: number }[]
+    { id: string; name: string; subject: string; audience: string; status: string; sent_count: number; open_count?: number; click_count?: number }[]
   >([]);
   const [funnel, setFunnel] = useState({
     leads: 0,
@@ -141,6 +142,32 @@ export default function MarketingPage() {
         </div>
       )}
 
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8">
+        <h2 className="font-semibold text-white mb-3">Campaign templates</h2>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {CAMPAIGN_TEMPLATES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => {
+                setName(t.name);
+                setSubject(t.subject);
+                setBodyHtml(t.bodyHtml);
+                setAudience(t.audience);
+              }}
+              className="text-left bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-4 py-3 transition"
+            >
+              <p className="text-white text-sm font-medium">{t.name}</p>
+              <p className="text-white/40 text-xs mt-0.5 truncate">{t.subject}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4 mb-8 text-sm text-yellow-200/80">
+        Email open/click tracking and ROAS reporting are placeholders — connect ad spend in a future release.
+      </div>
+
       <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8 space-y-3">
         <h2 className="font-semibold text-white">New Campaign</h2>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Campaign name" className={inputClass} />
@@ -172,7 +199,12 @@ export default function MarketingPage() {
             <div key={c.id} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 flex justify-between items-center">
               <div>
                 <p className="text-white font-medium text-sm">{c.name}</p>
-                <p className="text-white/40 text-xs">{c.status} · {c.sent_count} sent</p>
+                <p className="text-white/40 text-xs">
+                  {c.status} · {c.sent_count} sent
+                  {c.status === 'sent' && (c.open_count != null || c.click_count != null)
+                    ? ` · ${c.open_count ?? 0} opens · ${c.click_count ?? 0} clicks`
+                    : ''}
+                </p>
               </div>
               {c.status === 'draft' && (
                 <div className="flex items-center gap-3">

@@ -8,6 +8,7 @@ type Props = { gymId: string; gymName: string; gymSlug: string; accent: string }
 export default function AiChatWidget({ gymId, gymName, gymSlug, accent }: Props) {
   const [open, setOpen] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationToken, setConversationToken] = useState<string | null>(null);
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,37 +21,48 @@ export default function AiChatWidget({ gymId, gymName, gymSlug, accent }: Props)
   }, [messages, open]);
 
   const ensureConversation = async () => {
-    if (conversationId) return conversationId;
+    if (conversationId && conversationToken) {
+      return { conversationId, conversationToken };
+    }
     const res = await fetch('/api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'start', gym_id: gymId }),
     });
     const data = await res.json();
-    if (data.conversation_id) {
+    if (data.conversation_id && data.conversation_token) {
       setConversationId(data.conversation_id);
+      setConversationToken(data.conversation_token);
       setMessages([
         {
           role: 'assistant',
           text: `Hi! I'm the ${gymName} assistant. Ask about our schedule, pricing, or booking a free trial.`,
         },
       ]);
-      return data.conversation_id as string;
+      return {
+        conversationId: data.conversation_id as string,
+        conversationToken: data.conversation_token as string,
+      };
     }
     return null;
   };
 
-  const sendSmsFollowUp = async (convId: string, phone: string) => {
+  const sendSmsFollowUp = async (convId: string, token: string, phone: string) => {
     await fetch('/api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'sms_followup', conversation_id: convId, phone }),
+      body: JSON.stringify({
+        action: 'sms_followup',
+        conversation_id: convId,
+        conversation_token: token,
+        phone,
+      }),
     });
   };
 
   const handleClose = async () => {
-    if (conversationId && visitorPhone.trim()) {
-      await sendSmsFollowUp(conversationId, visitorPhone.trim());
+    if (conversationId && conversationToken && visitorPhone.trim()) {
+      await sendSmsFollowUp(conversationId, conversationToken, visitorPhone.trim());
     } else if (conversationId && messages.length > 2) {
       setShowPhonePrompt(true);
       return;
@@ -66,8 +78,8 @@ export default function AiChatWidget({ gymId, gymName, gymSlug, accent }: Props)
     setMessages((m) => [...m, { role: 'user', text }]);
     setLoading(true);
 
-    const convId = await ensureConversation();
-    if (!convId) {
+    const session = await ensureConversation();
+    if (!session) {
       setMessages((m) => [...m, { role: 'assistant', text: 'Chat is unavailable right now.' }]);
       setLoading(false);
       return;
@@ -76,7 +88,12 @@ export default function AiChatWidget({ gymId, gymName, gymSlug, accent }: Props)
     const res = await fetch('/api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversation_id: convId, message: text }),
+      body: JSON.stringify({
+        action: 'message',
+        conversation_id: session.conversationId,
+        conversation_token: session.conversationToken,
+        message: text,
+      }),
     });
     const data = await res.json();
     setMessages((m) => [...m, { role: 'assistant', text: data.reply ?? 'Sorry, something went wrong.' }]);
@@ -135,8 +152,8 @@ export default function AiChatWidget({ gymId, gymName, gymSlug, accent }: Props)
                 />
                 <button
                   onClick={() => {
-                    if (conversationId && visitorPhone.trim()) {
-                      void sendSmsFollowUp(conversationId, visitorPhone.trim());
+                    if (conversationId && conversationToken && visitorPhone.trim()) {
+                      void sendSmsFollowUp(conversationId, conversationToken, visitorPhone.trim());
                     }
                     setShowPhonePrompt(false);
                     setOpen(false);

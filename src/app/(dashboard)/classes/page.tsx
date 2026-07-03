@@ -8,12 +8,14 @@ import { Dumbbell, Plus } from 'lucide-react'
 import {
   createClassAction,
   deleteClassAction,
+  duplicateClassAction,
   getClassAttendanceReportAction,
   getEnrollmentCountsAction,
   listClassesAction,
   listStaffAction,
   updateClassAction,
 } from '@/app/(dashboard)/actions'
+import { formatClassTime } from '@/lib/gym-public-time'
 import { useAppUi } from '@/components/ui/AppUiProvider'
 import PageLoader from '@/components/PageLoader'
 import ClassWaitlistPanel from '@/components/classes/ClassWaitlistPanel'
@@ -32,6 +34,7 @@ interface StaffOption {
 interface Class {
   id: string
   name: string
+  description: string | null
   instructor: string
   instructor_staff_id: string | null
   day_of_week: string
@@ -52,9 +55,11 @@ export default function ClassesPage() {
   const [loading, setLoading] = useState(true)
   const [canManageClasses, setCanManageClasses] = useState(false)
   const [gymId, setGymId] = useState<string | null>(null)
+  const [gymTimezone, setGymTimezone] = useState('America/Los_Angeles')
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [instructor, setInstructor] = useState('')
   const [instructorStaffId, setInstructorStaffId] = useState<string>('')
   const [day, setDay] = useState('Monday')
@@ -77,12 +82,13 @@ export default function ClassesPage() {
       setGymId(info.gymId)
       setCanManageClasses(hasCapability(info.role, 'classes.manage'))
 
-      const [classResult, staffResult, countsResult, reportResult, { data: membersData }] = await Promise.all([
+      const [classResult, staffResult, countsResult, reportResult, { data: membersData }, { data: gymData }] = await Promise.all([
         listClassesAction(),
         listStaffAction(),
         getEnrollmentCountsAction(),
         getClassAttendanceReportAction(30),
         supabase.from('members').select('id, first_name, last_name').eq('gym_id', info.gymId).eq('status', 'active').order('first_name'),
+        supabase.from('gyms').select('timezone').eq('id', info.gymId).maybeSingle(),
       ])
 
       if (classResult.ok && classResult.data) setClasses(classResult.data as Class[])
@@ -107,6 +113,7 @@ export default function ClassesPage() {
       }
 
       setMembers(membersData || [])
+      if (gymData?.timezone) setGymTimezone(gymData.timezone)
       setLoading(false)
     }
     void load()
@@ -114,6 +121,7 @@ export default function ClassesPage() {
 
   const resetForm = () => {
     setName('')
+    setDescription('')
     setInstructor('')
     setInstructorStaffId('')
     setDay('Monday')
@@ -135,6 +143,7 @@ export default function ClassesPage() {
     setError('')
     const result = await createClassAction({
       name,
+      description: description || undefined,
       instructor,
       instructorStaffId: instructorStaffId || null,
       dayOfWeek: day,
@@ -155,6 +164,7 @@ export default function ClassesPage() {
   const startEdit = (cls: Class) => {
     setEditingId(cls.id)
     setName(cls.name)
+    setDescription(cls.description ?? '')
     setInstructor(cls.instructor)
     setInstructorStaffId(cls.instructor_staff_id ?? '')
     setDay(cls.day_of_week)
@@ -169,6 +179,7 @@ export default function ClassesPage() {
     setSubmitting(true)
     const result = await updateClassAction(editingId, {
       name,
+      description: description || null,
       instructor,
       instructorStaffId: instructorStaffId || null,
       dayOfWeek: day,
@@ -200,6 +211,14 @@ export default function ClassesPage() {
     } else {
       showError(result.error)
     }
+  }
+
+  const handleDuplicate = async (cls: Class) => {
+    const targetDay = window.prompt('Duplicate to which day?', cls.day_of_week)
+    if (!targetDay || !DAYS.includes(targetDay)) return
+    const result = await duplicateClassAction(cls.id, targetDay)
+    if (result.ok) await reloadClasses()
+    else showError(result.error)
   }
 
   const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -253,6 +272,10 @@ export default function ClassesPage() {
             <label className="block text-sm font-medium text-gray-300 mb-1">Instructor display name</label>
             <input value={instructor} onChange={(e) => setInstructor(e.target.value)} placeholder="e.g. Coach John" className={inputClass} />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Description (optional)</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="What to expect in this class" className={inputClass} />
+          </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Day</label>
@@ -305,8 +328,9 @@ export default function ClassesPage() {
                       </div>
                       <div>
                         <p className="font-semibold text-white">{cls.name}</p>
+                        {cls.description && <p className="text-xs text-white/40 mt-0.5">{cls.description}</p>}
                         <p className="text-xs text-white/30">
-                          {cls.instructor} · {cls.start_time} – {cls.end_time} ·{' '}
+                          {cls.instructor} · {formatClassTime(cls.start_time, gymTimezone)} – {formatClassTime(cls.end_time, gymTimezone)} ·{' '}
                           <span className={(enrollCounts[cls.id] ?? 0) >= cls.capacity ? 'text-red-400' : ''}>
                             {enrollCounts[cls.id] ?? 0}/{cls.capacity} enrolled
                           </span>
@@ -320,6 +344,7 @@ export default function ClassesPage() {
                       {canManageClasses && (
                         <div className="flex gap-2">
                           <button onClick={() => startEdit(cls)} className="text-white/30 hover:text-blue-400 text-xs transition">Edit</button>
+                          <button onClick={() => void handleDuplicate(cls)} className="text-white/30 hover:text-blue-400 text-xs transition">Duplicate</button>
                           <button onClick={() => handleDelete(cls.id)} className="text-white/20 hover:text-red-400 text-xs transition">Remove</button>
                         </div>
                       )}

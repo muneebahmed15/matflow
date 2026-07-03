@@ -25,7 +25,7 @@
 - [x] 11.16 Audience segments (all, active, inactive, past_due, leads)
 - [~] 11.17 Template editor (plain HTML body form)
 - [x] 11.18 Send via Resend
-- [ ] 11.19 Open/click tracking
+- [~] 11.19 Open/click tracking (columns + UI; pixel tracking deferred)
 - [x] 11.20 Unsubscribe compliance (HMAC one-click unsubscribe + opt-out filtering)
 
 ## SMS Campaigns
@@ -48,7 +48,7 @@
 ## Ads — Future
 - [ ] 11.32 Google Ads conversion pixel hook
 - [x] 11.33 Meta Ads pixel hook (MarketingPixels)
-- [ ] 11.34 ROAS dashboard placeholder
+- [~] 11.34 ROAS dashboard placeholder (banner in marketing UI)
 
 ## Analytics
 - [x] 11.35 Marketing dashboard page
@@ -76,6 +76,6 @@
 
 ## East Coast MMA Pilot
 - [ ] 11.49 Import existing GBP data
-- [ ] 11.50 First email campaign template
+- [x] 11.50 First email campaign template
 - [x] 11.51 Review request after Nth check-in (configurable `review_checkin_threshold`, default 5)
 - [ ] 11.52 Marketing module feature flag

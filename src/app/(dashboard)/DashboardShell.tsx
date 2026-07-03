@@ -40,7 +40,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       setUser(user)
 
       const staffInfo = await getCurrentStaffInfo()
-      if (!staffInfo.role) { router.push('/login'); return }
+      if (!staffInfo.role) { router.push('/onboarding'); return }
       setRole(staffInfo.role)
 
       if (staffInfo.gymId) {

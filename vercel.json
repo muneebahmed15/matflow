@@ -11,6 +11,12 @@
       "master": true
     }
   },
+  "crons": [
+    { "path": "/api/cron/daily-digest", "schedule": "0 13 * * *" },
+    { "path": "/api/cron/waiver-expiry-reminders", "schedule": "0 14 * * *" },
+    { "path": "/api/cron/lead-reminders", "schedule": "0 15 * * *" },
+    { "path": "/api/cron/campaigns", "schedule": "0 16 * * *" }
+  ],
   "functions": {
     "src/app/api/stripe/webhook/route.ts": {
       "maxDuration": 30

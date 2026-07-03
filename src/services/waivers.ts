@@ -134,12 +134,62 @@ export async function getWaiverSignatures(waiverId: string) {
   const admin = getAdminClient();
   const { data, error } = await admin
     .from('waiver_signatures')
-    .select('*, members(first_name, last_name, email)')
+    .select('*, members(first_name, last_name, email), leads(first_name, last_name, email)')
     .eq('waiver_id', waiverId)
     .order('signed_at', { ascending: false });
 
   if (error) throw new ServiceError(500, error.message);
   return data ?? [];
+}
+
+export async function listActiveWaiversForGym(gymId: string): Promise<Waiver[]> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('waivers')
+    .select('*')
+    .eq('gym_id', gymId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new ServiceError(500, error.message);
+  return data ?? [];
+}
+
+export async function getLeadWaiverSignatures(leadId: string) {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('waiver_signatures')
+    .select('*, waivers(title, version)')
+    .eq('lead_id', leadId)
+    .order('signed_at', { ascending: false });
+
+  if (error) throw new ServiceError(500, error.message);
+  return data ?? [];
+}
+
+type LatestSignatureRow = {
+  id: string;
+  expires_at: string | null;
+  waiver_version: number;
+  signed_at: string;
+};
+
+async function getLatestValidSignature(
+  admin: ReturnType<typeof getAdminClient>,
+  filter: { waiverId: string; memberId?: string; leadId?: string }
+): Promise<LatestSignatureRow | null> {
+  let query = admin
+    .from('waiver_signatures')
+    .select('id, expires_at, waiver_version, signed_at')
+    .eq('waiver_id', filter.waiverId)
+    .order('signed_at', { ascending: false })
+    .limit(1);
+
+  if (filter.memberId) query = query.eq('member_id', filter.memberId);
+  if (filter.leadId) query = query.eq('lead_id', filter.leadId);
+
+  const { data } = await query.maybeSingle();
+  return data as LatestSignatureRow | null;
 }
 
 export async function getMemberWaiverSignatures(memberId: string) {
@@ -159,6 +209,103 @@ function waiverExpiresAt(expiresAfterDays: number | null): string | null {
   const expires = new Date();
   expires.setDate(expires.getDate() + expiresAfterDays);
   return expires.toISOString();
+}
+
+function isSignatureStillValid(
+  sig: LatestSignatureRow | null,
+  waiverVersion: number,
+  now = new Date()
+): boolean {
+  if (!sig) return false;
+  const notExpired = !sig.expires_at || new Date(sig.expires_at) > now;
+  const currentVersion = (sig.waiver_version ?? 1) === waiverVersion;
+  return notExpired && currentVersion;
+}
+
+async function insertImmutableSignature(input: {
+  waiverId: string;
+  gymId: string;
+  memberId?: string;
+  leadId?: string;
+  signedName: string;
+  guardianName?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  waiver: { title: string; body: string; expires_after_days?: number | null; version?: number };
+  signerEmail?: string | null;
+  gymName?: string;
+  webhookPayload: Record<string, unknown>;
+}): Promise<{ signatureId: string; pdfStoragePath: string | null }> {
+  const admin = getAdminClient();
+  const waiverVersion = input.waiver.version ?? 1;
+  const signedAt = new Date().toISOString();
+  const expiresAt = waiverExpiresAt(input.waiver.expires_after_days ?? null);
+  const signatureId = crypto.randomUUID();
+
+  let pdfStoragePath: string | null = null;
+  try {
+    const { buildWaiverPdf } = await import('@/lib/waiver-pdf');
+    const pdfBytes = await buildWaiverPdf({
+      gymName: input.gymName ?? 'Gym',
+      waiverTitle: input.waiver.title,
+      waiverBody: input.waiver.body,
+      signedName: input.signedName.trim(),
+      signedAt,
+      memberEmail: input.signerEmail,
+    });
+    pdfStoragePath = `${input.gymId}/${signatureId}.pdf`;
+    await admin.storage.from('waiver-signatures').upload(pdfStoragePath, pdfBytes, {
+      contentType: 'application/pdf',
+      upsert: false,
+    });
+  } catch {
+    pdfStoragePath = null;
+  }
+
+  const { error } = await admin.from('waiver_signatures').insert({
+    id: signatureId,
+    waiver_id: input.waiverId,
+    member_id: input.memberId ?? null,
+    lead_id: input.leadId ?? null,
+    gym_id: input.gymId,
+    signed_name: input.signedName.trim(),
+    guardian_name: input.guardianName?.trim() || null,
+    signed_at: signedAt,
+    expires_at: expiresAt,
+    waiver_version: waiverVersion,
+    ip_address: input.ipAddress ?? null,
+    user_agent: input.userAgent ?? null,
+    pdf_storage_path: pdfStoragePath,
+  });
+
+  if (error) throw new ServiceError(500, error.message);
+
+  try {
+    const { data: gymHook } = await admin
+      .from('gyms')
+      .select('signature_webhook_url')
+      .eq('id', input.gymId)
+      .maybeSingle();
+
+    const webhookUrl = (gymHook as { signature_webhook_url?: string | null })
+      ?.signature_webhook_url;
+    if (webhookUrl && /^https:\/\//.test(webhookUrl)) {
+      void fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'waiver.signature.completed',
+          signature_id: signatureId,
+          signed_at: signedAt,
+          ...input.webhookPayload,
+        }),
+      }).catch(() => undefined);
+    }
+  } catch {
+    // Webhook is best-effort
+  }
+
+  return { signatureId, pdfStoragePath };
 }
 
 export async function signWaiver(input: {
@@ -190,7 +337,6 @@ export async function signWaiver(input: {
     .eq('gym_id', input.gymId)
     .maybeSingle();
 
-  // Minors need a parent/guardian signature (6.15 / 6.48).
   const dob = (member as { date_of_birth?: string | null } | null)?.date_of_birth;
   if (dob) {
     const age = (Date.now() - new Date(dob).getTime()) / (365.25 * 86_400_000);
@@ -208,128 +354,121 @@ export async function signWaiver(input: {
     .eq('id', input.gymId)
     .maybeSingle();
 
-  const signedAt = new Date().toISOString();
-  const expiresAt = waiverExpiresAt(
-    (waiver as { expires_after_days?: number | null }).expires_after_days ?? null
-  );
+  const existing = await getLatestValidSignature(admin, {
+    waiverId: input.waiverId,
+    memberId: input.memberId,
+  });
 
-  const { data: existing } = await admin
-    .from('waiver_signatures')
-    .select('id, expires_at, waiver_version')
-    .eq('waiver_id', input.waiverId)
-    .eq('member_id', input.memberId)
-    .maybeSingle();
-
-  if (existing) {
-    const notExpired =
-      !existing.expires_at || new Date(existing.expires_at) > new Date();
-    const currentVersion =
-      ((existing as { waiver_version?: number }).waiver_version ?? 1) === waiverVersion;
-    if (notExpired && currentVersion) {
-      throw new ServiceError(409, 'This waiver is already signed and still valid.');
-    }
+  if (isSignatureStillValid(existing, waiverVersion)) {
+    throw new ServiceError(409, 'This waiver is already signed and still valid.');
   }
 
-  let signatureId: string;
+  return insertImmutableSignature({
+    waiverId: input.waiverId,
+    gymId: input.gymId,
+    memberId: input.memberId,
+    signedName: input.signedName,
+    guardianName: input.guardianName,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    waiver,
+    signerEmail: member?.email,
+    gymName: gym?.name ?? 'Gym',
+    webhookPayload: {
+      waiver_id: input.waiverId,
+      member_id: input.memberId,
+      gym_id: input.gymId,
+    },
+  });
+}
 
-  if (existing) {
-    const { data: updated, error: updateError } = await admin
-      .from('waiver_signatures')
-      .update({
-        signed_name: input.signedName.trim(),
-        guardian_name: input.guardianName?.trim() || null,
-        signed_at: signedAt,
-        expires_at: expiresAt,
-        waiver_version: waiverVersion,
-        ip_address: input.ipAddress ?? null,
-        user_agent: input.userAgent ?? null,
-        pdf_storage_path: null,
-      })
-      .eq('id', existing.id)
-      .select('id')
-      .single();
+/** Trial / lead waiver signing before conversion to member (6.40). */
+export async function signLeadWaiver(input: {
+  waiverId: string;
+  leadId: string;
+  gymId: string;
+  signedName: string;
+  guardianName?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}): Promise<{ signatureId: string; pdfStoragePath: string | null }> {
+  const admin = getAdminClient();
 
-    if (updateError || !updated) throw new ServiceError(500, updateError?.message ?? 'Update failed');
-    signatureId = updated.id;
-  } else {
-    const { data: inserted, error } = await admin
-      .from('waiver_signatures')
-      .insert({
-        waiver_id: input.waiverId,
-        member_id: input.memberId,
-        gym_id: input.gymId,
-        signed_name: input.signedName.trim(),
-        guardian_name: input.guardianName?.trim() || null,
-        signed_at: signedAt,
-        expires_at: expiresAt,
-        waiver_version: waiverVersion,
-        ip_address: input.ipAddress ?? null,
-        user_agent: input.userAgent ?? null,
-      })
-      .select('id')
-      .single();
+  const [{ data: waiver }, { data: lead }, { data: gym }] = await Promise.all([
+    admin
+      .from('waivers')
+      .select('id, title, body, expires_after_days, version')
+      .eq('id', input.waiverId)
+      .eq('gym_id', input.gymId)
+      .eq('is_active', true)
+      .maybeSingle(),
+    admin
+      .from('leads')
+      .select('id, first_name, last_name, email')
+      .eq('id', input.leadId)
+      .eq('gym_id', input.gymId)
+      .maybeSingle(),
+    admin.from('gyms').select('name').eq('id', input.gymId).maybeSingle(),
+  ]);
 
-    if (error || !inserted) throw new ServiceError(500, error?.message ?? 'Insert failed');
-    signatureId = inserted.id;
+  if (!waiver) throw new ServiceError(404, 'Waiver not found');
+  if (!lead) throw new ServiceError(404, 'Lead not found');
+
+  const waiverVersion = (waiver as { version?: number }).version ?? 1;
+  const existing = await getLatestValidSignature(admin, {
+    waiverId: input.waiverId,
+    leadId: input.leadId,
+  });
+
+  if (isSignatureStillValid(existing, waiverVersion)) {
+    throw new ServiceError(409, 'This waiver is already signed and still valid.');
   }
 
-  let pdfStoragePath: string | null = null;
-  try {
-    const { buildWaiverPdf } = await import('@/lib/waiver-pdf');
-    const pdfBytes = await buildWaiverPdf({
-      gymName: gym?.name ?? 'Gym',
-      waiverTitle: waiver.title,
-      waiverBody: waiver.body,
-      signedName: input.signedName.trim(),
-      signedAt,
-      memberEmail: member?.email,
-    });
-    pdfStoragePath = `${input.gymId}/${signatureId}.pdf`;
-    const { error: uploadErr } = await admin.storage
-      .from('waiver-signatures')
-      .upload(pdfStoragePath, pdfBytes, {
-        contentType: 'application/pdf',
-        upsert: true,
-      });
-    if (!uploadErr) {
-      await admin
-        .from('waiver_signatures')
-        .update({ pdf_storage_path: pdfStoragePath })
-        .eq('id', signatureId);
-    }
-  } catch {
-    // PDF storage is best-effort; signature row is still valid.
-  }
+  return insertImmutableSignature({
+    waiverId: input.waiverId,
+    gymId: input.gymId,
+    leadId: input.leadId,
+    signedName: input.signedName,
+    guardianName: input.guardianName,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    waiver,
+    signerEmail: lead.email,
+    gymName: gym?.name ?? 'Gym',
+    webhookPayload: {
+      waiver_id: input.waiverId,
+      lead_id: input.leadId,
+      gym_id: input.gymId,
+    },
+  });
+}
 
-  // Optional per-gym webhook on signature completion (best-effort, 6.42).
-  try {
-    const { data: gymHook } = await admin
-      .from('gyms')
-      .select('signature_webhook_url')
-      .eq('id', input.gymId)
-      .maybeSingle();
+/** Copy lead waiver signatures to a new member on conversion. */
+export async function transferLeadWaiversToMember(
+  gymId: string,
+  leadId: string,
+  memberId: string
+): Promise<void> {
+  const admin = getAdminClient();
+  const leadSigs = await getLeadWaiverSignatures(leadId);
+  if (!leadSigs.length) return;
 
-    const webhookUrl = (gymHook as { signature_webhook_url?: string | null })
-      ?.signature_webhook_url;
-    if (webhookUrl && /^https:\/\//.test(webhookUrl)) {
-      void fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event: 'waiver.signature.completed',
-          signature_id: signatureId,
-          waiver_id: input.waiverId,
-          member_id: input.memberId,
-          gym_id: input.gymId,
-          signed_at: signedAt,
-        }),
-      }).catch(() => undefined);
-    }
-  } catch {
-    // Webhook is best-effort
-  }
+  const rows = leadSigs.map((sig) => ({
+    waiver_id: sig.waiver_id,
+    member_id: memberId,
+    gym_id: gymId,
+    signed_name: sig.signed_name,
+    guardian_name: (sig as { guardian_name?: string | null }).guardian_name ?? null,
+    signed_at: sig.signed_at,
+    expires_at: sig.expires_at,
+    waiver_version: (sig as { waiver_version?: number }).waiver_version ?? 1,
+    ip_address: (sig as { ip_address?: string | null }).ip_address ?? null,
+    user_agent: (sig as { user_agent?: string | null }).user_agent ?? null,
+    pdf_storage_path: (sig as { pdf_storage_path?: string | null }).pdf_storage_path ?? null,
+  }));
 
-  return { signatureId, pdfStoragePath };
+  const { error } = await admin.from('waiver_signatures').insert(rows);
+  if (error) throw new ServiceError(500, error.message);
 }
 
 export async function assertMemberWaiverCompliance(
@@ -370,8 +509,16 @@ export async function assertMemberWaiverCompliance(
   if (sigError) throw new ServiceError(500, sigError.message);
 
   const now = new Date();
+  const latestByWaiver = new Map<string, (typeof signatures)[number]>();
+  for (const sig of signatures ?? []) {
+    const prev = latestByWaiver.get(sig.waiver_id);
+    if (!prev || new Date(sig.signed_at) > new Date(prev.signed_at)) {
+      latestByWaiver.set(sig.waiver_id, sig);
+    }
+  }
+
   const validSigned = new Set(
-    (signatures ?? [])
+    [...latestByWaiver.values()]
       .filter((s) => {
         const notExpired = !s.expires_at || new Date(s.expires_at) > now;
         const sigVersion = (s as { waiver_version?: number }).waiver_version ?? 1;

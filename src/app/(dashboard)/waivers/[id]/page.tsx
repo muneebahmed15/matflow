@@ -3,18 +3,21 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ToggleLeft, ToggleRight } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 import {
   getWaiverAction,
   getWaiverSignaturesAction,
   toggleWaiverStatusAction,
 } from '@/app/(dashboard)/actions'
 import type { Waiver } from '@/services/waivers'
+import { formatTimestampInGymTimezone } from '@/lib/gym-public-time'
 import { useAppUi } from '@/components/ui/AppUiProvider'
 import PageLoader from '@/components/PageLoader'
 
 type Signature = {
   id: string; signed_name: string; signed_at: string
-  members: { first_name: string; last_name: string; email: string }
+  members: { first_name: string; last_name: string; email: string } | null
+  leads: { first_name: string; last_name: string; email: string | null } | null
 }
 
 export default function WaiverDetailPage() {
@@ -25,6 +28,7 @@ export default function WaiverDetailPage() {
   const [signatures, setSignatures] = useState<Signature[]>([])
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState(false)
+  const [gymTimezone, setGymTimezone] = useState('America/Los_Angeles')
 
   useEffect(() => {
     void (async () => {
@@ -32,8 +36,15 @@ export default function WaiverDetailPage() {
         getWaiverAction(id),
         getWaiverSignaturesAction(id),
       ])
-      if (waiverResult.ok && waiverResult.data) setWaiver(waiverResult.data)
-      else if (!waiverResult.ok) showError(waiverResult.error)
+      if (waiverResult.ok && waiverResult.data) {
+        setWaiver(waiverResult.data)
+        const { data: gym } = await supabase
+          .from('gyms')
+          .select('timezone')
+          .eq('id', waiverResult.data.gym_id)
+          .maybeSingle()
+        if (gym?.timezone) setGymTimezone(gym.timezone)
+      } else if (!waiverResult.ok) showError(waiverResult.error)
       if (sigResult.ok && sigResult.data) setSignatures(sigResult.data as Signature[])
       setLoading(false)
     })()
@@ -82,18 +93,23 @@ export default function WaiverDetailPage() {
           <p className="text-white/30 text-sm text-center py-8">No signatures yet.</p>
         ) : (
           <div className="space-y-2">
-            {signatures.map((sig) => (
+            {signatures.map((sig) => {
+              const person = sig.members ?? sig.leads
+              const label = person
+                ? `${person.first_name} ${person.last_name}`
+                : 'Unknown'
+              return (
               <div key={sig.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
                 <div>
-                  <p className="text-white text-sm font-medium">{sig.members.first_name} {sig.members.last_name}</p>
-                  <p className="text-white/30 text-xs">{sig.members.email}</p>
+                  <p className="text-white text-sm font-medium">{label}</p>
+                  <p className="text-white/30 text-xs">{person?.email ?? (sig.leads ? 'Trial lead' : '')}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-white text-xs italic">&ldquo;{sig.signed_name}&rdquo;</p>
-                  <p className="text-white/20 text-xs">{new Date(sig.signed_at).toLocaleDateString()}</p>
+                  <p className="text-white/20 text-xs">{formatTimestampInGymTimezone(sig.signed_at, gymTimezone)}</p>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </div>

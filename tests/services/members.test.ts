@@ -58,9 +58,16 @@ describe('members service', () => {
   });
 
   it('updates a member', async () => {
-    mockFrom.mockReturnValueOnce(
-      chain({ data: { id: 'm1', first_name: 'Janet' }, error: null })
-    );
+    mockFrom
+      .mockReturnValueOnce(
+        chain({
+          data: { id: 'm1', first_name: 'Jane', status: 'active', date_of_birth: '1990-01-01' },
+          error: null,
+        })
+      )
+      .mockReturnValueOnce(
+        chain({ data: { id: 'm1', first_name: 'Janet' }, error: null })
+      );
 
     const member = await updateMember('g1', 'm1', { first_name: 'Janet' });
     expect(member.first_name).toBe('Janet');

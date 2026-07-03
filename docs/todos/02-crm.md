@@ -8,7 +8,7 @@
 - [x] 2.5 Member detail uses `getCurrentStaffInfo` not owner-only lookup
 - [~] 2.6 Member soft-delete with `deleted_at`
 - [x] 2.7 Member archive status vs hard delete
-- [ ] 2.8 Member photo/avatar URL field
+- [x] 2.8 Member photo/avatar URL field
 - [x] 2.9 Member date of birth field (used for minor waiver flow)
 - [ ] 2.10 Member gender field (optional)
 - [ ] 2.11 Member address fields
@@ -39,7 +39,7 @@
 - [x] 2.30 Status filter pills (done)
 - [x] 2.31 Convert lead to member (done)
 - [ ] 2.32 Lead notes field editable in UI
-- [ ] 2.33 Lead assignment to staff member
+- [x] 2.33 Lead assignment to staff member
 - [x] 2.34 Lead source analytics dashboard (marketing page)
 - [x] 2.35 Public trial booking creates lead automatically
 - [x] 2.36 Lead email notification on new lead (lead automation welcome email)

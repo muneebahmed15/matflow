@@ -41,16 +41,18 @@ Run migrations **in order**:
 2. `20250630200000_indexes_and_constraints.sql`
 3. `20250630210000_stripe_webhook_events.sql`
 4. `20250630220000_coach_admin_rls_split.sql`
-5. `20260630192935_initial_schema.sql` (if not superseded)
-6. `20250702000000_wave1_prd_foundation.sql`
-7. `20250702010000_wave2_full_platform.sql`
-8. `20250702020000_wave3_enterprise_payments.sql`
-9. `20250702030000_wave4_scale.sql`
-10. `20250702040000_wave5_portal_waivers.sql`
-11. `20250702100000_competitive_features.sql`
-12. `20250703000000_rbac_launch.sql`
+5. `20250702000000_wave1_prd_foundation.sql`
+6. `20250702010000_wave2_full_platform.sql`
+7. `20250702020000_wave3_enterprise_payments.sql`
+8. `20250702030000_wave4_scale.sql`
+9. `20250702040000_wave5_portal_waivers.sql`
+10. `20250702100000_competitive_features.sql`
+11. `20250703000000_rbac_launch.sql`
+12. `20250703010000_production_readiness.sql`
+13. `20250703020000_competitions_events.sql`
 14. `20250704000000_platform_polish.sql`
 15. `20250704010000_class_enrollments.sql`
+16. `20250704020000_belt_engine.sql` … `20250704080000_import_history.sql` (in timestamp order)
 
 Then run backfills:
 
@@ -95,6 +97,22 @@ curl http://localhost:3000/api/health
 Returns `database: ok` when Supabase is reachable.
 
 ## Production deploy checklist
+
+Apply migrations, run backfill scripts, configure Supabase Auth redirect URLs (`https://your-domain.com/auth/callback`), and set all required env vars before `next start`:
+
+- `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`
+- `STRIPE_*`, `NEXT_PUBLIC_APP_URL`
+- `RESEND_API_KEY`, `RESEND_FROM_EMAIL`
+- `CRON_SECRET`
+- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+- `UNSUBSCRIBE_SECRET` (recommended; do not reuse service role key)
+
+Run backfills after migrations:
+
+```bash
+psql $DATABASE_URL -f supabase/scripts/backfill_auth_user_id.sql
+psql $DATABASE_URL -f supabase/scripts/backfill_owner_staff_roles.sql
+```
 
 1. Run all migrations in order (through `20250703010000_production_readiness.sql`).
 2. Set required env vars: `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_*`, `NEXT_PUBLIC_APP_URL`.
