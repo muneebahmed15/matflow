@@ -8,6 +8,7 @@ import { Dumbbell, Plus } from 'lucide-react'
 import {
   createClassAction,
   deleteClassAction,
+  getEnrollmentCountsAction,
   listClassesAction,
   listStaffAction,
   updateClassAction,
@@ -43,6 +44,7 @@ const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sun
 export default function ClassesPage() {
   const { confirm, error: showError } = useAppUi()
   const [classes, setClasses] = useState<Class[]>([])
+  const [enrollCounts, setEnrollCounts] = useState<Record<string, number>>({})
   const [members, setMembers] = useState<MemberOption[]>([])
   const [staff, setStaff] = useState<StaffOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,14 +75,17 @@ export default function ClassesPage() {
       setGymId(info.gymId)
       setCanManageClasses(hasCapability(info.role, 'classes.manage'))
 
-      const [classResult, staffResult, { data: membersData }] = await Promise.all([
+      const [classResult, staffResult, countsResult, { data: membersData }] = await Promise.all([
         listClassesAction(),
         listStaffAction(),
+        getEnrollmentCountsAction(),
         supabase.from('members').select('id, first_name, last_name').eq('gym_id', info.gymId).eq('status', 'active').order('first_name'),
       ])
 
       if (classResult.ok && classResult.data) setClasses(classResult.data as Class[])
       else if (!classResult.ok) showError(classResult.error)
+
+      if (countsResult.ok && countsResult.data) setEnrollCounts(countsResult.data)
 
       if (staffResult.ok && staffResult.data) {
         setStaff(staffResult.data.map((s) => ({
@@ -289,7 +294,12 @@ export default function ClassesPage() {
                       </div>
                       <div>
                         <p className="font-semibold text-white">{cls.name}</p>
-                        <p className="text-xs text-white/30">{cls.instructor} · {cls.start_time} – {cls.end_time} · {cls.capacity} max</p>
+                        <p className="text-xs text-white/30">
+                          {cls.instructor} · {cls.start_time} – {cls.end_time} ·{' '}
+                          <span className={(enrollCounts[cls.id] ?? 0) >= cls.capacity ? 'text-red-400' : ''}>
+                            {enrollCounts[cls.id] ?? 0}/{cls.capacity} enrolled
+                          </span>
+                        </p>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1">

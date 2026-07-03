@@ -29,3 +29,18 @@ export async function listAllPlans(gymId: string): Promise<PlanRow[]> {
   if (error) throw new ServiceError(500, error.message);
   return data ?? [];
 }
+
+export async function setPlanActive(
+  gymId: string,
+  planId: string,
+  isActive: boolean
+): Promise<void> {
+  const admin = getAdminClient();
+  const { error } = await admin
+    .from('plans')
+    .update({ is_active: isActive })
+    .eq('id', planId)
+    .eq('gym_id', gymId);
+
+  if (error) throw new ServiceError(500, error.message);
+}

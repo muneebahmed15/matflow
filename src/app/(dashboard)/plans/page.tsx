@@ -2,6 +2,7 @@ import { CreditCard } from 'lucide-react'
 import { requireStaffSessionForPage } from '@/lib/auth/staff'
 import { listAllPlans } from '@/services/plans'
 import NewPlanForm from '@/components/plans/NewPlanForm'
+import PlanToggleButton from '@/components/plans/PlanToggleButton'
 
 export default async function PlansPage() {
   const auth = await requireStaffSessionForPage({ adminOnly: true })
@@ -30,11 +31,14 @@ export default async function PlansPage() {
                   <p className="text-xs text-white/30">{plan.description}</p>
                 </div>
               </div>
-              <div className="text-right">
+              <div className="text-right flex flex-col items-end gap-2">
                 <p className="text-white font-bold">${((plan.price_cents ?? 0) / 100).toFixed(2)}<span className="text-white/30 font-normal text-xs"> / {plan.interval}</span></p>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${plan.is_active ? 'bg-green-500/10 text-green-400' : 'bg-white/5 text-white/30'}`}>
-                  {plan.is_active ? 'Active' : 'Inactive'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${plan.is_active ? 'bg-green-500/10 text-green-400' : 'bg-white/5 text-white/30'}`}>
+                    {plan.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                  <PlanToggleButton planId={plan.id} isActive={plan.is_active} />
+                </div>
               </div>
             </div>
           ))}

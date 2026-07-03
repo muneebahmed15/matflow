@@ -10,7 +10,7 @@
 
 - [x] 8.3 Import history list
 
-- [ ] 8.4 Rollback last import (admin)
+- [x] 8.4 Rollback last import (admin)
 
 
 

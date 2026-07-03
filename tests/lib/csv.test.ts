@@ -34,3 +34,12 @@ describe('MEMBER_IMPORT_TEMPLATE', () => {
     expect(MEMBER_IMPORT_TEMPLATE).toContain('last_name');
   });
 });
+
+describe('stringifyCsv', () => {
+  it('escapes commas and quotes', async () => {
+    const { stringifyCsv } = await import('@/lib/csv');
+    const csv = stringifyCsv(['name', 'note'], [['Smith, Jr', 'said "hi"']]);
+    expect(csv).toContain('"Smith, Jr"');
+    expect(csv).toContain('"said ""hi"""');
+  });
+});

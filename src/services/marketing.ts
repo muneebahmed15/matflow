@@ -90,13 +90,23 @@ export async function sendCampaign(gymId: string, campaignId: string): Promise<{
   const emails = await resolveAudienceEmails(gymId, campaign.audience);
   let sent = 0;
 
+  const { data: gym } = await admin.from('gyms').select('name, contact_email').eq('id', gymId).maybeSingle();
+  const gymName = gym?.name ?? 'Gym';
+  const footer = `
+    <hr style="margin-top:24px;border:none;border-top:1px solid #eee" />
+    <p style="font-size:12px;color:#666;margin-top:16px">
+      You received this email because you are a member or lead of ${gymName}.
+      ${gym?.contact_email ? `Contact us at <a href="mailto:${gym.contact_email}">${gym.contact_email}</a>.` : ''}
+    </p>
+  `;
+
   for (const to of emails) {
     try {
       await sendTransactionalEmail({
         to,
         subject: campaign.subject,
-        html: campaign.body_html,
-        text: campaign.body_html.replace(/<[^>]+>/g, ''),
+        html: `${campaign.body_html}${footer}`,
+        text: `${campaign.body_html.replace(/<[^>]+>/g, '')}\n\nYou received this email from ${gymName}.`,
       });
       sent++;
     } catch {

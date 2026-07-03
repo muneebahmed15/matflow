@@ -62,7 +62,7 @@
 - [ ] 11.41 Workflow: win-back inactive 30d
 
 ## Compliance
-- [ ] 11.42 CAN-SPAM footer in emails
+- [x] 11.42 CAN-SPAM footer in emails
 - [ ] 11.43 TCPA consent log
 - [ ] 11.44 GDPR marketing preferences per member
 

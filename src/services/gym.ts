@@ -28,10 +28,11 @@ export type GymSettings = Pick<GymRow, 'id' | 'name' | 'slug' | 'kiosk_enabled'>
   google_place_id: string | null;
   review_checkin_threshold: number;
   require_waiver_for_checkin: boolean;
+  timezone: string;
 };
 
 const GYM_SETTINGS_COLUMNS =
-  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, review_checkin_threshold, require_waiver_for_checkin';
+  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, review_checkin_threshold, require_waiver_for_checkin, timezone';
 
 export async function getGymSettings(gymId: string): Promise<GymSettings> {
   const admin = getAdminClient();
@@ -71,6 +72,7 @@ export type UpdateGymSettingsInput = {
   googlePlaceId?: string | null;
   reviewCheckinThreshold?: number;
   requireWaiverForCheckin?: boolean;
+  timezone?: string;
 };
 
 export async function updateGymSettings(
@@ -140,6 +142,7 @@ export async function updateGymSettings(
       google_place_id: input.googlePlaceId?.trim() || null,
       review_checkin_threshold: input.reviewCheckinThreshold ?? 5,
       require_waiver_for_checkin: input.requireWaiverForCheckin ?? true,
+      timezone: input.timezone?.trim() || 'America/New_York',
     })
     .eq('id', gymId)
     .select(GYM_SETTINGS_COLUMNS)

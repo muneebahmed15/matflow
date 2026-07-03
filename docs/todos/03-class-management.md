@@ -44,11 +44,11 @@
 
 - [x] 3.16 Capacity integer on class (done)
 
-- [ ] 3.17 Enrolled count per class session
+- [x] 3.17 Enrolled count per class session (classes page shows enrolled/capacity)
 
-- [ ] 3.18 Capacity warning when near full
+- [x] 3.18 Capacity warning when near full (count turns red at capacity)
 
-- [ ] 3.19 Block enrollment when at capacity
+- [x] 3.19 Block enrollment when at capacity (service throws 409, suggests waitlist)
 
 - [ ] 3.20 Overbooking allowance setting
 
@@ -86,7 +86,7 @@
 
 ## Booking / Enrollment
 
-- [ ] 3.32 Member enrolls in recurring class
+- [x] 3.32 Member enrolls in recurring class (`class_enrollments` + portal booking)
 
 - [ ] 3.33 Drop-in booking for single session
 

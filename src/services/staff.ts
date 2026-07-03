@@ -6,6 +6,7 @@ import {
   staffInviteEmail,
 } from '@/lib/email/resend';
 import { ServiceError } from '@/services/errors';
+import { logAuditEvent } from '@/services/audit';
 import type { StaffRole } from '@/lib/auth/staff';
 
 type AdminClient = ReturnType<typeof getAdminClient>;
@@ -203,14 +204,31 @@ export async function removeStaffMember(
     .eq('gym_id', gymId);
 
   if (deleteError) throw new ServiceError(500, deleteError.message);
+
+  await logAuditEvent({
+    gymId,
+    actorId: actorUserId,
+    action: 'staff.removed',
+    entityType: 'staff_roles',
+    entityId: staffRoleId,
+  });
 }
 
 export async function updateStaffRole(
   gymId: string,
   staffRoleId: string,
-  role: StaffRole
+  role: StaffRole,
+  actorUserId: string
 ): Promise<void> {
   const admin = getAdminClient();
+
+  const { data: existing } = await admin
+    .from('staff_roles')
+    .select('role')
+    .eq('id', staffRoleId)
+    .eq('gym_id', gymId)
+    .maybeSingle();
+
   const { error } = await admin
     .from('staff_roles')
     .update({ role })
@@ -218,6 +236,17 @@ export async function updateStaffRole(
     .eq('gym_id', gymId);
 
   if (error) throw new ServiceError(500, error.message);
+
+  if (existing && existing.role !== role) {
+    await logAuditEvent({
+      gymId,
+      actorId: actorUserId,
+      action: 'staff.role_changed',
+      entityType: 'staff_roles',
+      entityId: staffRoleId,
+      payload: { from: existing.role, to: role },
+    });
+  }
 }
 
 export async function listStaffMembers(gymId: string) {

@@ -76,6 +76,6 @@
 - [ ] 7.51 Multi-language public site
 - [ ] 7.52 A/B test hero variants
 - [ ] 7.53 Online class booking from schedule
-- [ ] 7.54 Member login link in header
+- [x] 7.54 Member login link in header
 - [ ] 7.55 Privacy policy page template
 - [ ] 7.56 Terms of service page template

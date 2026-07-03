@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { getBeltProgress } from '@/lib/belt-progress';
 import { usePortalMember } from '@/lib/portal-member-context';
 
 type Promotion = {
@@ -38,6 +39,7 @@ export default function PortalBeltPage() {
 
   const beltRank = activeMember.belt_rank ?? 'white';
   const stripeCount = activeMember.stripe_count ?? 0;
+  const progress = getBeltProgress(beltRank, stripeCount);
 
   return (
     <div className="space-y-6">
@@ -55,6 +57,23 @@ export default function PortalBeltPage() {
         {stripeCount > 0 && (
           <p className="text-white/50 text-sm mt-2">{stripeCount} stripe{stripeCount === 1 ? '' : 's'}</p>
         )}
+        <div className="mt-4">
+          <div className="flex justify-between text-xs text-white/40 mb-1">
+            <span>Overall progress</span>
+            <span>{progress.progressPercent}%</span>
+          </div>
+          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-blue-500 rounded-full transition-all"
+              style={{ width: `${progress.progressPercent}%` }}
+            />
+          </div>
+          {progress.nextBelt && progress.stripesUntilPromotion > 0 && (
+            <p className="text-white/40 text-xs mt-2">
+              {progress.stripesUntilPromotion} stripe{progress.stripesUntilPromotion === 1 ? '' : 's'} until {progress.nextBelt} belt
+            </p>
+          )}
+        </div>
       </div>
 
       <div>

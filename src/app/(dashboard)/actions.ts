@@ -5,7 +5,9 @@ import { requireStaffSession } from '@/lib/auth/staff';
 import { isServiceError } from '@/services/errors';
 import {
   createMember,
+  archiveMember,
   deleteMember,
+  exportMembersCsv,
   getMember,
   listFamilies,
   listMembers,
@@ -21,8 +23,11 @@ import { getInstructorScopedClassIds } from '@/services/instructor-scope';
 import { promoteMember } from '@/services/belts';
 import {
   createWaiver,
+  bulkSendWaiverLinks,
+  exportWaiverSignaturesCsv,
   getMemberWaiverSignatures,
   getWaiver,
+  getWaiverCompletionStats,
   getWaiverSignatures,
   listWaivers,
   listMembersWithWaiverGaps,
@@ -63,7 +68,8 @@ import {
   removeFromWaitlist,
   type ClassWaitlistEntry,
 } from '@/services/class-waitlist';
-import { importMembersFromRows, listImportJobs, importLeadsFromRows, getImportJobErrors, type ImportJob } from '@/services/migration';
+import { importMembersFromRows, listImportJobs, importLeadsFromRows, getImportJobErrors, rollbackImportJob, type ImportJob } from '@/services/migration';
+import { setPlanActive } from '@/services/plans';
 import { getLatestSnapshot, saveDailySnapshot } from '@/services/business-assistant';
 import { listCampaigns, createCampaign, sendCampaign, requestReview } from '@/services/marketing';
 import { listProducts, createProduct, listOrders } from '@/services/merchandise';
@@ -217,6 +223,7 @@ export async function updateGymSettingsAction(input: {
   googlePlaceId?: string | null;
   reviewCheckinThreshold?: number;
   requireWaiverForCheckin?: boolean;
+  timezone?: string;
 }): Promise<ActionResult<GymSettings>> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });
@@ -400,6 +407,19 @@ export async function listClassesAction(): Promise<
   }
 }
 
+export async function getEnrollmentCountsAction(): Promise<
+  ActionResult<Record<string, number>>
+> {
+  try {
+    const auth = await requireStaffSession();
+    const { getEnrollmentCounts } = await import('@/services/class-enrollment');
+    const counts = await getEnrollmentCounts(auth.gymId);
+    return { ok: true, data: counts };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
 export async function getWaiverComplianceAction(): Promise<
   ActionResult<Awaited<ReturnType<typeof listMembersWithWaiverGaps>>>
 > {
@@ -407,6 +427,94 @@ export async function getWaiverComplianceAction(): Promise<
     const auth = await requireStaffSession({ capability: 'members.read' });
     const gaps = await listMembersWithWaiverGaps(auth.gymId);
     return { ok: true, data: gaps };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function getWaiverCompletionStatsAction(): Promise<
+  ActionResult<Awaited<ReturnType<typeof getWaiverCompletionStats>>>
+> {
+  try {
+    const auth = await requireStaffSession({ capability: 'members.read' });
+    const stats = await getWaiverCompletionStats(auth.gymId);
+    return { ok: true, data: stats };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function bulkSendWaiverLinksAction(): Promise<
+  ActionResult<{ sent: number; skipped: number }>
+> {
+  try {
+    const auth = await requireStaffSession({ capability: 'members.write' });
+    const limit = await checkRateLimit(`waiver-bulk:${auth.user.id}`, 3, 60 * 60 * 1000);
+    if (!limit.allowed) {
+      return { ok: false, error: 'Bulk send rate limit reached. Try again later.' };
+    }
+    const result = await bulkSendWaiverLinks(auth.gymId);
+    revalidatePath('/waivers');
+    return { ok: true, data: result };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function exportMembersCsvAction(): Promise<ActionResult<string>> {
+  try {
+    const auth = await requireStaffSession({ capability: 'members.read' });
+    const csv = await exportMembersCsv(auth.gymId);
+    return { ok: true, data: csv };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function exportWaiverSignaturesCsvAction(): Promise<ActionResult<string>> {
+  try {
+    const auth = await requireStaffSession({ capability: 'members.read' });
+    const csv = await exportWaiverSignaturesCsv(auth.gymId);
+    return { ok: true, data: csv };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function archiveMemberAction(memberId: string): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ capability: 'members.write' });
+    await archiveMember(auth.gymId, memberId);
+    revalidatePath('/members');
+    revalidatePath(`/members/${memberId}`);
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function setPlanActiveAction(
+  planId: string,
+  isActive: boolean
+): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    await setPlanActive(auth.gymId, planId, isActive);
+    revalidatePath('/plans');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function rollbackImportJobAction(jobId: string): Promise<
+  ActionResult<{ removed: number }>
+> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const result = await rollbackImportJob(auth.gymId, jobId);
+    revalidatePath('/migration');
+    return { ok: true, data: result };
   } catch (error) {
     return toActionError(error);
   }
@@ -547,7 +655,7 @@ export async function updateStaffRoleAction(
 ): Promise<ActionResult> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });
-    await updateStaffRole(auth.gymId, staffRoleId, role);
+    await updateStaffRole(auth.gymId, staffRoleId, role, auth.user.id);
     revalidatePath('/staff');
     return { ok: true };
   } catch (error) {

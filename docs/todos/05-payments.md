@@ -7,7 +7,7 @@
 - [ ] 5.4 Plan description rich text
 - [ ] 5.5 Plan trial period days
 - [ ] 5.6 Plan setup fee
-- [ ] 5.7 Deactivate plan without deleting
+- [x] 5.7 Deactivate plan without deleting
 - [ ] 5.8 Plan sort order for public display
 
 ## Checkout
@@ -28,7 +28,7 @@
 - [x] 5.21 Cancel subscription API (done)
 - [x] 5.22 Pause subscription API (done)
 - [x] 5.23 Refund API (done)
-- [ ] 5.24 Subscriptions dashboard uses getCurrentStaffInfo
+- [x] 5.24 Subscriptions dashboard uses getCurrentStaffInfo
 - [ ] 5.25 Subscription detail drawer
 - [ ] 5.26 Manual subscription (cash/check) without Stripe
 

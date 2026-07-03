@@ -18,7 +18,7 @@
 - [ ] 4.13 Promotion approval workflow (coach proposes, admin approves)
 
 ## Stripes
-- [~] 4.14 Add stripe on member profile
+- [x] 4.14 Add stripe on member profile
 - [ ] 4.15 Stripe history log table
 - [ ] 4.16 Max stripes per belt rules
 - [ ] 4.17 Stripe increment/decrement UI
@@ -35,7 +35,7 @@
 ## Portal
 - [ ] 4.25 Member portal: view current rank + stripes
 - [ ] 4.26 Member portal: promotion history
-- [ ] 4.27 Member portal: progress toward next rank
+- [x] 4.27 Member portal: progress toward next rank
 
 ## Public / Marketing
 - [ ] 4.28 Public site: coaches page with ranks

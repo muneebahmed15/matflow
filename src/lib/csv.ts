@@ -76,3 +76,18 @@ John,Doe,john@example.com,555-0100,white,active,EXT001`;
 
 export const LEAD_IMPORT_TEMPLATE = `first_name,last_name,email,phone,source,notes
 Jane,Doe,jane@example.com,555-0100,referral,Interested in BJJ`;
+
+function escapeCsvField(value: string): string {
+  if (/[",\n\r]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+export function stringifyCsv(headers: string[], rows: string[][]): string {
+  const lines = [
+    headers.map(escapeCsvField).join(','),
+    ...rows.map((row) => row.map((cell) => escapeCsvField(cell ?? '')).join(',')),
+  ];
+  return `${lines.join('\n')}\n`;
+}

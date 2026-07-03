@@ -49,7 +49,8 @@ Run migrations **in order**:
 10. `20250702040000_wave5_portal_waivers.sql`
 11. `20250702100000_competitive_features.sql`
 12. `20250703000000_rbac_launch.sql`
-13. `20250703010000_production_readiness.sql`
+14. `20250704000000_platform_polish.sql`
+15. `20250704010000_class_enrollments.sql`
 
 Then run backfills:
 

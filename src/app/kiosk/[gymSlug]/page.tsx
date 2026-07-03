@@ -3,13 +3,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { UserCheck, Search } from 'lucide-react'
+import { UserCheck, Search, FileText } from 'lucide-react'
 
 interface Member {
   id: string
   first_name: string
   last_name: string
   email: string
+}
+
+interface KioskWaiver {
+  id: string
+  title: string
+  body: string
 }
 
 export default function KioskCheckInPage() {
@@ -20,6 +26,13 @@ export default function KioskCheckInPage() {
   const [loading, setLoading] = useState(true)
   const [checkedInName, setCheckedInName] = useState<string | null>(null)
   const [error, setError] = useState('')
+
+  // Waiver sign flow state
+  const [waiverMember, setWaiverMember] = useState<Member | null>(null)
+  const [waivers, setWaivers] = useState<KioskWaiver[]>([])
+  const [signedName, setSignedName] = useState('')
+  const [signing, setSigning] = useState(false)
+  const [waiverError, setWaiverError] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -40,22 +53,87 @@ export default function KioskCheckInPage() {
     return members.filter(m => `${m.first_name} ${m.last_name}`.toLowerCase().includes(q))
   }, [search, members])
 
-  const handleCheckIn = async (member: Member) => {
-    if (!gym) return
-    setError('')
+  const attemptCheckIn = async (member: Member): Promise<{ ok: boolean; error?: string; status?: number }> => {
+    if (!gym) return { ok: false }
     const res = await fetch('/api/attendance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ member_id: member.id, gym_id: gym.id }),
     })
-    const data = await res.json()
-    if (!res.ok) {
-      setError(data.error || 'Check-in failed.')
-      return
-    }
+    const data = (await res.json()) as { error?: string }
+    if (!res.ok) return { ok: false, error: data.error, status: res.status }
+    return { ok: true }
+  }
+
+  const showSuccess = (member: Member) => {
     setCheckedInName(`${member.first_name} ${member.last_name}`)
     setSearch('')
     setTimeout(() => setCheckedInName(null), 3500)
+  }
+
+  const startWaiverFlow = async (member: Member) => {
+    if (!gym) return
+    const res = await fetch(`/api/public/waivers?gym_id=${gym.id}`)
+    const data = (await res.json()) as { data?: KioskWaiver[] }
+    if (!res.ok || !data.data?.length) {
+      setError('A waiver is required but could not be loaded. Ask staff for help.')
+      return
+    }
+    setWaivers(data.data)
+    setSignedName('')
+    setWaiverError('')
+    setWaiverMember(member)
+  }
+
+  const handleCheckIn = async (member: Member) => {
+    setError('')
+    const result = await attemptCheckIn(member)
+    if (result.ok) {
+      showSuccess(member)
+      return
+    }
+    if (result.status === 403 && result.error?.toLowerCase().startsWith('waiver signature required')) {
+      await startWaiverFlow(member)
+      return
+    }
+    setError(result.error || 'Check-in failed.')
+  }
+
+  const handleSignWaivers = async () => {
+    if (!gym || !waiverMember) return
+    setSigning(true)
+    setWaiverError('')
+
+    for (const waiver of waivers) {
+      const res = await fetch('/api/public/waivers/sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gym_id: gym.id,
+          waiver_id: waiver.id,
+          member_id: waiverMember.id,
+          signed_name: signedName,
+        }),
+      })
+      // 409 = already signed and still valid; safe to skip
+      if (!res.ok && res.status !== 409) {
+        const data = (await res.json()) as { error?: string }
+        setWaiverError(data.error || 'Signing failed. Ask staff for help.')
+        setSigning(false)
+        return
+      }
+    }
+
+    const result = await attemptCheckIn(waiverMember)
+    setSigning(false)
+    const member = waiverMember
+    setWaiverMember(null)
+
+    if (result.ok) {
+      showSuccess(member)
+    } else {
+      setError(result.error || 'Check-in failed after signing. Ask staff for help.')
+    }
   }
 
   if (loading) return (
@@ -94,6 +172,59 @@ export default function KioskCheckInPage() {
             </div>
             <p className="text-2xl font-bold">{checkedInName}</p>
             <p className="text-green-400 mt-1">Checked in!</p>
+          </div>
+        </div>
+      )}
+
+      {waiverMember && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 px-4 py-8">
+          <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-lg max-h-full flex flex-col">
+            <div className="p-5 border-b border-white/10">
+              <p className="font-bold text-lg flex items-center gap-2">
+                <FileText size={18} className="text-purple-400" />
+                Waiver required
+              </p>
+              <p className="text-white/40 text-sm mt-1">
+                {waiverMember.first_name} {waiverMember.last_name} must sign before checking in.
+              </p>
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-4 flex-1 min-h-0">
+              {waivers.map((w) => (
+                <div key={w.id}>
+                  <p className="font-semibold text-sm mb-1">{w.title}</p>
+                  <p className="text-white/50 text-xs whitespace-pre-wrap max-h-40 overflow-y-auto border border-white/10 rounded-lg p-3">
+                    {w.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-5 border-t border-white/10 space-y-3">
+              <input
+                type="text"
+                value={signedName}
+                onChange={(e) => setSignedName(e.target.value)}
+                placeholder={`Type your full name (${waiverMember.first_name} ${waiverMember.last_name})`}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              {waiverError && <p className="text-red-400 text-sm">{waiverError}</p>}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setWaiverMember(null)}
+                  className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 text-sm font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => void handleSignWaivers()}
+                  disabled={signing || signedName.trim().length < 2}
+                  className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-sm font-semibold"
+                >
+                  {signing ? 'Signing...' : 'I agree — sign & check in'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

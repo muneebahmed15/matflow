@@ -37,8 +37,8 @@
 ## Notifications
 - [x] 6.27 waiver_signed notification type (done)
 - [x] 6.28 Send waiver link via email to member
-- [ ] 6.29 Bulk send waiver to all active members
-- [ ] 6.30 Waiver completion rate report
+- [x] 6.29 Bulk send waiver to all active members
+- [x] 6.30 Waiver completion rate report
 
 ## Portal
 - [x] 6.31 Portal waivers page (done)
@@ -48,16 +48,16 @@
 ## Staff Views
 - [x] 6.34 Waiver detail with signatures (done)
 - [x] 6.35 Member profile waivers tab (done)
-- [ ] 6.36 Export signatures CSV
+- [x] 6.36 Export signatures CSV
 - [ ] 6.37 Print-friendly waiver view
 
 ## Kiosk / Onboarding
-- [ ] 6.38 Kiosk waiver sign before first check-in
+- [x] 6.38 Kiosk waiver sign before first check-in (inline modal when check-in blocked)
 - [ ] 6.39 New member auto-assigned active waivers
 - [ ] 6.40 Trial member waiver flow
 
 ## API
-- [ ] 6.41 Public API: get active waivers for gym (anon)
+- [x] 6.41 Public API: get active waivers for gym (anon, kiosk-gated)
 - [ ] 6.42 Webhook on signature completed
 
 ## Testing

@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { Users, Plus, Search } from 'lucide-react'
+import { Users, Plus, Search, Download } from 'lucide-react'
+import { getCurrentStaffInfo } from '@/lib/permissions'
+import { exportMembersCsvAction } from '@/app/(dashboard)/actions'
 
 interface Member {
   id: string
@@ -18,19 +20,35 @@ export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     const fetchMembers = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: gymData } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
-      if (!gymData) return
-      const { data } = await supabase.from('members').select('*').eq('gym_id', gymData.id).order('first_name')
+      const info = await getCurrentStaffInfo()
+      if (!info.gymId) {
+        setLoading(false)
+        return
+      }
+      const { data } = await supabase.from('members').select('*').eq('gym_id', info.gymId).order('first_name')
       if (data) setMembers(data)
       setLoading(false)
     }
-    fetchMembers()
+    void fetchMembers()
   }, [])
+
+  const handleExport = async () => {
+    setExporting(true)
+    const result = await exportMembersCsvAction()
+    setExporting(false)
+    if (!result.ok || !result.data) return
+    const blob = new Blob([result.data], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'members.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -57,9 +75,18 @@ export default function MembersPage() {
           <h1 className="text-3xl font-extrabold">Members</h1>
           <p className="text-white/40 text-sm mt-1">{members.length} total members</p>
         </div>
-        <Link href="/members/new" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
-          <Plus size={16} /> Add Member
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => void handleExport()}
+            disabled={exporting || members.length === 0}
+            className="flex items-center gap-2 border border-white/10 text-white/70 hover:text-white text-sm font-medium px-4 py-2.5 rounded-xl transition disabled:opacity-40"
+          >
+            <Download size={16} /> {exporting ? 'Exporting...' : 'Export CSV'}
+          </button>
+          <Link href="/members/new" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+            <Plus size={16} /> Add Member
+          </Link>
+        </div>
       </div>
 
       <div className="relative mb-4">

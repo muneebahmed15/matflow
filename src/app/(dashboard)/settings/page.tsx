@@ -72,6 +72,7 @@ export default function SettingsPage() {
       googlePlaceId: settings.google_place_id,
       reviewCheckinThreshold: settings.review_checkin_threshold,
       requireWaiverForCheckin: settings.require_waiver_for_checkin,
+      timezone: settings.timezone ?? 'America/New_York',
     })
     setSaving(false)
     if (!result.ok) {
@@ -132,6 +133,20 @@ export default function SettingsPage() {
               className={`${inputClass} font-mono`}
             />
             <p className="text-white/20 text-xs mt-1">Used in kiosk and public website URLs.</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Timezone</label>
+            <select
+              value={settings.timezone ?? 'America/New_York'}
+              onChange={(e) => update({ timezone: e.target.value })}
+              className={inputClass}
+            >
+              <option value="America/New_York" className="bg-gray-900">Eastern (America/New_York)</option>
+              <option value="America/Chicago" className="bg-gray-900">Central (America/Chicago)</option>
+              <option value="America/Denver" className="bg-gray-900">Mountain (America/Denver)</option>
+              <option value="America/Los_Angeles" className="bg-gray-900">Pacific (America/Los_Angeles)</option>
+              <option value="America/Phoenix" className="bg-gray-900">Arizona (America/Phoenix)</option>
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Tagline</label>

@@ -158,6 +158,7 @@ describe('staff service', () => {
     mockFrom
       .mockReturnValueOnce(chain({ data: { id: 'role-1', user_id: 'coach-1', gym_id: 'gym-1' } }))
       .mockReturnValueOnce(chain({ data: { owner_id: 'owner-1' } }))
+      .mockReturnValueOnce(chain({ error: null }))
       .mockReturnValueOnce(chain({ error: null }));
 
     await expect(removeStaffMember('gym-1', 'role-1', 'admin-1')).resolves.toBeUndefined();
@@ -172,8 +173,11 @@ describe('staff service', () => {
   });
 
   it('updates a staff member role', async () => {
-    mockFrom.mockReturnValueOnce(chain({ error: null }));
-    await expect(updateStaffRole('gym-1', 'role-1', 'admin')).resolves.toBeUndefined();
+    mockFrom
+      .mockReturnValueOnce(chain({ data: { role: 'coach' }, error: null }))
+      .mockReturnValueOnce(chain({ error: null }))
+      .mockReturnValueOnce(chain({ error: null }));
+    await expect(updateStaffRole('gym-1', 'role-1', 'admin', 'actor-1')).resolves.toBeUndefined();
   });
 
   it('lists staff members for a gym', async () => {

@@ -6,21 +6,21 @@
 - [x] 2.3 List/search members dashboard (done)
 - [x] 2.4 Member detail page with tabs (done)
 - [ ] 2.5 Member detail uses `getCurrentStaffInfo` not owner-only lookup
-- [ ] 2.6 Member soft-delete with `deleted_at`
-- [ ] 2.7 Member archive status vs hard delete
+- [~] 2.6 Member soft-delete with `deleted_at`
+- [x] 2.7 Member archive status vs hard delete
 - [ ] 2.8 Member photo/avatar URL field
 - [ ] 2.9 Member date of birth field
 - [ ] 2.10 Member gender field (optional)
 - [ ] 2.11 Member address fields
 - [ ] 2.12 Member tags (JSONB array)
-- [ ] 2.13 Bulk member export CSV
+- [x] 2.13 Bulk member export CSV
 - [ ] 2.14 Bulk member import (see Migration module)
-- [ ] 2.15 Member duplicate detection by email
+- [x] 2.15 Member duplicate detection by email
 
 ## Families
 - [x] 2.16 Families table (done)
 - [x] 2.17 Link member to family on create (done)
-- [ ] 2.18 Family detail page
+- [x] 2.18 Family detail page (`/families/[id]` with member list)
 - [ ] 2.19 View all members in a family
 - [ ] 2.20 Family billing contact designation
 - [ ] 2.21 Merge duplicate families

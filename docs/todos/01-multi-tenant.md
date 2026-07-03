@@ -4,7 +4,7 @@
 - [ ] 1.1 Add `gyms.branding` JSONB column (logo, colors, tagline)
 - [ ] 1.2 Add `gyms.website_enabled` boolean default false
 - [ ] 1.3 Add `gyms.custom_domain` text nullable unique
-- [ ] 1.4 Add `gyms.timezone` text default 'America/New_York'
+- [x] 1.4 Add `gyms.timezone` text default 'America/New_York'
 - [ ] 1.5 Add `gyms.locale` text default 'en-US'
 - [ ] 1.6 Add `gym_locations` table for multi-location
 - [ ] 1.7 Add `location_id` FK on classes, attendance (nullable)
@@ -41,8 +41,8 @@
 - [~] 1.30 Settings UI: gym name, slug, kiosk (done)
 - [~] 1.31 Settings UI: logo URL, primary color, tagline
 - [~] 1.32 Settings UI: website enabled toggle
-- [ ] 1.33 Settings UI: timezone selector
-- [ ] 1.34 Settings UI: preview public site link
+- [x] 1.33 Settings UI: timezone selector
+- [x] 1.34 Settings UI: preview public site link
 - [ ] 1.35 `updateGymSettings` service accepts branding fields
 - [ ] 1.36 Validate hex color format server-side
 - [ ] 1.37 Validate slug uniqueness on update
@@ -64,7 +64,7 @@
 - [ ] 1.47 Health check includes DB connectivity
 - [ ] 1.48 Rate limit per gym for public endpoints
 - [ ] 1.49 Audit log on settings changes
-- [ ] 1.50 Audit log on staff role changes
+- [x] 1.50 Audit log on staff role changes
 
 ## Enterprise / Future
 - [ ] 1.51 White-label: hide MatsFlow branding flag

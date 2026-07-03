@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { getCurrentStaffInfo } from '@/lib/permissions';
 import { Users } from 'lucide-react';
@@ -55,13 +56,17 @@ export default function FamiliesPage() {
       ) : (
         <div className="space-y-2">
           {families.map((f) => (
-            <div key={f.id} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 flex justify-between">
+            <Link
+              key={f.id}
+              href={`/families/${f.id}`}
+              className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-4 py-3 flex justify-between transition"
+            >
               <div>
                 <p className="text-white font-medium">{f.family_name}</p>
                 {f.primary_email && <p className="text-white/30 text-xs">{f.primary_email}</p>}
               </div>
               <span className="text-white/40 text-sm">{f.member_count} member{f.member_count === 1 ? '' : 's'}</span>
-            </div>
+            </Link>
           ))}
         </div>
       )}

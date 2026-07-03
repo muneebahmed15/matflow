@@ -53,6 +53,20 @@ export type CreateMemberInput = {
 
 export async function createMember(input: CreateMemberInput): Promise<MemberRow> {
   const admin = getAdminClient();
+
+  const normalizedEmail = input.email?.trim().toLowerCase();
+  if (normalizedEmail) {
+    const { data: duplicate } = await admin
+      .from('members')
+      .select('id')
+      .eq('gym_id', input.gymId)
+      .ilike('email', normalizedEmail)
+      .maybeSingle();
+    if (duplicate) {
+      throw new ServiceError(409, 'A member with this email already exists.');
+    }
+  }
+
   let familyId: string | null = null;
 
   if (input.familyOption === 'new') {
@@ -142,4 +156,25 @@ export async function deleteMember(gymId: string, memberId: string): Promise<voi
   const admin = getAdminClient();
   const { error } = await admin.from('members').delete().eq('id', memberId).eq('gym_id', gymId);
   if (error) throw new ServiceError(500, error.message);
+}
+
+export async function archiveMember(gymId: string, memberId: string): Promise<MemberDetail> {
+  return updateMember(gymId, memberId, { status: 'inactive' });
+}
+
+export async function exportMembersCsv(gymId: string): Promise<string> {
+  const { stringifyCsv } = await import('@/lib/csv');
+  const members = await listMembers(gymId);
+  const rows = members.map((m) => [
+    m.first_name,
+    m.last_name,
+    m.email ?? '',
+    m.phone ?? '',
+    m.belt_rank ?? '',
+    m.status ?? '',
+  ]);
+  return stringifyCsv(
+    ['first_name', 'last_name', 'email', 'phone', 'belt_rank', 'status'],
+    rows
+  );
 }

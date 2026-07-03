@@ -7,6 +7,7 @@ import {
   importLeadsCsvAction,
   importMembersCsvAction,
   listImportJobsAction,
+  rollbackImportJobAction,
 } from '@/app/(dashboard)/actions';
 import {
   parseCsv,
@@ -26,6 +27,7 @@ export default function MigrationPage() {
   const [result, setResult] = useState<string | null>(null);
   const [dryRun, setDryRun] = useState(true);
   const [preview, setPreview] = useState<Record<string, string>[]>([]);
+  const [rollingBack, setRollingBack] = useState<string | null>(null);
 
   const load = async () => {
     const res = await listImportJobsAction();
@@ -130,6 +132,19 @@ export default function MigrationPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleRollback = async (jobId: string) => {
+    if (!confirm('Remove all records created by this import? This cannot be undone.')) return;
+    setRollingBack(jobId);
+    const res = await rollbackImportJobAction(jobId);
+    setRollingBack(null);
+    if (!res.ok) {
+      setResult(`Rollback failed: ${res.error}`);
+      return;
+    }
+    setResult(`Rolled back import — removed ${res.data?.removed ?? 0} records.`);
+    void load();
+  };
+
   return (
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
       <h1 className="text-3xl font-extrabold mb-2">Migration Center</h1>
@@ -204,6 +219,15 @@ export default function MigrationPage() {
                     className="flex items-center gap-1 text-xs text-yellow-400 hover:underline"
                   >
                     <FileWarning size={12} /> Errors
+                  </button>
+                )}
+                {j.status === 'completed' && (
+                  <button
+                    onClick={() => void handleRollback(j.id)}
+                    disabled={rollingBack === j.id}
+                    className="text-xs text-red-400 hover:underline disabled:opacity-40"
+                  >
+                    {rollingBack === j.id ? 'Rolling back…' : 'Rollback'}
                   </button>
                 )}
                 <span className="text-white/40 capitalize">{j.status}</span>

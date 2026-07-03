@@ -86,7 +86,7 @@
 
 - [x] 12.29 Promotion history
 
-- [ ] 12.30 Progress to next rank
+- [x] 12.30 Progress to next rank
 
 
 
@@ -94,11 +94,11 @@
 
 - [x] 12.31 Browse schedule
 
-- [x] 12.32 Book class / join waitlist
+- [x] 12.32 Book class / join waitlist (recurring enrollment + waitlist)
 
-- [~] 12.33 My bookings list (waitlist only)
+- [x] 12.33 My bookings list ("My Classes" + waitlist sections)
 
-- [x] 12.34 Cancel booking (leave waitlist)
+- [x] 12.34 Cancel booking (enrollment or waitlist)
 
 
 

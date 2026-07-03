@@ -68,6 +68,12 @@ export default function GymPublicShell({ gym, children }: Props) {
             ))}
           </nav>
           <Link
+            href="/portal/login"
+            className="hidden sm:inline text-sm text-white/60 hover:text-white px-3 py-2"
+          >
+            Member Login
+          </Link>
+          <Link
             href={`${base}/trial`}
             className="text-sm font-semibold px-4 py-2 rounded-xl text-white shrink-0 transition hover:opacity-90"
             style={{ backgroundColor: accent }}

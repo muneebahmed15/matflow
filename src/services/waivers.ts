@@ -371,3 +371,105 @@ export async function listMembersWithWaiverGaps(gymId: string): Promise<MemberWa
 
   return computeMemberWaiverGaps(activeWaivers, signatures ?? [], members);
 }
+
+export type WaiverCompletionStats = {
+  activeWaiverCount: number;
+  activeMemberCount: number;
+  compliantMemberCount: number;
+  complianceRate: number;
+};
+
+export async function getWaiverCompletionStats(gymId: string): Promise<WaiverCompletionStats> {
+  const gaps = await listMembersWithWaiverGaps(gymId);
+  const admin = getAdminClient();
+
+  const [{ count: activeMemberCount }, { count: activeWaiverCount }] = await Promise.all([
+    admin
+      .from('members')
+      .select('id', { count: 'exact', head: true })
+      .eq('gym_id', gymId)
+      .eq('status', 'active'),
+    admin
+      .from('waivers')
+      .select('id', { count: 'exact', head: true })
+      .eq('gym_id', gymId)
+      .eq('is_active', true),
+  ]);
+
+  const members = activeMemberCount ?? 0;
+  const waivers = activeWaiverCount ?? 0;
+  if (members === 0 || waivers === 0) {
+    return {
+      activeWaiverCount: waivers,
+      activeMemberCount: members,
+      compliantMemberCount: members,
+      complianceRate: 100,
+    };
+  }
+
+  const gapMemberIds = new Set(gaps.map((g) => g.memberId));
+  const compliantMemberCount = members - gapMemberIds.size;
+
+  return {
+    activeWaiverCount: waivers,
+    activeMemberCount: members,
+    compliantMemberCount,
+    complianceRate: Math.round((compliantMemberCount / members) * 100),
+  };
+}
+
+export async function bulkSendWaiverLinks(gymId: string): Promise<{ sent: number; skipped: number }> {
+  const gaps = await listMembersWithWaiverGaps(gymId);
+  const { sendWaiverLinkToMember } = await import('@/services/waiver-reminders');
+
+  let sent = 0;
+  let skipped = 0;
+
+  for (const gap of gaps) {
+    if (!gap.email) {
+      skipped++;
+      continue;
+    }
+    try {
+      await sendWaiverLinkToMember({ gymId, memberId: gap.memberId });
+      sent++;
+    } catch {
+      skipped++;
+    }
+  }
+
+  return { sent, skipped };
+}
+
+export async function exportWaiverSignaturesCsv(gymId: string): Promise<string> {
+  const { stringifyCsv } = await import('@/lib/csv');
+  const admin = getAdminClient();
+
+  const { data, error } = await admin
+    .from('waiver_signatures')
+    .select(
+      'signed_name, signed_at, expires_at, members(first_name, last_name, email), waivers(title)'
+    )
+    .eq('gym_id', gymId)
+    .order('signed_at', { ascending: false });
+
+  if (error) throw new ServiceError(500, error.message);
+
+  const rows = (data ?? []).map((row) => {
+    const members = Array.isArray(row.members) ? row.members[0] : row.members;
+    const waivers = Array.isArray(row.waivers) ? row.waivers[0] : row.waivers;
+    return [
+      waivers?.title ?? '',
+      members ? `${members.first_name} ${members.last_name}`.trim() : '',
+      members?.email ?? '',
+      row.signed_name ?? '',
+      row.signed_at ?? '',
+      row.expires_at ?? '',
+    ];
+  });
+
+  return stringifyCsv(
+    ['waiver_title', 'member_name', 'member_email', 'signed_name', 'signed_at', 'expires_at'],
+    rows
+  );
+}

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState, Suspense } from 'react'
 import { supabase } from '@/lib/supabase'
+import { getCurrentStaffInfo } from '@/lib/permissions'
 import { CreditCard, CheckCircle, XCircle } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 
@@ -22,19 +23,20 @@ function SubscriptionsContent() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: gym } = await supabase.from('gyms').select('id').eq('owner_id', user.id).single()
-      if (!gym) return
+      const info = await getCurrentStaffInfo()
+      if (!info.gymId) {
+        setLoading(false)
+        return
+      }
       const { data } = await supabase
         .from('subscriptions')
         .select('id, status, current_period_end, stripe_subscription_id, members(first_name, last_name, email), plans(name, price, interval)')
-        .eq('gym_id', gym.id)
+        .eq('gym_id', info.gymId)
         .order('created_at', { ascending: false })
       setSubscriptions((data ?? []) as unknown as Subscription[])
       setLoading(false)
     }
-    load()
+    void load()
   }, [])
 
   const statusColor = (s: string) => {

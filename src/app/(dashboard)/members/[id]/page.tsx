@@ -6,13 +6,14 @@ import { useParams, useRouter } from 'next/navigation'
 import { getMemberSignatures } from '@/lib/waivers'
 import { redirectTo } from '@/lib/navigation'
 import { getCurrentStaffInfo } from '@/lib/permissions'
-import { inviteMemberToPortalAction, sendWaiverLinkAction } from '@/app/(dashboard)/actions'
+import { inviteMemberToPortalAction, sendWaiverLinkAction, archiveMemberAction, updateMemberStripesAction } from '@/app/(dashboard)/actions'
 import MemberNotesPanel from '@/components/members/MemberNotesPanel'
 import MemberEmergencyContactsPanel from '@/components/members/MemberEmergencyContactsPanel'
 
 interface Member {
   id: string; first_name: string; last_name: string
   email: string; phone: string; belt_rank: string; status: string
+  stripe_count?: number
 }
 interface Plan {
   id: string; name: string; stripe_price_id: string; price_cents: number; interval: string
@@ -38,6 +39,8 @@ export default function MemberDetailPage() {
   const [inviteMsg, setInviteMsg] = useState('')
   const [sendingWaiverLink, setSendingWaiverLink] = useState(false)
   const [waiverLinkMsg, setWaiverLinkMsg] = useState('')
+  const [archiving, setArchiving] = useState(false)
+  const [stripeUpdating, setStripeUpdating] = useState(false)
   const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'waivers' | 'notes' | 'contacts'>('info')
 
   useEffect(() => {
@@ -102,11 +105,36 @@ export default function MemberDetailPage() {
     if (!error) setMember({ ...member, [field]: value })
   }
 
-  const handleDelete = async () => {
-    if (!confirm('Delete this member?')) return
-    await supabase.from('members').delete().eq('id', id)
-    router.push('/members')
+  const handleArchive = async () => {
+    if (!confirm('Archive this member? They will be marked inactive.')) return
+    setArchiving(true)
+    const res = await archiveMemberAction(id)
+    setArchiving(false)
+    if (res.ok) {
+      setMember((m) => (m ? { ...m, status: 'inactive' } : m))
+    }
   }
+
+  const handleStripeChange = async (next: number) => {
+    if (!member) return
+    setStripeUpdating(true)
+    const res = await updateMemberStripesAction({ memberId: member.id, stripeCount: next })
+    setStripeUpdating(false)
+    if (res.ok) setMember({ ...member, stripe_count: next })
+  }
+
+  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
+  if (!member) return <div className="p-8 text-gray-400">Member not found.</div>
+
+  const tabs: { key: typeof activeTab; label: string }[] = [
+    { key: 'info', label: 'Info' },
+    { key: 'notes', label: 'Notes' },
+    { key: 'contacts', label: 'Contacts' },
+    { key: 'attendance', label: `Attendance (${attendance.length})` },
+    { key: 'waivers', label: `Waivers (${signatures.length})` },
+  ]
+
+  const stripeCount = member.stripe_count ?? 0
 
   const handleInvitePortal = async () => {
     if (!member?.email) {
@@ -132,17 +160,6 @@ export default function MemberDetailPage() {
     setWaiverLinkMsg(res.ok ? 'Waiver link sent.' : (res.error ?? 'Failed to send waiver link'))
   }
 
-  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
-  if (!member) return <div className="p-8 text-gray-400">Member not found.</div>
-
-  const tabs: { key: typeof activeTab; label: string }[] = [
-    { key: 'info', label: 'Info' },
-    { key: 'notes', label: 'Notes' },
-    { key: 'contacts', label: 'Contacts' },
-    { key: 'attendance', label: `Attendance (${attendance.length})` },
-    { key: 'waivers', label: `Waivers (${signatures.length})` },
-  ]
-
   return (
     <div className="p-6 md:p-8 max-w-2xl mx-auto space-y-6">
       <button onClick={() => router.push('/members')} className="text-sm text-gray-400 hover:text-white flex items-center gap-1">
@@ -155,7 +172,13 @@ export default function MemberDetailPage() {
             <h1 className="text-2xl font-bold text-white">{member.first_name} {member.last_name}</h1>
             <p className="text-white/40 text-sm">{member.email}</p>
           </div>
-          <button onClick={handleDelete} className="text-red-500 text-sm hover:underline">Delete</button>
+          <button
+            onClick={() => void handleArchive()}
+            disabled={archiving || member.status === 'inactive'}
+            className="text-amber-400 text-sm hover:underline disabled:opacity-40"
+          >
+            {archiving ? 'Archiving…' : 'Archive'}
+          </button>
         </div>
 
         <div className="flex gap-1 bg-white/5 rounded-xl p-1">
@@ -182,6 +205,28 @@ export default function MemberDetailPage() {
                 <option key={b} value={b} className="bg-gray-900">{b}</option>
               ))}
             </select>
+          </div>
+          <div className="flex justify-between border-b border-white/10 pb-3">
+            <span className="text-gray-400 text-sm">Stripes</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={stripeUpdating || stripeCount <= 0}
+                onClick={() => void handleStripeChange(stripeCount - 1)}
+                className="w-7 h-7 rounded-lg bg-white/5 text-white/60 hover:text-white disabled:opacity-30"
+              >
+                −
+              </button>
+              <span className="text-white text-sm w-4 text-center">{stripeCount}</span>
+              <button
+                type="button"
+                disabled={stripeUpdating || stripeCount >= 4}
+                onClick={() => void handleStripeChange(stripeCount + 1)}
+                className="w-7 h-7 rounded-lg bg-white/5 text-white/60 hover:text-white disabled:opacity-30"
+              >
+                +
+              </button>
+            </div>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-400 text-sm">Status</span>

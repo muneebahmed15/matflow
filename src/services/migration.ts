@@ -111,8 +111,10 @@ export async function importMembersFromRows(
       if (row.external_id) {
         await admin
           .from('members')
-          .update({ external_id: row.external_id })
+          .update({ external_id: row.external_id, import_job_id: job.id })
           .eq('id', member.id);
+      } else {
+        await admin.from('members').update({ import_job_id: job.id }).eq('id', member.id);
       }
 
       success++;
@@ -195,7 +197,7 @@ export async function importLeadsFromRows(
     }
 
     try {
-      await createLead({
+      const lead = await createLead({
         gymId,
         firstName: row.first_name,
         lastName: row.last_name,
@@ -203,7 +205,9 @@ export async function importLeadsFromRows(
         phone: row.phone,
         source: row.source ?? 'import',
         notes: row.notes,
+        skipAutomation: true,
       });
+      await admin.from('leads').update({ import_job_id: job.id }).eq('id', lead.id);
       success++;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Import failed';
@@ -249,4 +253,61 @@ export async function getImportJobErrors(jobId: string, gymId: string) {
 
   if (error) throw new ServiceError(500, error.message);
   return data ?? [];
+}
+
+export async function rollbackImportJob(gymId: string, jobId: string): Promise<{ removed: number }> {
+  const admin = getAdminClient();
+
+  const { data: job, error: jobError } = await admin
+    .from('import_jobs')
+    .select('id, import_type, status, rolled_back_at')
+    .eq('id', jobId)
+    .eq('gym_id', gymId)
+    .maybeSingle();
+
+  if (jobError) throw new ServiceError(500, jobError.message);
+  if (!job) throw new ServiceError(404, 'Import job not found');
+  if (job.rolled_back_at) throw new ServiceError(400, 'Import job was already rolled back.');
+  if (job.status !== 'completed') {
+    throw new ServiceError(400, 'Only completed imports can be rolled back.');
+  }
+
+  let removed = 0;
+
+  if (job.import_type === 'members') {
+    const { data: members } = await admin
+      .from('members')
+      .select('id')
+      .eq('gym_id', gymId)
+      .eq('import_job_id', jobId);
+
+    const ids = (members ?? []).map((m) => m.id);
+    if (ids.length > 0) {
+      const { error } = await admin.from('members').delete().in('id', ids);
+      if (error) throw new ServiceError(500, error.message);
+      removed = ids.length;
+    }
+  } else if (job.import_type === 'leads') {
+    const { data: leads } = await admin
+      .from('leads')
+      .select('id')
+      .eq('gym_id', gymId)
+      .eq('import_job_id', jobId);
+
+    const ids = (leads ?? []).map((l) => l.id);
+    if (ids.length > 0) {
+      const { error } = await admin.from('leads').delete().in('id', ids);
+      if (error) throw new ServiceError(500, error.message);
+      removed = ids.length;
+    }
+  } else {
+    throw new ServiceError(400, 'Rollback is not supported for this import type.');
+  }
+
+  await admin
+    .from('import_jobs')
+    .update({ rolled_back_at: new Date().toISOString(), status: 'rolled_back' })
+    .eq('id', jobId);
+
+  return { removed };
 }
