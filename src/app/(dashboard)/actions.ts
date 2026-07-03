@@ -37,6 +37,7 @@ import {
   updateStaffRole,
 } from '@/services/staff';
 import { inviteMemberToPortal } from '@/services/member-invite';
+import { sendWaiverLinkToMember } from '@/services/waiver-reminders';
 import { sendMemberNotification } from '@/services/notifications';
 import { checkRateLimit } from '@/lib/rate-limit';
 import type { StaffRole } from '@/lib/auth/staff';
@@ -507,6 +508,21 @@ export async function inviteMemberToPortalAction(
       return { ok: false, error: 'Too many invites. Try again later.' };
     }
     await inviteMemberToPortal({ gymId: auth.gymId, memberId });
+    revalidatePath(`/members/${memberId}`);
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function sendWaiverLinkAction(memberId: string): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession();
+    const limit = await checkRateLimit(`waiver-link:${auth.user.id}`, 30, 60 * 60 * 1000);
+    if (!limit.allowed) {
+      return { ok: false, error: 'Too many waiver emails. Try again later.' };
+    }
+    await sendWaiverLinkToMember({ gymId: auth.gymId, memberId });
     revalidatePath(`/members/${memberId}`);
     return { ok: true };
   } catch (error) {

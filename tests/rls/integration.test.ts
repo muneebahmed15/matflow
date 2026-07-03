@@ -10,23 +10,56 @@
  */
 import { describe, expect, it } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
+import { seedFamilyWaiverFixture, signInPortalMember } from './fixtures/family-portal';
 
 const testUrl = process.env.SUPABASE_TEST_URL;
 const testAnonKey = process.env.SUPABASE_TEST_ANON_KEY;
-const enabled = Boolean(testUrl && testAnonKey);
+const testServiceKey = process.env.SUPABASE_TEST_SERVICE_ROLE_KEY;
+const enabled = Boolean(testUrl && testAnonKey && testServiceKey);
 
 describe.skipIf(!enabled)('RLS integration', () => {
   it('anon cannot list all members without kiosk context', async () => {
     const supabase = createClient(testUrl!, testAnonKey!);
     const { data, error } = await supabase.from('members').select('id').limit(5);
-    // With RLS enabled and no kiosk policy match, expect empty or error
     expect(error !== null || (data?.length ?? 0) === 0).toBe(true);
   });
 
-  it('family portal can read dependent waiver signatures after rbac migration', async () => {
-    // Requires SUPABASE_TEST_* plus seeded family fixtures (primary + dependent, shared family_id).
-    // Validates waiver_signatures_member_select uses can_access_member(member_id).
-    expect(true).toBe(true);
+  it('primary portal member can read dependent waiver signatures after rbac migration', async () => {
+    const fixture = await seedFamilyWaiverFixture();
+
+    try {
+      const portal = await signInPortalMember(fixture.primaryEmail, fixture.primaryPassword);
+
+      const { data, error } = await portal
+        .from('waiver_signatures')
+        .select('id, member_id, waiver_id')
+        .eq('member_id', fixture.dependentMemberId);
+
+      expect(error).toBeNull();
+      expect(data?.some((row) => row.id === fixture.signatureId)).toBe(true);
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it('primary portal member cannot read unrelated gym waiver signatures', async () => {
+    const fixture = await seedFamilyWaiverFixture();
+    const other = await seedFamilyWaiverFixture();
+
+    try {
+      const portal = await signInPortalMember(fixture.primaryEmail, fixture.primaryPassword);
+
+      const { data, error } = await portal
+        .from('waiver_signatures')
+        .select('id')
+        .eq('member_id', other.dependentMemberId);
+
+      expect(error).toBeNull();
+      expect(data?.length ?? 0).toBe(0);
+    } finally {
+      await fixture.cleanup();
+      await other.cleanup();
+    }
   });
 });
 

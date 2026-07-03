@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test e2e/smoke.spec.ts",
+    "test:e2e:waiver": "playwright test e2e/waiver-checkin.spec.ts",
     "test:rls": "vitest run --config vitest.rls.config.ts",
     "db:start": "npx supabase start",
     "db:stop": "npx supabase stop",

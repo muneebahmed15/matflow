@@ -64,6 +64,24 @@ Then run backfills:
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only service role |
 
+Optional for RLS integration tests (`npm run test:rls`):
+
+| Variable | Description |
+|----------|-------------|
+| `SUPABASE_TEST_URL` | Dedicated test project URL |
+| `SUPABASE_TEST_ANON_KEY` | Test project anon key |
+| `SUPABASE_TEST_SERVICE_ROLE_KEY` | Test project service role (fixture seeding) |
+
+## Cron jobs
+
+Secure with `Authorization: Bearer $CRON_SECRET`:
+
+| Route | Purpose |
+|-------|---------|
+| `GET /api/cron/daily-digest` | Owner daily business digest |
+| `GET /api/cron/lead-reminders` | Stale lead follow-ups |
+| `GET /api/cron/waiver-expiry-reminders` | Email members 7 days before waiver expiry |
+
 In development, if `.env.local` still has placeholder values, the app falls back to standard local Supabase keys (`http://127.0.0.1:54321`).
 
 ## Health check

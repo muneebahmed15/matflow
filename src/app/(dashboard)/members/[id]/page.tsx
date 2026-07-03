@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { getMemberSignatures } from '@/lib/waivers'
 import { redirectTo } from '@/lib/navigation'
 import { getCurrentStaffInfo } from '@/lib/permissions'
-import { inviteMemberToPortalAction } from '@/app/(dashboard)/actions'
+import { inviteMemberToPortalAction, sendWaiverLinkAction } from '@/app/(dashboard)/actions'
 import MemberNotesPanel from '@/components/members/MemberNotesPanel'
 import MemberEmergencyContactsPanel from '@/components/members/MemberEmergencyContactsPanel'
 
@@ -36,6 +36,8 @@ export default function MemberDetailPage() {
   const [subscribing, setSubscribing] = useState(false)
   const [inviting, setInviting] = useState(false)
   const [inviteMsg, setInviteMsg] = useState('')
+  const [sendingWaiverLink, setSendingWaiverLink] = useState(false)
+  const [waiverLinkMsg, setWaiverLinkMsg] = useState('')
   const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'waivers' | 'notes' | 'contacts'>('info')
 
   useEffect(() => {
@@ -118,6 +120,18 @@ export default function MemberDetailPage() {
     setInviteMsg(res.ok ? 'Portal invite sent.' : (res.error ?? 'Invite failed'))
   }
 
+  const handleSendWaiverLink = async () => {
+    if (!member?.email) {
+      setWaiverLinkMsg('Add an email address first.')
+      return
+    }
+    setSendingWaiverLink(true)
+    setWaiverLinkMsg('')
+    const res = await sendWaiverLinkAction(member.id)
+    setSendingWaiverLink(false)
+    setWaiverLinkMsg(res.ok ? 'Waiver link sent.' : (res.error ?? 'Failed to send waiver link'))
+  }
+
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
   if (!member) return <div className="p-8 text-gray-400">Member not found.</div>
 
@@ -186,6 +200,14 @@ export default function MemberDetailPage() {
               {inviting ? 'Sending invite...' : 'Invite to member portal'}
             </button>
             {inviteMsg && <p className="text-xs text-white/40 mt-1">{inviteMsg}</p>}
+            <button
+              onClick={() => void handleSendWaiverLink()}
+              disabled={sendingWaiverLink || !member.email}
+              className="block text-sm text-blue-400 hover:underline disabled:opacity-40 mt-2"
+            >
+              {sendingWaiverLink ? 'Sending waiver link...' : 'Email waiver sign link'}
+            </button>
+            {waiverLinkMsg && <p className="text-xs text-white/40 mt-1">{waiverLinkMsg}</p>}
           </div>
           <a href={`/waivers/${id}/sign-waiver`}
             className="block w-full text-center border border-white/10 text-gray-300 py-2 rounded-xl text-sm hover:bg-white/5 transition mt-2">

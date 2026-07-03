@@ -161,6 +161,60 @@ export function memberPortalInviteEmail(input: {
   };
 }
 
+export function memberWaiverLinkEmail(input: {
+  fullName: string;
+  gymName: string;
+  portalUrl: string;
+}): SendEmailInput {
+  const subject = `Sign your waiver for ${input.gymName}`;
+  const text = [
+    `Hi ${input.fullName},`,
+    '',
+    `${input.gymName} needs you to review and sign your waiver before your next visit.`,
+    'Open the member portal to sign:',
+    input.portalUrl,
+  ].join('\n');
+
+  return {
+    to: '',
+    subject,
+    text,
+    html: `
+      <p>Hi ${escapeHtml(input.fullName)},</p>
+      <p><strong>${escapeHtml(input.gymName)}</strong> needs you to review and sign your waiver before your next visit.</p>
+      <p><a href="${escapeHtml(input.portalUrl)}">Sign waiver in member portal</a></p>
+    `.trim(),
+  };
+}
+
+export function waiverExpiryReminderEmail(input: {
+  fullName: string;
+  gymName: string;
+  waiverTitle: string;
+  expiresLabel: string;
+  portalUrl: string;
+}): SendEmailInput {
+  const subject = `Your ${input.waiverTitle} expires on ${input.expiresLabel}`;
+  const text = [
+    `Hi ${input.fullName},`,
+    '',
+    `Your signed waiver "${input.waiverTitle}" at ${input.gymName} expires on ${input.expiresLabel}.`,
+    'Please sign an updated waiver before your next check-in:',
+    input.portalUrl,
+  ].join('\n');
+
+  return {
+    to: '',
+    subject,
+    text,
+    html: `
+      <p>Hi ${escapeHtml(input.fullName)},</p>
+      <p>Your signed waiver <strong>${escapeHtml(input.waiverTitle)}</strong> at <strong>${escapeHtml(input.gymName)}</strong> expires on <strong>${escapeHtml(input.expiresLabel)}</strong>.</p>
+      <p><a href="${escapeHtml(input.portalUrl)}">Sign an updated waiver</a></p>
+    `.trim(),
+  };
+}
+
 export function waitlistPromotedEmail(input: {
   memberName: string;
   className: string;
