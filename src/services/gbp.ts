@@ -271,3 +271,261 @@ export async function syncGbpHoursFromSchedule(gymId: string): Promise<{
 
   return { synced: true, periods, message: `Synced ${periods.length} day(s) of hours to Google Business Profile.` };
 }
+
+function resolveLocationResource(locationId: string): string {
+  if (locationId.startsWith('locations/')) return locationId;
+  return `locations/${locationId}`;
+}
+
+async function requireGbpAccess(gymId: string): Promise<{ accessToken: string; locationId: string }> {
+  const admin = getAdminClient();
+  const { data: conn } = await admin
+    .from('gbp_connections')
+    .select('location_id')
+    .eq('gym_id', gymId)
+    .maybeSingle();
+
+  if (!conn?.location_id) throw new ServiceError(400, 'Connect Google Business Profile first.');
+
+  const accessToken = await refreshGbpAccessToken(gymId);
+  if (!accessToken) throw new ServiceError(503, 'Could not obtain GBP access token.');
+
+  return { accessToken, locationId: conn.location_id };
+}
+
+export type GbpLocalPost = {
+  id: string;
+  summary: string;
+  body: string | null;
+  status: string;
+  external_id: string | null;
+  posted_at: string | null;
+  created_at: string;
+};
+
+export async function listGbpLocalPosts(gymId: string): Promise<GbpLocalPost[]> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('gbp_local_posts')
+    .select('id, summary, body, status, external_id, posted_at, created_at')
+    .eq('gym_id', gymId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new ServiceError(500, error.message);
+  return (data ?? []) as GbpLocalPost[];
+}
+
+export async function createAndPublishGbpPost(
+  gymId: string,
+  input: { summary: string; body?: string }
+): Promise<{ post: GbpLocalPost; synced: boolean; message: string }> {
+  const summary = input.summary.trim();
+  if (!summary) throw new ServiceError(400, 'Post summary is required.');
+
+  const admin = getAdminClient();
+  const { data: draft, error: insertError } = await admin
+    .from('gbp_local_posts')
+    .insert({
+      gym_id: gymId,
+      summary,
+      body: input.body?.trim() || null,
+      status: 'draft',
+    })
+    .select('id, summary, body, status, external_id, posted_at, created_at')
+    .single();
+
+  if (insertError || !draft) throw new ServiceError(500, insertError?.message ?? 'Could not save post');
+
+  try {
+    const { accessToken, locationId } = await requireGbpAccess(gymId);
+    const locationName = resolveLocationResource(locationId);
+    const res = await fetch(`https://mybusiness.googleapis.com/v4/${locationName}/localPosts`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        languageCode: 'en-US',
+        summary,
+        callToAction: { actionType: 'LEARN_MORE', url: getPublicEnv().NEXT_PUBLIC_APP_URL },
+        topicType: 'STANDARD',
+      }),
+    });
+
+    const payload = (await res.json()) as { name?: string; error?: { message?: string } };
+    if (!res.ok) {
+      const message = payload.error?.message ?? 'GBP API rejected the post.';
+      await admin
+        .from('gbp_local_posts')
+        .update({ status: 'failed', error_message: message })
+        .eq('id', draft.id);
+      return { post: draft as GbpLocalPost, synced: false, message };
+    }
+
+    const { data: posted } = await admin
+      .from('gbp_local_posts')
+      .update({
+        status: 'posted',
+        external_id: payload.name ?? null,
+        posted_at: new Date().toISOString(),
+      })
+      .eq('id', draft.id)
+      .select('id, summary, body, status, external_id, posted_at, created_at')
+      .single();
+
+    return {
+      post: (posted ?? draft) as GbpLocalPost,
+      synced: true,
+      message: 'Posted to Google Business Profile.',
+    };
+  } catch (err) {
+    const message = err instanceof ServiceError ? err.message : 'GBP post failed.';
+    await admin.from('gbp_local_posts').update({ status: 'failed', error_message: message }).eq('id', draft.id);
+    return { post: draft as GbpLocalPost, synced: false, message };
+  }
+}
+
+export type GbpReviewRow = {
+  id: string;
+  external_review_id: string;
+  author_name: string | null;
+  rating: number | null;
+  comment: string | null;
+  review_reply: string | null;
+  replied_at: string | null;
+  imported_at: string;
+};
+
+export async function listGbpReviews(gymId: string): Promise<GbpReviewRow[]> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('gbp_reviews_cache')
+    .select('*')
+    .eq('gym_id', gymId)
+    .order('imported_at', { ascending: false });
+
+  if (error) throw new ServiceError(500, error.message);
+  return (data ?? []) as GbpReviewRow[];
+}
+
+export async function importGbpReviews(gymId: string): Promise<{ imported: number; message: string }> {
+  const admin = getAdminClient();
+
+  try {
+    const { accessToken, locationId } = await requireGbpAccess(gymId);
+    const locationName = resolveLocationResource(locationId);
+    const res = await fetch(`https://mybusiness.googleapis.com/v4/${locationName}/reviews`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    const payload = (await res.json()) as {
+      reviews?: Array<{
+        reviewId?: string;
+        name?: string;
+        reviewer?: { displayName?: string };
+        starRating?: string;
+        comment?: string;
+        reviewReply?: { comment?: string; updateTime?: string };
+      }>;
+      error?: { message?: string };
+    };
+
+    if (!res.ok) {
+      return { imported: 0, message: payload.error?.message ?? 'Could not fetch GBP reviews.' };
+    }
+
+    const ratingMap: Record<string, number> = {
+      ONE: 1,
+      TWO: 2,
+      THREE: 3,
+      FOUR: 4,
+      FIVE: 5,
+    };
+
+    let imported = 0;
+    for (const review of payload.reviews ?? []) {
+      const externalId = review.reviewId ?? review.name ?? '';
+      if (!externalId) continue;
+
+      const { error } = await admin.from('gbp_reviews_cache').upsert(
+        {
+          gym_id: gymId,
+          external_review_id: externalId,
+          author_name: review.reviewer?.displayName ?? null,
+          rating: review.starRating ? ratingMap[review.starRating] ?? null : null,
+          comment: review.comment ?? null,
+          review_reply: review.reviewReply?.comment ?? null,
+          replied_at: review.reviewReply?.updateTime ?? null,
+          imported_at: new Date().toISOString(),
+        },
+        { onConflict: 'gym_id,external_review_id' }
+      );
+
+      if (!error) imported += 1;
+    }
+
+    return { imported, message: `Imported ${imported} review(s) from Google.` };
+  } catch (err) {
+    const message = err instanceof ServiceError ? err.message : 'GBP import failed.';
+    return { imported: 0, message };
+  }
+}
+
+export async function replyToGbpReview(
+  gymId: string,
+  reviewCacheId: string,
+  replyText: string
+): Promise<{ synced: boolean; message: string }> {
+  const text = replyText.trim();
+  if (!text) throw new ServiceError(400, 'Reply text is required.');
+
+  const admin = getAdminClient();
+  const { data: review } = await admin
+    .from('gbp_reviews_cache')
+    .select('external_review_id')
+    .eq('id', reviewCacheId)
+    .eq('gym_id', gymId)
+    .maybeSingle();
+
+  if (!review) throw new ServiceError(404, 'Review not found.');
+
+  try {
+    const { accessToken } = await requireGbpAccess(gymId);
+    const reviewName = review.external_review_id.includes('/')
+      ? review.external_review_id
+      : `reviews/${review.external_review_id}`;
+
+    const res = await fetch(`https://mybusiness.googleapis.com/v4/${reviewName}/reply`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ comment: text }),
+    });
+
+    if (!res.ok) {
+      const payload = (await res.json()) as { error?: { message?: string } };
+      return { synced: false, message: payload.error?.message ?? 'GBP rejected the reply.' };
+    }
+
+    await admin
+      .from('gbp_reviews_cache')
+      .update({ review_reply: text, replied_at: new Date().toISOString() })
+      .eq('id', reviewCacheId);
+
+    return { synced: true, message: 'Reply posted to Google.' };
+  } catch (err) {
+    const message = err instanceof ServiceError ? err.message : 'Reply failed.';
+    return { synced: false, message };
+  }
+}
+
+export async function importGbpLocationData(gymId: string): Promise<{ message: string }> {
+  const reviewResult = await importGbpReviews(gymId);
+  const hoursResult = await syncGbpHoursFromSchedule(gymId);
+  return {
+    message: `${reviewResult.message} ${hoursResult.message}`.trim(),
+  };
+}

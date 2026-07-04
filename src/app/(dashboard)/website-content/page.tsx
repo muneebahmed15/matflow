@@ -20,7 +20,9 @@ import {
   suggestSeoKeywordsAction,
   getGymSettingsAction,
   updateGymSettingsAction,
+  generateBlogDraftAction,
 } from '@/app/(dashboard)/actions';
+import BlogRichTextEditor from '@/components/marketing/BlogRichTextEditor';
 
 type StaffOption = { id: string; full_name: string; role: string };
 
@@ -43,6 +45,7 @@ export default function WebsiteContentPage() {
   const [blogTitle, setBlogTitle] = useState('');
   const [blogExcerpt, setBlogExcerpt] = useState('');
   const [blogBody, setBlogBody] = useState('');
+  const [blogTopic, setBlogTopic] = useState('');
   const [editingProgramId, setEditingProgramId] = useState<string | null>(null);
   const [editProgName, setEditProgName] = useState('');
   const [editProgDesc, setEditProgDesc] = useState('');
@@ -339,7 +342,20 @@ export default function WebsiteContentPage() {
         <h2 className="font-semibold text-white">Blog</h2>
         <input value={blogTitle} onChange={(e) => setBlogTitle(e.target.value)} placeholder="Post title" className={inputClass} />
         <input value={blogExcerpt} onChange={(e) => setBlogExcerpt(e.target.value)} placeholder="Excerpt (for SEO)" className={inputClass} />
-        <textarea value={blogBody} onChange={(e) => setBlogBody(e.target.value)} placeholder="HTML body" rows={5} className={inputClass} />
+        <BlogRichTextEditor value={blogBody} onChange={setBlogBody} />
+        <div className="flex flex-wrap gap-2">
+          <input value={blogTopic} onChange={(e) => setBlogTopic(e.target.value)} placeholder="AI topic (optional)" className={inputClass} />
+          <button
+            type="button"
+            onClick={async () => {
+              const res = await generateBlogDraftAction({ topic: blogTopic });
+              if (res.ok && res.data) setBlogBody(res.data.text);
+            }}
+            className="shrink-0 bg-white/10 hover:bg-white/15 text-white text-sm font-semibold px-4 py-2 rounded-xl"
+          >
+            AI draft
+          </button>
+        </div>
         <button
           onClick={async () => {
             await createBlogPostAction({ title: blogTitle, excerpt: blogExcerpt, bodyHtml: blogBody });

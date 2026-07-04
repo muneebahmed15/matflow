@@ -10,13 +10,13 @@
 ## Google Business Profile
 - [x] 11.6 GBP OAuth connection (`src/services/gbp.ts` + settings UI)
 - [x] 11.7 Sync hours from class schedule (`syncGbpHoursFromSchedule` + Settings button)
-- [ ] 11.8 Post updates from dashboard
-- [ ] 11.9 Reply to reviews from MatsFlow
+- [x] 11.8 Post updates from dashboard (`createAndPublishGbpPost` + Marketing GBP panel)
+- [x] 11.9 Reply to reviews from MatsFlow (`replyToGbpReview` + cached reviews UI)
 
 ## Blog
 - [x] 11.10 `blog_posts` table per gym
-- [ ] 11.11 Rich text editor
-- [ ] 11.12 AI blog draft generator
+- [x] 11.11 Rich text editor (`BlogRichTextEditor` toolbar for blog HTML)
+- [x] 11.12 AI blog draft generator (`generateBlogDraftAction` + template/OpenAI fallback)
 - [x] 11.13 SEO score for post (`computeSeoScore`)
 - [x] 11.14 Publish to public site `/g/[slug]/blog`
 
@@ -39,13 +39,13 @@
 - [x] 11.27 Track review conversion (`link_clicked_at` + tracked review-click URL + dashboard stats)
 
 ## Social Content
-- [ ] 11.28 AI generate Instagram caption
+- [x] 11.28 AI generate Instagram caption (`generateInstagramCaptionAction`)
 - [x] 11.29 Promotion announcement template (campaign template)
-- [ ] 11.30 Export image with gym branding
+- [x] 11.30 Export image with gym branding (`SocialPromoExporter` canvas PNG)
 - [ ] 11.31 Schedule posts (Buffer integration future)
 
 ## Ads — Future
-- [ ] 11.32 Google Ads conversion pixel hook
+- [x] 11.32 Google Ads conversion pixel hook (`google_ads_conversion_id` + MarketingPixels)
 - [x] 11.33 Meta Ads pixel hook (MarketingPixels)
 - [x] 11.34 ROAS dashboard (campaign engagement + ad spend)
 
@@ -74,7 +74,7 @@
 - [x] 11.48 Sandbox email send in dev (logs when Resend unconfigured)
 
 ## East Coast MMA Pilot
-- [ ] 11.49 Import existing GBP data
+- [x] 11.49 Import existing GBP data (`importGbpLocationData` — reviews + hours)
 - [x] 11.50 First email campaign template
 - [x] 11.51 Review request after Nth check-in (configurable `review_checkin_threshold`, default 5)
 - [x] 11.52 Marketing module feature flag (`gyms.marketing_enabled` + nav gate)

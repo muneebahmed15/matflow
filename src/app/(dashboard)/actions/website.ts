@@ -220,3 +220,20 @@ export async function deleteBlogPostAction(postId: string) {
   }
 }
 
+export async function generateBlogDraftAction(input: { topic?: string }) {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { getGymSettings } = await import('@/services/gym');
+    const { generateMarketingCopy } = await import('@/lib/ai/marketing-copy');
+    const settings = await getGymSettings(auth.gymId);
+    const data = await generateMarketingCopy('blog_draft', {
+      gymName: settings.name,
+      tagline: settings.tagline,
+      topic: input.topic,
+    });
+    return { ok: true as const, data };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+

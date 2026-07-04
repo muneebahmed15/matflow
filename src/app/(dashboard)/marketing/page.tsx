@@ -17,7 +17,10 @@ import {
   createSmsCampaignAction,
   sendSmsCampaignAction,
   getGymSettingsAction,
+  generateInstagramCaptionAction,
 } from '@/app/(dashboard)/actions';
+import GbpMarketingPanel from '@/components/marketing/GbpMarketingPanel';
+import SocialPromoExporter from '@/components/marketing/SocialPromoExporter';
 import { CAMPAIGN_TEMPLATES } from '@/lib/campaign-templates';
 import { computeCampaignRoas, summarizeCampaignRoas } from '@/lib/campaign-roas';
 import { smsSegmentInfo } from '@/lib/sms-segments';
@@ -57,6 +60,15 @@ export default function MarketingPage() {
   const [smsName, setSmsName] = useState('');
   const [smsBody, setSmsBody] = useState('');
   const [smsAudience, setSmsAudience] = useState('active_members');
+  const [gymBranding, setGymBranding] = useState<{
+    name: string;
+    tagline: string | null;
+    logo_url: string | null;
+    primary_color: string | null;
+  } | null>(null);
+  const [instagramTopic, setInstagramTopic] = useState('');
+  const [instagramCaption, setInstagramCaption] = useState('');
+  const [promoHeadline, setPromoHeadline] = useState('New student special this month!');
 
   const smsPreview = smsSegmentInfo(smsBody);
 
@@ -64,6 +76,12 @@ export default function MarketingPage() {
     const settingsRes = await getGymSettingsAction();
     if (settingsRes.ok && settingsRes.data) {
       setMarketingEnabled(settingsRes.data.marketing_enabled);
+      setGymBranding({
+        name: settingsRes.data.name,
+        tagline: settingsRes.data.tagline,
+        logo_url: settingsRes.data.logo_url,
+        primary_color: settingsRes.data.primary_color,
+      });
       if (!settingsRes.data.marketing_enabled) {
         setLoading(false);
         return;
@@ -366,6 +384,48 @@ export default function MarketingPage() {
           ))}
         </div>
       )}
+
+      <GbpMarketingPanel />
+
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8 space-y-3">
+        <h2 className="font-semibold text-white">Social content</h2>
+        <input
+          value={instagramTopic}
+          onChange={(e) => setInstagramTopic(e.target.value)}
+          placeholder="Topic (e.g. kids BJJ summer camp)"
+          className={inputClass}
+        />
+        <button
+          type="button"
+          onClick={async () => {
+            const res = await generateInstagramCaptionAction({ topic: instagramTopic });
+            if (res.ok && res.data) setInstagramCaption(res.data.text);
+          }}
+          className="bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-xl"
+        >
+          Generate Instagram caption
+        </button>
+        {instagramCaption && (
+          <textarea value={instagramCaption} readOnly rows={4} className={inputClass} />
+        )}
+        {gymBranding && (
+          <>
+            <input
+              value={promoHeadline}
+              onChange={(e) => setPromoHeadline(e.target.value)}
+              placeholder="Promo headline for image export"
+              className={inputClass}
+            />
+            <SocialPromoExporter
+              gymName={gymBranding.name}
+              tagline={gymBranding.tagline}
+              logoUrl={gymBranding.logo_url}
+              primaryColor={gymBranding.primary_color}
+              headline={promoHeadline}
+            />
+          </>
+        )}
+      </div>
 
       <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8 space-y-3">
         <h2 className="font-semibold text-white">SMS Campaign</h2>

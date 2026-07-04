@@ -28,6 +28,15 @@ import { getMember } from '@/services/members';
 
 import { listCampaigns, createCampaign, sendCampaign, requestReview, updateCampaignAdSpend, getReviewConversionStats } from '@/services/marketing';
 import { createSmsCampaign, listSmsCampaigns, sendSmsCampaign } from '@/services/sms-campaigns';
+import {
+  createAndPublishGbpPost,
+  importGbpLocationData,
+  listGbpLocalPosts,
+  listGbpReviews,
+  replyToGbpReview,
+} from '@/services/gbp';
+import { generateMarketingCopy } from '@/lib/ai/marketing-copy';
+import { getGymSettings } from '@/services/gym';
 
 
 
@@ -175,6 +184,72 @@ export async function sendSmsCampaignAction(campaignId: string) {
   try {
     const auth = await requireStaffSession({ adminOnly: true });
     return { ok: true as const, data: await sendSmsCampaign(auth.gymId, campaignId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function listGbpPostsAction() {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    return { ok: true as const, data: await listGbpLocalPosts(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function createGbpPostAction(input: { summary: string; body?: string }) {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const data = await createAndPublishGbpPost(auth.gymId, input);
+    revalidatePath('/marketing');
+    return { ok: true as const, data };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function listGbpReviewsAction() {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    return { ok: true as const, data: await listGbpReviews(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function replyGbpReviewAction(reviewId: string, replyText: string) {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const data = await replyToGbpReview(auth.gymId, reviewId, replyText);
+    revalidatePath('/marketing');
+    return { ok: true as const, data };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function importGbpDataAction() {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const data = await importGbpLocationData(auth.gymId);
+    revalidatePath('/marketing');
+    return { ok: true as const, data };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function generateInstagramCaptionAction(input: { topic?: string }) {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const settings = await getGymSettings(auth.gymId);
+    const data = await generateMarketingCopy('instagram_caption', {
+      gymName: settings.name,
+      tagline: settings.tagline,
+      topic: input.topic,
+    });
+    return { ok: true as const, data };
   } catch (error) {
     return toActionError(error);
   }

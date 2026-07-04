@@ -8,8 +8,9 @@ type Props = { gym: PublicGymProfile };
 export default function MarketingPixels({ gym }: Props) {
   const ga4 = gym.ga4_measurement_id;
   const metaPixel = gym.meta_pixel_id;
+  const googleAds = gym.google_ads_conversion_id;
 
-  if (!ga4 && !metaPixel) return null;
+  if (!ga4 && !metaPixel && !googleAds) return null;
 
   return (
     <>
@@ -25,6 +26,22 @@ export default function MarketingPixels({ gym }: Props) {
               function gtag(){dataLayer.push(arguments);}
               gtag('js', new Date());
               gtag('config', '${ga4}');
+            `}
+          </Script>
+        </>
+      )}
+      {googleAds && (
+        <>
+          <Script
+            src={`https://www.googletagmanager.com/gtag/js?id=${googleAds}`}
+            strategy="afterInteractive"
+          />
+          <Script id={`gads-${gym.id}`} strategy="afterInteractive">
+            {`
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', '${googleAds}');
             `}
           </Script>
         </>

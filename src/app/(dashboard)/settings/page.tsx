@@ -72,6 +72,7 @@ export default function SettingsPage() {
       ga4MeasurementId: settings.ga4_measurement_id,
       metaPixelId: settings.meta_pixel_id,
       googlePlaceId: settings.google_place_id,
+      googleAdsConversionId: settings.google_ads_conversion_id,
       reviewCheckinThreshold: settings.review_checkin_threshold,
       requireWaiverForCheckin: settings.require_waiver_for_checkin,
       timezone: settings.timezone ?? 'America/New_York',
@@ -434,6 +435,15 @@ export default function SettingsPage() {
               value={settings.meta_pixel_id ?? ''}
               onChange={(e) => update({ meta_pixel_id: e.target.value || null })}
               placeholder="1234567890"
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Google Ads conversion ID</label>
+            <input
+              value={settings.google_ads_conversion_id ?? ''}
+              onChange={(e) => update({ google_ads_conversion_id: e.target.value || null })}
+              placeholder="AW-XXXXXXXXX"
               className={inputClass}
             />
           </div>

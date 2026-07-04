@@ -1369,6 +1369,94 @@ export type Database = {
           },
         ]
       }
+      gbp_local_posts: {
+        Row: {
+          body: string | null
+          created_at: string
+          error_message: string | null
+          external_id: string | null
+          gym_id: string
+          id: string
+          posted_at: string | null
+          status: string
+          summary: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          error_message?: string | null
+          external_id?: string | null
+          gym_id: string
+          id?: string
+          posted_at?: string | null
+          status?: string
+          summary: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          error_message?: string | null
+          external_id?: string | null
+          gym_id?: string
+          id?: string
+          posted_at?: string | null
+          status?: string
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gbp_local_posts_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gbp_reviews_cache: {
+        Row: {
+          author_name: string | null
+          comment: string | null
+          external_review_id: string
+          gym_id: string
+          id: string
+          imported_at: string
+          rating: number | null
+          replied_at: string | null
+          review_reply: string | null
+        }
+        Insert: {
+          author_name?: string | null
+          comment?: string | null
+          external_review_id: string
+          gym_id: string
+          id?: string
+          imported_at?: string
+          rating?: number | null
+          replied_at?: string | null
+          review_reply?: string | null
+        }
+        Update: {
+          author_name?: string | null
+          comment?: string | null
+          external_review_id?: string
+          gym_id?: string
+          id?: string
+          imported_at?: string
+          rating?: number | null
+          replied_at?: string | null
+          review_reply?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gbp_reviews_cache_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gym_coaches: {
         Row: {
           belt_rank: string | null
@@ -1727,6 +1815,7 @@ export type Database = {
           daily_digest_enabled: boolean
           ga4_measurement_id: string | null
           google_place_id: string | null
+          google_ads_conversion_id: string | null
           id: string
           kiosk_enabled: boolean
           locale: string
