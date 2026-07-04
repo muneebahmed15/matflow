@@ -160,7 +160,7 @@ export async function updateMember(
   fields: Partial<
     Pick<
       MemberRow,
-      'first_name' | 'last_name' | 'email' | 'phone' | 'belt_rank' | 'status' | 'email_opt_out' | 'marketing_email_consent' | 'sms_marketing_consent' | 'marketing_consent_at' | 'profile_photo_url'
+      'first_name' | 'last_name' | 'email' | 'phone' | 'belt_rank' | 'status' | 'email_opt_out' | 'marketing_email_consent' | 'sms_marketing_consent' | 'marketing_consent_at' | 'profile_photo_url' | 'tags'
     >
   > & {
     date_of_birth?: string | null;

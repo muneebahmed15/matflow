@@ -123,6 +123,7 @@ export async function updateMemberAction(
     email_opt_out: boolean;
     marketing_email_consent: boolean;
     sms_marketing_consent: boolean;
+    tags: string[];
   }>
 ): Promise<ActionResult<MemberDetail>> {
   try {

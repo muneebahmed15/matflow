@@ -24,7 +24,7 @@ function todayBounds(date?: string): { start: string; end: string; day: string }
 
 export async function listAttendance(
   gymId: string,
-  options?: { date?: string }
+  options?: { date?: string; locationId?: string | null }
 ): Promise<AttendanceWithMember[]> {
   const admin = getAdminClient();
   const { start, end } = todayBounds(options?.date);
@@ -37,6 +37,10 @@ export async function listAttendance(
 
   if (options?.date) {
     query = query.gte('checked_in_at', start).lte('checked_in_at', end);
+  }
+
+  if (options?.locationId) {
+    query = query.eq('location_id', options.locationId);
   }
 
   const { data, error } = await query;
@@ -65,6 +69,7 @@ export async function checkInMember(input: {
   checkedInBy?: string | null;
   notes?: string | null;
   classId?: string | null;
+  locationId?: string | null;
 }): Promise<AttendanceRow> {
   const admin = getAdminClient();
   const { start, end } = todayBounds();
@@ -87,12 +92,24 @@ export async function checkInMember(input: {
   await assertMemberWaiverCompliance(input.gymId, input.memberId);
 
   let classId: string | null = null;
+  let locationId: string | null = input.locationId ?? null;
+
+  if (locationId) {
+    const { data: location } = await admin
+      .from('gym_locations')
+      .select('id')
+      .eq('id', locationId)
+      .eq('gym_id', input.gymId)
+      .maybeSingle();
+    if (!location) throw new ServiceError(400, 'Invalid location for check-in.');
+  }
+
   if (input.classId) {
     const { weekdayNameForDate } = await import('@/lib/todays-classes');
     const today = new Date().toISOString().slice(0, 10);
     const { data: gymClass } = await admin
       .from('classes')
-      .select('id, day_of_week, instructor, is_active')
+      .select('id, day_of_week, instructor, is_active, location_id')
       .eq('id', input.classId)
       .eq('gym_id', input.gymId)
       .maybeSingle();
@@ -110,6 +127,7 @@ export async function checkInMember(input: {
     }
 
     classId = gymClass.id;
+    if (gymClass.location_id) locationId = gymClass.location_id;
   }
 
   const { data: existing } = await admin
@@ -133,6 +151,7 @@ export async function checkInMember(input: {
       notes: input.notes ?? null,
       checked_in_by: input.checkedInBy ?? null,
       class_id: classId,
+      location_id: locationId,
     })
     .select()
     .single();

@@ -5,7 +5,7 @@
 - [x] 6.2 Create waiver (done)
 - [x] 6.3 Toggle active/inactive (done)
 - [x] 6.4 Waiver list page (done)
-- [ ] 6.5 Waiver rich text editor
+- [x] 6.5 Waiver rich text editor
 - [x] 6.6 Waiver version numbering (`waivers.version`, bumped on content edit)
 - [x] 6.7 Waiver expires_at field (Wave 1)
 - [x] 6.8 Require re-sign on template update (compliance checks signed version)

@@ -14,6 +14,7 @@ import {
 } from '@/app/(dashboard)/actions';
 import type { LeadSummary } from '@/services/leads';
 import { useAppUi } from '@/components/ui/AppUiProvider';
+import LeadNotesPanel from '@/components/leads/LeadNotesPanel';
 import { ListSkeleton } from '@/components/LoadingSkeleton';
 
 interface StaffOption {
@@ -369,6 +370,7 @@ export default function LeadsPage() {
                   >
                     {notesSaving ? 'Saving...' : 'Save notes'}
                   </button>
+                  <LeadNotesPanel leadId={lead.id} />
                 </div>
               )}
             </div>

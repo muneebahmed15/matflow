@@ -45,7 +45,7 @@
 - [x] 5.34 List invoices from Stripe per member (`/api/portal/invoices`)
 - [x] 5.35 Invoice PDF download link
 - [x] 5.36 Invoice history in member portal
-- [ ] 5.37 Admin: all invoices report
+- [x] 5.37 Admin: all invoices report
 
 ## Family Plans
 - [ ] 5.38 Family subscription links multiple members

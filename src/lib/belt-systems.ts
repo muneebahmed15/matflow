@@ -75,6 +75,12 @@ export function isDemotion(system: BeltSystem, fromBelt: string, toBelt: string)
   return to <= from;
 }
 
+export function nextBeltInSystem(system: BeltSystem, currentBelt: string): string | null {
+  const idx = beltIndex(system, currentBelt);
+  if (idx < 0 || idx >= system.belts.length - 1) return null;
+  return system.belts[idx + 1];
+}
+
 export type BeltRequirement = {
   belt: string;
   minAttendance: number;

@@ -1,8 +1,14 @@
 import { notFound } from 'next/navigation';
 import { getPublicGymBySlug } from '@/lib/gym-public';
 import { listPrograms } from '@/services/gym-content';
+import { resolveGymPageMetadata } from '@/lib/seo/gym-seo';
 
 type Props = { params: Promise<{ gymSlug: string }> };
+
+export async function generateMetadata({ params }: Props) {
+  const { gymSlug } = await params;
+  return resolveGymPageMetadata(gymSlug, { title: 'Programs', path: '/programs' });
+}
 
 export default async function GymProgramsPage({ params }: Props) {
   const { gymSlug } = await params;

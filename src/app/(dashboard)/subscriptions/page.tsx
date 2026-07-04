@@ -10,6 +10,8 @@ import {
   exportSubscriptionsCsvAction,
   createManualSubscriptionAction,
   getSubscriptionsPageDataAction,
+  listGymInvoicesAction,
+  exportGymInvoicesCsvAction,
 } from '@/app/(dashboard)/actions';
 import { useAppUi } from '@/components/ui/AppUiProvider';
 
@@ -49,11 +51,25 @@ function SubscriptionsContent() {
   const [manualMethod, setManualMethod] = useState<'cash' | 'check' | 'other'>('cash');
   const [submitting, setSubmitting] = useState(false);
   const [selectedSub, setSelectedSub] = useState<Subscription | null>(null);
+  const [invoices, setInvoices] = useState<
+    {
+      id: string;
+      number: string | null;
+      status: string | null;
+      amountCents: number;
+      created: number;
+      customerName: string | null;
+      customerEmail: string | null;
+      pdfUrl: string | null;
+      hostedUrl: string | null;
+    }[]
+  >([]);
 
   const load = async () => {
-    const [pageResult, metricsResult] = await Promise.all([
+    const [pageResult, metricsResult, invoicesResult] = await Promise.all([
       getSubscriptionsPageDataAction(),
       getRevenueMetricsAction(),
+      listGymInvoicesAction(),
     ]);
     if (pageResult.ok && pageResult.data) {
       setSubscriptions(pageResult.data.subscriptions);
@@ -61,6 +77,7 @@ function SubscriptionsContent() {
       setPlanOptions(pageResult.data.planOptions.map((p) => ({ id: p.id, label: p.name })));
     }
     if (metricsResult.ok && metricsResult.data) setMetrics(metricsResult.data);
+    if (invoicesResult.ok && invoicesResult.data) setInvoices(invoicesResult.data);
     setLoading(false);
   };
 
@@ -77,6 +94,21 @@ function SubscriptionsContent() {
     const a = document.createElement('a');
     a.href = url;
     a.download = 'subscriptions.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportInvoices = async () => {
+    const result = await exportGymInvoicesCsvAction();
+    if (!result.ok || !result.data) {
+      showError(!result.ok ? result.error : 'Export failed');
+      return;
+    }
+    const blob = new Blob([result.data], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'invoices.csv';
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -186,6 +218,43 @@ function SubscriptionsContent() {
           </div>
         </div>
       )}
+
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-5 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-white/40 text-xs font-semibold uppercase tracking-wider">Recent invoices</p>
+          <button
+            type="button"
+            onClick={() => void handleExportInvoices()}
+            className="text-xs text-blue-400 hover:underline"
+          >
+            Export CSV
+          </button>
+        </div>
+        {invoices.length === 0 ? (
+          <p className="text-white/30 text-sm">No Stripe invoices found for active customers.</p>
+        ) : (
+          <div className="space-y-2">
+            {invoices.slice(0, 12).map((inv) => (
+              <div key={inv.id} className="flex items-center justify-between text-sm bg-white/5 rounded-xl px-3 py-2">
+                <div>
+                  <p className="text-white">{inv.customerName ?? 'Customer'}</p>
+                  <p className="text-white/30 text-xs">
+                    {inv.number ?? inv.id} · {new Date(inv.created * 1000).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-white">${(inv.amountCents / 100).toFixed(2)}</p>
+                  {inv.pdfUrl ? (
+                    <a href={inv.pdfUrl} target="_blank" rel="noreferrer" className="text-blue-400 text-xs hover:underline">
+                      PDF
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {showManual && (
         <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-6 space-y-4">

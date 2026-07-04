@@ -96,6 +96,15 @@ describe('attendance service', () => {
 
       await expect(listAttendance('gym-1')).rejects.toBeInstanceOf(ServiceError);
     });
+
+    it('filters by location when locationId is provided', async () => {
+      const builder = chain({ data: [{ id: 'att-1' }], error: null });
+      mockFrom.mockReturnValueOnce(builder);
+
+      await listAttendance('gym-1', { locationId: 'loc-1' });
+
+      expect(builder.eq).toHaveBeenCalledWith('location_id', 'loc-1');
+    });
   });
 
   describe('validateKioskCheckIn', () => {

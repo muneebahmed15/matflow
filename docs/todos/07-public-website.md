@@ -5,7 +5,7 @@
 - [x] 7.2 Resolve gym by slug middleware/helper (`getPublicGymBySlug`)
 - [x] 7.3 Custom domain → gym resolution (proxy rewrite in `src/lib/supabase/proxy.ts`)
 - [x] 7.4 404 when website_enabled=false (`getPublicGymBySlug` filters + `notFound()`)
-- [~] 7.5 Canonical URL (gym-level via layout; per-subpage paths only on blog/locations)
+- [x] 7.5 Canonical URL per public subpage (`resolveGymPageMetadata` on all `/g/[slug]/*` routes)
 
 ## Pages — Core
 - [x] 7.6 Home page (Wave 1)
@@ -22,7 +22,7 @@
 ## Content Management
 - [x] 7.16 Gym content tables/columns (gym_programs, gym_coaches, gym_gallery, tagline, about_text)
 - [x] 7.17 Admin CMS (`/website-content` page)
-- [~] 7.18 Logo URL upload (no dedicated hero image)
+- [x] 7.18 Hero background image URL in settings (`hero_image_url` + GymHeroSection banner)
 - [x] 7.19 Programs list create/delete (no edit)
 - [x] 7.20 Coach bios CRUD (linked to staff_roles via `staff_role_id`)
 
@@ -49,7 +49,7 @@
 
 ## Performance
 - [x] 7.36 ISR/cache public pages (revalidate=300 on gym layout)
-- [~] 7.37 Image optimization via next/image (logo uses img for remote domains)
+- [x] 7.37 Image optimization via next/image (`PublicGymImage` + Supabase remotePatterns)
 - [~] 7.38 Lighthouse score > 90 mobile (manual check — run Lighthouse on `/g/[slug]` after deploy)
 
 ## Mobile

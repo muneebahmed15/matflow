@@ -12,6 +12,7 @@ export type GymSettings = Pick<GymRow, 'id' | 'name' | 'slug' | 'kiosk_enabled'>
   daily_digest_enabled: boolean;
   logo_url: string | null;
   favicon_url: string | null;
+  hero_image_url: string | null;
   setup_completed_at: string | null;
   primary_color: string | null;
   tagline: string | null;
@@ -47,7 +48,7 @@ export type GymSettings = Pick<GymRow, 'id' | 'name' | 'slug' | 'kiosk_enabled'>
 };
 
 const GYM_SETTINGS_COLUMNS =
-  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, marketing_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, google_ads_conversion_id, review_checkin_threshold, require_waiver_for_checkin, timezone, locale, belt_system, belt_custom_order, belt_color_overrides, booking_cancel_hours, class_reminder_hours, hero_ab_enabled, hero_variant_b_headline, hero_variant_b_subheadline, seo_keywords, public_translations';
+  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, marketing_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, hero_image_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, google_ads_conversion_id, review_checkin_threshold, require_waiver_for_checkin, timezone, locale, belt_system, belt_custom_order, belt_color_overrides, booking_cancel_hours, class_reminder_hours, hero_ab_enabled, hero_variant_b_headline, hero_variant_b_subheadline, seo_keywords, public_translations';
 
 function parseGymSettingsRow(data: Record<string, unknown>): GymSettings {
   const customOrder = data.belt_custom_order;
@@ -100,6 +101,7 @@ export type UpdateGymSettingsInput = {
   dailyDigestEnabled?: boolean;
   logoUrl?: string | null;
   faviconUrl?: string | null;
+  heroImageUrl?: string | null;
   primaryColor?: string | null;
   tagline?: string | null;
   aboutText?: string | null;
@@ -199,6 +201,7 @@ export async function updateGymSettings(
       daily_digest_enabled: input.dailyDigestEnabled ?? true,
       logo_url: input.logoUrl?.trim() || null,
       favicon_url: input.faviconUrl?.trim() || null,
+      hero_image_url: input.heroImageUrl?.trim() || null,
       primary_color: primaryColor || '#2563eb',
       tagline: input.tagline?.trim() || null,
       about_text: input.aboutText?.trim() || null,

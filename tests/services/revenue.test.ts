@@ -9,13 +9,15 @@ vi.mock('@/lib/supabase/admin', () => ({
 import {
   churnRate,
   createManualSubscription,
+  exportGymInvoicesCsv,
   getRevenueMetrics,
+  listGymInvoices,
   monthlyContributionCents,
 } from '@/services/revenue';
 
 function chain(result: { data?: unknown; error?: { message: string } | null }) {
   const builder: Record<string, unknown> = {};
-  for (const method of ['select', 'eq', 'in', 'order', 'insert', 'update']) {
+  for (const method of ['select', 'eq', 'in', 'order', 'insert', 'update', 'not']) {
     builder[method] = vi.fn(() => builder);
   }
   builder.maybeSingle = vi.fn(async () => result);
@@ -107,5 +109,31 @@ describe('createManualSubscription', () => {
     });
     expect(result.id).toBe('sub-1');
     expect(memberUpdate.update).toHaveBeenCalledWith({ status: 'active' });
+  });
+});
+
+describe('listGymInvoices', () => {
+  beforeEach(() => mockFrom.mockReset());
+
+  it('returns empty when gym has no Stripe customers', async () => {
+    mockFrom
+      .mockReturnValueOnce(chain({ data: [] }))
+      .mockReturnValueOnce(chain({ data: [] }));
+
+    await expect(listGymInvoices('g1')).resolves.toEqual([]);
+  });
+});
+
+describe('exportGymInvoicesCsv', () => {
+  beforeEach(() => mockFrom.mockReset());
+
+  it('exports CSV header when there are no invoices', async () => {
+    mockFrom
+      .mockReturnValueOnce(chain({ data: [] }))
+      .mockReturnValueOnce(chain({ data: [] }));
+
+    const csv = await exportGymInvoicesCsv('g1');
+    expect(csv).toContain('Invoice,Customer,Email,Status,Amount,Date,PDF URL');
+    expect(csv.trim().split('\n')).toHaveLength(1);
   });
 });

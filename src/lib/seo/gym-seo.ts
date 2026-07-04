@@ -1,6 +1,16 @@
 import type { Metadata } from 'next';
 import type { PublicGymProfile } from '@/lib/gym-public';
 import { getPublicEnv } from '@/lib/env';
+import { getPublicGymBySlug } from '@/lib/gym-public';
+
+export async function resolveGymPageMetadata(
+  gymSlug: string,
+  page: { title: string; description?: string; path: string }
+): Promise<Metadata> {
+  const gym = await getPublicGymBySlug(gymSlug);
+  if (!gym) return { title: 'Not found' };
+  return buildGymPageMetadata(gym, page);
+}
 
 export function gymPublicUrl(gym: Pick<PublicGymProfile, 'slug'>, path = ''): string {
   const base = getPublicEnv().NEXT_PUBLIC_APP_URL;
@@ -31,13 +41,21 @@ export function buildGymPageMetadata(
       type: 'website',
       url,
       siteName: gym.name,
-      images: gym.logo_url ? [{ url: gym.logo_url, alt: gym.name }] : undefined,
+      images: gym.hero_image_url
+        ? [{ url: gym.hero_image_url, alt: gym.name }]
+        : gym.logo_url
+          ? [{ url: gym.logo_url, alt: gym.name }]
+          : undefined,
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      images: gym.logo_url ? [gym.logo_url] : undefined,
+      images: gym.hero_image_url
+        ? [gym.hero_image_url]
+        : gym.logo_url
+          ? [gym.logo_url]
+          : undefined,
     },
     robots: { index: true, follow: true },
   };

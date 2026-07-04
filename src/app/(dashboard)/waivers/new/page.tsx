@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createWaiverAction } from '@/app/(dashboard)/actions';
 import { WAIVER_TEMPLATES } from '@/lib/waiver-templates';
+import BlogRichTextEditor from '@/components/marketing/BlogRichTextEditor';
 
 const DEFAULT_BODY = `I, the undersigned, acknowledge and agree to the following:
 
@@ -62,7 +63,10 @@ export default function NewWaiverPage() {
                 <button
                   key={t.key}
                   type="button"
-                  onClick={() => { setTitle(t.title); setBody(t.body); }}
+                  onClick={() => {
+                    setTitle(t.title);
+                    setBody(t.body);
+                  }}
                   className="text-xs border border-white/10 text-white/60 hover:text-white hover:bg-white/5 px-3 py-1.5 rounded-lg transition"
                 >
                   {t.label}
@@ -85,12 +89,7 @@ export default function NewWaiverPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Waiver Text</label>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={16}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm leading-relaxed"
-            />
+            <BlogRichTextEditor value={body} onChange={setBody} rows={14} placeholder="Waiver body (HTML supported)" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Expires after (days, optional)</label>
@@ -105,7 +104,7 @@ export default function NewWaiverPage() {
           </div>
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <button
-            onClick={handleSubmit}
+            onClick={() => void handleSubmit()}
             disabled={loading}
             className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
           >

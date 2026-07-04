@@ -110,3 +110,25 @@ export async function getBillingMetricsAction() {
   }
 }
 
+export async function listGymInvoicesAction(): Promise<
+  ActionResult<import('@/services/revenue').GymInvoice[]>
+> {
+  try {
+    const auth = await requireStaffSession({ capability: 'billing.read' });
+    const { listGymInvoices } = await import('@/services/revenue');
+    return { ok: true, data: await listGymInvoices(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function exportGymInvoicesCsvAction(): Promise<ActionResult<string>> {
+  try {
+    const auth = await requireStaffSession({ capability: 'billing.read' });
+    const { exportGymInvoicesCsv } = await import('@/services/revenue');
+    return { ok: true, data: await exportGymInvoicesCsv(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+

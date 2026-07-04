@@ -121,6 +121,7 @@ export type Database = {
           gym_id: string
           id: string
           import_job_id: string | null
+          location_id: string | null
           member_id: string
           notes: string | null
         }
@@ -131,6 +132,7 @@ export type Database = {
           gym_id: string
           id?: string
           import_job_id?: string | null
+          location_id?: string | null
           member_id: string
           notes?: string | null
         }
@@ -141,6 +143,7 @@ export type Database = {
           gym_id?: string
           id?: string
           import_job_id?: string | null
+          location_id?: string | null
           member_id?: string
           notes?: string | null
         }
@@ -150,6 +153,13 @@ export type Database = {
             columns: ["class_id"]
             isOneToOne: false
             referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "gym_locations"
             referencedColumns: ["id"]
           },
           {
@@ -1292,6 +1302,7 @@ export type Database = {
       }
       families: {
         Row: {
+          billing_member_id: string | null
           created_at: string
           family_name: string
           gym_id: string
@@ -1300,6 +1311,7 @@ export type Database = {
           stripe_customer_id: string | null
         }
         Insert: {
+          billing_member_id?: string | null
           created_at?: string
           family_name: string
           gym_id: string
@@ -1308,6 +1320,7 @@ export type Database = {
           stripe_customer_id?: string | null
         }
         Update: {
+          billing_member_id?: string | null
           created_at?: string
           family_name?: string
           gym_id?: string
@@ -1316,6 +1329,13 @@ export type Database = {
           stripe_customer_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "families_billing_member_id_fkey"
+            columns: ["billing_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "families_gym_id_fkey"
             columns: ["gym_id"]
@@ -1838,6 +1858,7 @@ export type Database = {
           setup_completed_at: string | null
           favicon_url: string | null
           hero_ab_enabled: boolean
+          hero_image_url: string | null
           hero_variant_b_headline: string | null
           hero_variant_b_subheadline: string | null
           marketing_enabled: boolean
@@ -2222,6 +2243,7 @@ export type Database = {
           profile_photo_url: string | null
           status: string
           stripe_count: number
+          tags: string[]
         }
         Insert: {
           auth_user_id?: string | null
@@ -2245,6 +2267,7 @@ export type Database = {
           profile_photo_url?: string | null
           status?: string
           stripe_count?: number
+          tags?: string[]
         }
         Update: {
           auth_user_id?: string | null
@@ -2268,6 +2291,7 @@ export type Database = {
           profile_photo_url?: string | null
           status?: string
           stripe_count?: number
+          tags?: string[]
         }
         Relationships: [
           {

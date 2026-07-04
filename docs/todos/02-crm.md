@@ -12,7 +12,7 @@
 - [x] 2.9 Member date of birth field (used for minor waiver flow)
 - [ ] 2.10 Member gender field (optional)
 - [ ] 2.11 Member address fields
-- [ ] 2.12 Member tags (JSONB array)
+- [x] 2.12 Member tags (text[] on members, editable on member detail)
 - [x] 2.13 Bulk member export CSV
 - [ ] 2.14 Bulk member import (see Migration module)
 - [x] 2.15 Member duplicate detection by email
@@ -22,7 +22,7 @@
 - [x] 2.17 Link member to family on create (done)
 - [x] 2.18 Family detail page (`/families/[id]` with member list)
 - [x] 2.19 View all members in a family (family detail page)
-- [ ] 2.20 Family billing contact designation
+- [x] 2.20 Family billing contact designation
 - [ ] 2.21 Merge duplicate families
 
 ## Parents & Guardians
@@ -38,7 +38,7 @@
 - [x] 2.29 Create lead form (done)
 - [x] 2.30 Status filter pills (done)
 - [x] 2.31 Convert lead to member (done)
-- [ ] 2.32 Lead notes field editable in UI
+- [x] 2.32 Lead notes field editable in UI (LeadNotesPanel on leads page)
 - [x] 2.33 Lead assignment to staff member
 - [x] 2.34 Lead source analytics dashboard (marketing page)
 - [x] 2.35 Public trial booking creates lead automatically
@@ -58,7 +58,7 @@
 - [x] 2.45 Notes linked to member_id and/or lead_id
 - [x] 2.46 Staff-only notes with author_id
 - [x] 2.47 Member detail Notes tab
-- [ ] 2.48 Lead detail Notes tab
+- [x] 2.48 Lead detail Notes tab (LeadNotesPanel in expanded lead row)
 - [x] 2.49 Pin important notes (toggleMemberNotePinAction)
 - [ ] 2.50 Note search across gym
 - [x] 2.51 Interaction timeline aggregates notes + attendance + promotions + waivers + subscriptions
@@ -73,7 +73,7 @@
 - [x] 2.56 Email format validation on create
 - [x] 2.57 Phone E.164 normalization
 - [ ] 2.58 Required fields configurable per gym
-- [ ] 2.59 Data completeness score per member
+- [x] 2.59 Data completeness score per member
 
 ## Permissions
 - [x] 2.60 Coaches can access members (done)

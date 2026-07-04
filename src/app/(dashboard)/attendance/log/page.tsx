@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useAsyncMount } from '@/hooks/use-async-mount';
 import { listAttendanceLogAction } from '@/app/(dashboard)/actions';
+import { getDashboardLocationFilter } from '@/components/dashboard/LocationFilterBar';
 
 type AttendanceRecord = {
   id: string;
@@ -22,7 +23,7 @@ export default function AttendanceLogPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const result = await listAttendanceLogAction(date);
+    const result = await listAttendanceLogAction(date, getDashboardLocationFilter());
     if (result.ok && result.data) {
       setRecords(result.data);
       setHasAccess(true);

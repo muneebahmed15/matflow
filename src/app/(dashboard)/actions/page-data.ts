@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { requireStaffSession } from '@/lib/auth/staff';
 import { getGymSettings } from '@/services/gym';
 import { getDashboardStats } from '@/services/dashboard-stats';
@@ -81,7 +82,10 @@ export async function getCheckInPageDataAction(): Promise<
   }
 }
 
-export async function listAttendanceLogAction(date: string): Promise<
+export async function listAttendanceLogAction(
+  date: string,
+  locationId?: string | null
+): Promise<
   ActionResult<
     {
       id: string;
@@ -92,7 +96,7 @@ export async function listAttendanceLogAction(date: string): Promise<
 > {
   try {
     const auth = await requireStaffSession();
-    const rows = await listAttendance(auth.gymId, { date });
+    const rows = await listAttendance(auth.gymId, { date, locationId: locationId ?? null });
     return {
       ok: true,
       data: rows.map((r) => ({
@@ -194,6 +198,7 @@ export async function getMemberDetailPageDataAction(memberId: string): Promise<
     }[];
     attendance: { id: string; checked_in_at: string }[];
     signatures: Awaited<ReturnType<typeof getMemberWaiverSignatures>>;
+    hasEmergencyContact: boolean;
   }>
 > {
   try {
@@ -213,6 +218,11 @@ export async function getMemberDetailPageDataAction(memberId: string): Promise<
 
     const signatures = await getMemberWaiverSignatures(memberId);
 
+    const { count: emergencyContactCount } = await admin
+      .from('emergency_contacts')
+      .select('*', { count: 'exact', head: true })
+      .eq('member_id', memberId);
+
     return {
       ok: true,
       data: {
@@ -226,6 +236,7 @@ export async function getMemberDetailPageDataAction(memberId: string): Promise<
         })),
         attendance: attendance ?? [],
         signatures,
+        hasEmergencyContact: (emergencyContactCount ?? 0) > 0,
       },
     };
   } catch (error) {
@@ -292,6 +303,21 @@ export async function getSignWaiverPageDataAction(memberId: string): Promise<
         signedWaiverIds,
       },
     };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function setFamilyBillingContactAction(
+  familyId: string,
+  billingMemberId: string | null
+): Promise<ActionResult<{ family: import('@/services/families').FamilyDetail }>> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { setFamilyBillingContact } = await import('@/services/families');
+    const family = await setFamilyBillingContact(auth.gymId, familyId, billingMemberId);
+    revalidatePath(`/families/${familyId}`);
+    return { ok: true, data: { family } };
   } catch (error) {
     return toActionError(error);
   }

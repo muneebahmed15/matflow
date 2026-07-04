@@ -7,7 +7,7 @@
 - [x] 1.4 Add `gyms.timezone` text default 'America/New_York'
 - [x] 1.5 Add `gyms.locale` text default 'en-US'
 - [x] 1.6 Add `gym_locations` table for multi-location
-- [~] 1.7 Add `location_id` FK on classes (attendance not location-scoped)
+- [x] 1.7 Add `location_id` FK on classes + attendance location scoping on check-in/log
 - [x] 1.8 Gym slug lookups (slug unique)
 - [x] 1.9 Index `gyms.custom_domain` partial where not null
 - [x] 1.10 Audit log table `audit_events` (gym_id, actor_id, action, entity, payload)

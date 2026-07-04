@@ -14,6 +14,7 @@ import {
 } from '@/app/(dashboard)/actions'
 import MemberNotesPanel from '@/components/members/MemberNotesPanel'
 import MemberEmergencyContactsPanel from '@/components/members/MemberEmergencyContactsPanel'
+import { computeMemberCompleteness, completenessLabel } from '@/lib/member-completeness'
 
 type TimelineEvent = {
   id: string
@@ -38,6 +39,9 @@ interface Member {
   email_opt_out?: boolean
   marketing_email_consent?: boolean
   sms_marketing_consent?: boolean
+  date_of_birth?: string | null
+  profile_photo_url?: string | null
+  tags?: string[]
 }
 interface Plan {
   id: string; name: string; stripe_price_id: string | null; price_cents: number | null; interval: string
@@ -68,6 +72,9 @@ export default function MemberDetailPage() {
   const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'waivers' | 'notes' | 'contacts' | 'timeline'>('info')
   const [timeline, setTimeline] = useState<TimelineEvent[]>([])
   const [timelineLoaded, setTimelineLoaded] = useState(false)
+  const [hasEmergencyContact, setHasEmergencyContact] = useState(false)
+  const [tagInput, setTagInput] = useState('')
+  const [savingTags, setSavingTags] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -84,6 +91,7 @@ export default function MemberDetailPage() {
       setPlans(result.data.plans)
       setAttendance(result.data.attendance)
       setSignatures(result.data.signatures as WaiverSig[])
+      setHasEmergencyContact(result.data.hasEmergencyContact)
       setLoading(false)
     }
 
@@ -158,6 +166,45 @@ export default function MemberDetailPage() {
     if (res.ok) setMember({ ...member, stripe_count: next })
   }
 
+  const completenessScore = member
+    ? computeMemberCompleteness({
+        email: member.email,
+        phone: member.phone,
+        date_of_birth: member.date_of_birth ?? null,
+        profile_photo_url: member.profile_photo_url ?? null,
+        hasEmergencyContact,
+        hasSignedWaiver: signatures.length > 0,
+      })
+    : 0
+
+  const handleAddTag = async () => {
+    if (!member) return
+    const next = tagInput.trim().toLowerCase()
+    if (!next) return
+    const current = member.tags ?? []
+    if (current.includes(next)) {
+      setTagInput('')
+      return
+    }
+    setSavingTags(true)
+    const result = await updateMemberAction(member.id, { tags: [...current, next] })
+    setSavingTags(false)
+    if (result.ok && result.data) {
+      setMember(result.data as Member)
+      setTagInput('')
+    }
+  }
+
+  const handleRemoveTag = async (tag: string) => {
+    if (!member) return
+    setSavingTags(true)
+    const result = await updateMemberAction(member.id, {
+      tags: (member.tags ?? []).filter((t) => t !== tag),
+    })
+    setSavingTags(false)
+    if (result.ok && result.data) setMember(result.data as Member)
+  }
+
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
   if (!member) return <div className="p-8 text-gray-400">Member not found.</div>
 
@@ -208,6 +255,17 @@ export default function MemberDetailPage() {
           <div>
             <h1 className="text-2xl font-bold text-white">{member.first_name} {member.last_name}</h1>
             <p className="text-white/40 text-sm">{member.email}</p>
+            <div className="mt-2 flex items-center gap-2">
+              <div className="h-1.5 w-24 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${completenessScore >= 100 ? 'bg-green-500' : completenessScore >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                  style={{ width: `${completenessScore}%` }}
+                />
+              </div>
+              <span className="text-white/40 text-xs">
+                {completenessScore}% · {completenessLabel(completenessScore)}
+              </span>
+            </div>
           </div>
           <button
             onClick={() => void handleArchive()}
@@ -265,13 +323,60 @@ export default function MemberDetailPage() {
               </button>
             </div>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between border-b border-white/10 pb-3">
             <span className="text-gray-400 text-sm">Status</span>
             <select value={member.status} onChange={(e) => handleEdit('status', e.target.value)}
               className="bg-transparent text-sm cursor-pointer">
               <option value="active" className="bg-gray-900">active</option>
               <option value="inactive" className="bg-gray-900">inactive</option>
             </select>
+          </div>
+          <div className="border-b border-white/10 pb-3 space-y-2">
+            <span className="text-gray-400 text-sm block">Tags</span>
+            <div className="flex flex-wrap gap-1.5">
+              {(member.tags ?? []).map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-xs"
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    disabled={savingTags}
+                    onClick={() => void handleRemoveTag(tag)}
+                    className="hover:text-white disabled:opacity-40"
+                    aria-label={`Remove tag ${tag}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {(member.tags ?? []).length === 0 && (
+                <span className="text-white/30 text-xs">No tags yet</span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void handleAddTag()
+                  }
+                }}
+                placeholder="Add tag…"
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm"
+              />
+              <button
+                type="button"
+                disabled={savingTags || !tagInput.trim()}
+                onClick={() => void handleAddTag()}
+                className="text-blue-400 text-sm hover:underline disabled:opacity-40"
+              >
+                Add
+              </button>
+            </div>
           </div>
           <div className="border-t border-white/10 pt-4 space-y-3">
             <p className="text-gray-400 text-sm">Marketing preferences</p>

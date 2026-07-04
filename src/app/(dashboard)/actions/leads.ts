@@ -20,7 +20,7 @@ import { createLead, convertLeadToMember, updateLeadStatus, updateLeadNotes, ass
 
 
 
-import { createCrmNote, listLeadNotes, type CrmNote, type CrmNoteType } from '@/services/crm-notes';
+import { createCrmNote, deleteCrmNote, listLeadNotes, toggleCrmNotePin, type CrmNote, type CrmNoteType } from '@/services/crm-notes';
 
 
 
@@ -159,6 +159,32 @@ export async function createLeadNoteAction(input: {
     });
     revalidatePath('/leads');
     return { ok: true, data: note };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function deleteLeadNoteAction(leadId: string, noteId: string): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ capability: 'leads.write' });
+    await deleteCrmNote(auth.gymId, noteId);
+    revalidatePath('/leads');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function toggleLeadNotePinAction(
+  leadId: string,
+  noteId: string,
+  isPinned: boolean
+): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ capability: 'leads.write' });
+    await toggleCrmNotePin(auth.gymId, noteId, isPinned);
+    revalidatePath('/leads');
+    return { ok: true };
   } catch (error) {
     return toActionError(error);
   }

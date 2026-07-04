@@ -130,6 +130,73 @@ export async function promoteMember(input: {
   }
 }
 
+export async function bulkPromoteMembers(input: {
+  gymId: string;
+  promotions: { memberId: string; fromBelt: string; toBelt: string }[];
+  notes?: string;
+  ceremonyDate?: string | null;
+  actorId?: string | null;
+  allowDemotion?: boolean;
+}): Promise<{ promoted: number; errors: string[] }> {
+  let promoted = 0;
+  const errors: string[] = [];
+
+  for (const promotion of input.promotions) {
+    try {
+      await promoteMember({
+        gymId: input.gymId,
+        memberId: promotion.memberId,
+        fromBelt: promotion.fromBelt,
+        toBelt: promotion.toBelt,
+        notes: input.notes,
+        ceremonyDate: input.ceremonyDate,
+        actorId: input.actorId,
+        allowDemotion: input.allowDemotion,
+      });
+      promoted += 1;
+    } catch (err) {
+      errors.push(err instanceof ServiceError ? err.message : 'Promotion failed');
+    }
+  }
+
+  return { promoted, errors };
+}
+
+export async function getPromotionCertificateData(gymId: string, promotionId: string) {
+  const admin = getAdminClient();
+  const { data: promo } = await admin
+    .from('belt_promotions')
+    .select('from_belt, to_belt, promoted_at, ceremony_date, notes, members(first_name, last_name), gyms(name)')
+    .eq('id', promotionId)
+    .eq('gym_id', gymId)
+    .maybeSingle();
+
+  if (!promo) throw new ServiceError(404, 'Promotion not found.');
+
+  const row = promo as unknown as {
+    from_belt: string;
+    to_belt: string;
+    promoted_at: string;
+    ceremony_date: string | null;
+    notes: string | null;
+    members: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
+    gyms: { name: string } | { name: string }[] | null;
+  };
+
+  const member = Array.isArray(row.members) ? row.members[0] : row.members;
+  const gym = Array.isArray(row.gyms) ? row.gyms[0] : row.gyms;
+
+  return {
+    gymName: gym?.name ?? 'Gym',
+    memberName: member ? `${member.first_name} ${member.last_name}`.trim() : 'Member',
+    fromBelt: row.from_belt,
+    toBelt: row.to_belt,
+    promotedAt: row.promoted_at,
+    ceremonyDate: row.ceremony_date,
+    notes: row.notes,
+  };
+}
+
 /** Undo the most recent promotion for a member and revert their rank. */
 export async function undoPromotion(
   gymId: string,

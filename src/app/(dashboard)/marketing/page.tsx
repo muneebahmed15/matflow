@@ -21,6 +21,7 @@ import {
 } from '@/app/(dashboard)/actions';
 import GbpMarketingPanel from '@/components/marketing/GbpMarketingPanel';
 import SocialPromoExporter from '@/components/marketing/SocialPromoExporter';
+import BlogRichTextEditor from '@/components/marketing/BlogRichTextEditor';
 import { CAMPAIGN_TEMPLATES } from '@/lib/campaign-templates';
 import { computeCampaignRoas, summarizeCampaignRoas } from '@/lib/campaign-roas';
 import { smsSegmentInfo } from '@/lib/sms-segments';
@@ -331,7 +332,16 @@ export default function MarketingPage() {
         <h2 className="font-semibold text-white">New Campaign</h2>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Campaign name" className={inputClass} />
         <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Email subject" className={inputClass} />
-        <textarea value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} placeholder="HTML body" rows={5} className={inputClass} />
+        <BlogRichTextEditor value={bodyHtml} onChange={setBodyHtml} rows={6} placeholder="Email HTML body" />
+        {bodyHtml ? (
+          <div className="border border-white/10 rounded-xl p-4 bg-black/20">
+            <p className="text-white/40 text-xs mb-2">Preview</p>
+            <div
+              className="prose prose-invert prose-sm max-w-none text-white/80"
+              dangerouslySetInnerHTML={{ __html: bodyHtml }}
+            />
+          </div>
+        ) : null}
         <select value={audience} onChange={(e) => setAudience(e.target.value)} className={inputClass}>
           <option value="all_members" className="bg-gray-900">All members</option>
           <option value="active_members" className="bg-gray-900">Active members</option>

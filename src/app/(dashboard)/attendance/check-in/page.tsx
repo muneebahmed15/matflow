@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useAsyncMount } from '@/hooks/use-async-mount';
 import { getCheckInPageDataAction } from '@/app/(dashboard)/actions';
+import { getDashboardLocationFilter } from '@/components/dashboard/LocationFilterBar';
 
 type Member = {
   id: string;
@@ -65,6 +66,7 @@ export default function CheckInPage() {
     if (!gymId) return;
     setLoading(member.id);
 
+    const locationId = getDashboardLocationFilter();
     const res = await fetch('/api/attendance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -72,6 +74,7 @@ export default function CheckInPage() {
         member_id: member.id,
         gym_id: gymId,
         ...(selectedClassId ? { class_id: selectedClassId } : {}),
+        ...(locationId ? { location_id: locationId } : {}),
       }),
     });
 

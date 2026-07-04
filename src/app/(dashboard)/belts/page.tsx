@@ -13,6 +13,8 @@ import {
   exportMembersByBeltCsvAction,
   getBeltsPageDataAction,
   getStaffContextAction,
+  bulkPromoteMembersAction,
+  downloadPromotionCertificateAction,
 } from '@/app/(dashboard)/actions'
 import { BELT_COLORS } from '@/lib/belt-colors'
 import { useAppUi } from '@/components/ui/AppUiProvider'
@@ -75,6 +77,9 @@ export default function BeltsPage() {
   const [ceremonyDate, setCeremonyDate] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [ceremonySelected, setCeremonySelected] = useState<Set<string>>(new Set())
+  const [ceremonyNotes, setCeremonyNotes] = useState('')
+  const [ceremonyDateBulk, setCeremonyDateBulk] = useState('')
 
   // requirements editor state
   const [reqBelt, setReqBelt] = useState('white')
@@ -187,6 +192,59 @@ export default function BeltsPage() {
   const selectedMemberData = members.find(m => m.id === selectedMember)
   const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
   const readyMembers = readiness.filter(r => r.ready)
+  const nextBeltFor = (belt: string) => {
+    const idx = beltRanks.indexOf(belt)
+    return idx >= 0 && idx < beltRanks.length - 1 ? beltRanks[idx + 1] : null
+  }
+
+  const handleCeremonyPromote = async () => {
+    if (!canPromote || ceremonySelected.size === 0) return
+    setSubmitting(true)
+    const promotions = [...ceremonySelected]
+      .map((memberId) => {
+        const row = readiness.find((r) => r.memberId === memberId)
+        if (!row) return null
+        const to = nextBeltFor(row.belt)
+        if (!to) return null
+        return { memberId, fromBelt: row.belt, toBelt: to }
+      })
+      .filter((p): p is { memberId: string; fromBelt: string; toBelt: string } => p !== null)
+
+    const result = await bulkPromoteMembersAction({
+      promotions,
+      notes: ceremonyNotes || 'Belt ceremony batch promotion',
+      ceremonyDate: ceremonyDateBulk || null,
+    })
+    setSubmitting(false)
+    if (!result.ok) {
+      showError(result.error)
+      return
+    }
+    if (result.data?.errors.length) {
+      showError(`${result.data.promoted} promoted. ${result.data.errors.length} failed.`)
+    } else {
+      showSuccess(`Promoted ${result.data?.promoted ?? 0} member(s)`)
+    }
+    setCeremonySelected(new Set())
+    setCeremonyNotes('')
+    await reload()
+  }
+
+  const handleDownloadCertificate = async (promotionId: string) => {
+    const result = await downloadPromotionCertificateAction(promotionId)
+    if (!result.ok || !result.data) {
+      showError(!result.ok ? result.error : 'Download failed')
+      return
+    }
+    const bytes = Uint8Array.from(atob(result.data.base64), (c) => c.charCodeAt(0))
+    const blob = new Blob([bytes], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = result.data.filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
 
@@ -210,23 +268,65 @@ export default function BeltsPage() {
       </div>
 
       {readyMembers.length > 0 && (
-        <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-5 mb-6">
-          <p className="text-green-300 font-semibold text-sm flex items-center gap-2 mb-3">
+        <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-5 mb-6 space-y-4">
+          <p className="text-green-300 font-semibold text-sm flex items-center gap-2">
             <CheckCircle2 size={16} /> Ready for promotion ({readyMembers.length})
           </p>
           <div className="space-y-2">
             {readyMembers.map(r => (
-              <div key={r.memberId} className="flex items-center justify-between text-sm">
-                <span className="text-white">
+              <label key={r.memberId} className="flex items-center justify-between text-sm gap-3">
+                <span className="flex items-center gap-2 text-white">
+                  {canPromote && (
+                    <input
+                      type="checkbox"
+                      checked={ceremonySelected.has(r.memberId)}
+                      onChange={(e) => {
+                        setCeremonySelected((prev) => {
+                          const next = new Set(prev)
+                          if (e.target.checked) next.add(r.memberId)
+                          else next.delete(r.memberId)
+                          return next
+                        })
+                      }}
+                    />
+                  )}
                   {r.firstName} {r.lastName}
-                  <span className={`ml-2 px-1.5 py-0.5 rounded text-xs capitalize ${beltBadge(r.belt)}`}>{r.belt}</span>
+                  <span className={`ml-1 px-1.5 py-0.5 rounded text-xs capitalize ${beltBadge(r.belt)}`}>{r.belt}</span>
+                  {nextBeltFor(r.belt) && (
+                    <span className="text-white/30 text-xs">→ {nextBeltFor(r.belt)}</span>
+                  )}
                 </span>
                 <span className="text-white/40 text-xs">
                   {r.attendanceSinceRank} classes · {r.daysAtRank} days at rank
                 </span>
-              </div>
+              </label>
             ))}
           </div>
+          {canPromote && ceremonySelected.size > 0 && (
+            <div className="border-t border-green-500/20 pt-4 space-y-3">
+              <p className="text-green-200 text-xs font-medium">Belt ceremony mode — promote {ceremonySelected.size} selected</p>
+              <input
+                type="date"
+                value={ceremonyDateBulk}
+                onChange={(e) => setCeremonyDateBulk(e.target.value)}
+                className={inputClass}
+              />
+              <input
+                value={ceremonyNotes}
+                onChange={(e) => setCeremonyNotes(e.target.value)}
+                placeholder="Ceremony notes (optional)"
+                className={inputClass}
+              />
+              <button
+                type="button"
+                onClick={() => void handleCeremonyPromote()}
+                disabled={submitting}
+                className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold py-2.5 rounded-xl"
+              >
+                {submitting ? 'Promoting...' : `Promote ${ceremonySelected.size} member(s)`}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -376,6 +476,13 @@ export default function BeltsPage() {
                 <div className="text-right">
                   <p className="text-white/30 text-xs">{new Date(p.promoted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                   {p.notes && <p className="text-white/20 text-xs mt-0.5 max-w-32 truncate">{p.notes}</p>}
+                  <button
+                    type="button"
+                    onClick={() => void handleDownloadCertificate(p.id)}
+                    className="text-blue-400 text-xs hover:underline mt-1"
+                  >
+                    Certificate
+                  </button>
                   {isAdmin && (
                     <button onClick={() => void handleUndo(p.id)} className="text-white/20 hover:text-red-400 text-xs mt-1 transition">
                       Undo

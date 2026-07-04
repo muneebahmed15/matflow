@@ -152,3 +152,47 @@ export async function exportMembersByBeltCsvAction(): Promise<ActionResult<strin
   }
 }
 
+export async function bulkPromoteMembersAction(input: {
+  promotions: { memberId: string; fromBelt: string; toBelt: string }[];
+  notes?: string;
+  ceremonyDate?: string | null;
+}): Promise<ActionResult<{ promoted: number; errors: string[] }>> {
+  try {
+    const auth = await requireStaffSession({ capability: 'belts.promote' });
+    const { bulkPromoteMembers } = await import('@/services/belts');
+    const result = await bulkPromoteMembers({
+      ...input,
+      gymId: auth.gymId,
+      actorId: auth.user.id,
+      allowDemotion: auth.role === 'admin',
+    });
+    revalidatePath('/belts');
+    revalidatePath('/members');
+    return { ok: true, data: result };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function downloadPromotionCertificateAction(
+  promotionId: string
+): Promise<ActionResult<{ base64: string; filename: string }>> {
+  try {
+    const auth = await requireStaffSession({ capability: 'belts.promote' });
+    const { getPromotionCertificateData } = await import('@/services/belts');
+    const { buildBeltCertificatePdf } = await import('@/lib/belt-certificate-pdf');
+    const data = await getPromotionCertificateData(auth.gymId, promotionId);
+    const pdf = await buildBeltCertificatePdf(data);
+    const filename = `${data.memberName.replace(/\s+/g, '-').toLowerCase()}-promotion.pdf`;
+    return {
+      ok: true,
+      data: {
+        base64: Buffer.from(pdf).toString('base64'),
+        filename,
+      },
+    };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+

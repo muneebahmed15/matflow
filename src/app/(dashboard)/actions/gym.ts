@@ -116,6 +116,7 @@ export async function updateGymSettingsAction(input: {
   metaPixelId?: string | null;
   googlePlaceId?: string | null;
   googleAdsConversionId?: string | null;
+  heroImageUrl?: string | null;
   reviewCheckinThreshold?: number;
   requireWaiverForCheckin?: boolean;
   timezone?: string;

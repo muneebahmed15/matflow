@@ -2,8 +2,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { getPublicGymBySlug, gymPrimaryColor } from '@/lib/gym-public';
+import { resolveGymPageMetadata } from '@/lib/seo/gym-seo';
 
 type Props = { params: Promise<{ gymSlug: string }> };
+
+export async function generateMetadata({ params }: Props) {
+  const { gymSlug } = await params;
+  return resolveGymPageMetadata(gymSlug, { title: 'Pricing', path: '/pricing' });
+}
 
 export default async function GymPricingPage({ params }: Props) {
   const { gymSlug } = await params;

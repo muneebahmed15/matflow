@@ -2,8 +2,14 @@ import { notFound } from 'next/navigation';
 import { getPublicGymBySlug } from '@/lib/gym-public';
 import { listPublishedReviews } from '@/services/gym-content';
 import ReviewSubmitForm from '@/components/gym-public/ReviewSubmitForm';
+import { resolveGymPageMetadata } from '@/lib/seo/gym-seo';
 
 type Props = { params: Promise<{ gymSlug: string }> };
+
+export async function generateMetadata({ params }: Props) {
+  const { gymSlug } = await params;
+  return resolveGymPageMetadata(gymSlug, { title: 'Reviews', path: '/reviews' });
+}
 
 export default async function GymReviewsPage({ params }: Props) {
   const { gymSlug } = await params;

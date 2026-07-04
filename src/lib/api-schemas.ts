@@ -9,11 +9,13 @@ export const checkInSchema = z.object({
   notes: z.string().max(2000).optional(),
   checked_in_by: uuid().optional(),
   class_id: uuid().optional(),
+  location_id: uuid().optional(),
 });
 
 export const attendanceLogQuerySchema = z.object({
   gym_id: uuid(),
   date: dateOnly().optional(),
+  location_id: uuid().optional(),
 });
 
 export const plansQuerySchema = z.object({

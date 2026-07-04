@@ -3,8 +3,14 @@ import { getPublicGymBySlug, gymPrimaryColor } from '@/lib/gym-public';
 import { listProducts } from '@/services/merchandise';
 import { getAdminClient } from '@/lib/supabase/admin';
 import PublicShopCatalog from '@/components/gym-public/PublicShopCatalog';
+import { resolveGymPageMetadata } from '@/lib/seo/gym-seo';
 
 type Props = { params: Promise<{ gymSlug: string }> };
+
+export async function generateMetadata({ params }: Props) {
+  const { gymSlug } = await params;
+  return resolveGymPageMetadata(gymSlug, { title: 'Shop', path: '/shop' });
+}
 
 export default async function GymShopPage({ params }: Props) {
   const { gymSlug } = await params;

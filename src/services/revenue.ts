@@ -221,3 +221,98 @@ export async function createManualSubscription(input: {
 
   return data;
 }
+
+export type GymInvoice = {
+  id: string;
+  number: string | null;
+  status: string | null;
+  amountCents: number;
+  created: number;
+  customerName: string | null;
+  customerEmail: string | null;
+  pdfUrl: string | null;
+  hostedUrl: string | null;
+};
+
+export async function listGymInvoices(gymId: string, limit = 50): Promise<GymInvoice[]> {
+  const admin = getAdminClient();
+  const customerMap = new Map<string, { name: string; email: string | null }>();
+
+  const { data: subs } = await admin
+    .from('subscriptions')
+    .select('stripe_customer_id, members(first_name, last_name, email)')
+    .eq('gym_id', gymId)
+    .not('stripe_customer_id', 'is', null);
+
+  for (const row of subs ?? []) {
+    const sub = row as unknown as {
+      stripe_customer_id: string | null;
+      members: { first_name: string; last_name: string; email: string | null } | { first_name: string; last_name: string; email: string | null }[] | null;
+    };
+    const member = Array.isArray(sub.members) ? sub.members[0] : sub.members;
+    if (!sub.stripe_customer_id || !member) continue;
+    customerMap.set(sub.stripe_customer_id, {
+      name: `${member.first_name} ${member.last_name}`.trim(),
+      email: member.email,
+    });
+  }
+
+  const { data: families } = await admin
+    .from('families')
+    .select('stripe_customer_id, family_name, primary_email')
+    .eq('gym_id', gymId)
+    .not('stripe_customer_id', 'is', null);
+
+  for (const fam of families ?? []) {
+    if (fam.stripe_customer_id && !customerMap.has(fam.stripe_customer_id)) {
+      customerMap.set(fam.stripe_customer_id, {
+        name: fam.family_name,
+        email: fam.primary_email,
+      });
+    }
+  }
+
+  if (customerMap.size === 0) return [];
+
+  const { stripe } = await import('@/lib/stripe');
+  const invoices: GymInvoice[] = [];
+
+  for (const [customerId, customer] of customerMap) {
+    try {
+      const result = await stripe.invoices.list({ customer: customerId, limit: 12 });
+      for (const inv of result.data) {
+        invoices.push({
+          id: inv.id,
+          number: inv.number,
+          status: inv.status,
+          amountCents: inv.amount_paid,
+          created: inv.created,
+          customerName: customer.name,
+          customerEmail: customer.email,
+          pdfUrl: inv.invoice_pdf ?? null,
+          hostedUrl: inv.hosted_invoice_url ?? null,
+        });
+      }
+    } catch {
+      // Skip customers Stripe cannot load.
+    }
+  }
+
+  return invoices.sort((a, b) => b.created - a.created).slice(0, limit);
+}
+
+export async function exportGymInvoicesCsv(gymId: string): Promise<string> {
+  const rows = await listGymInvoices(gymId, 200);
+  return stringifyCsv(
+    ['Invoice', 'Customer', 'Email', 'Status', 'Amount', 'Date', 'PDF URL'],
+    rows.map((inv) => [
+      inv.number ?? inv.id,
+      inv.customerName ?? '',
+      inv.customerEmail ?? '',
+      inv.status ?? '',
+      (inv.amountCents / 100).toFixed(2),
+      new Date(inv.created * 1000).toISOString(),
+      inv.pdfUrl ?? '',
+    ])
+  );
+}

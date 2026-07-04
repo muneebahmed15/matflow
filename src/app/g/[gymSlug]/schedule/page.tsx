@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getAdminClient } from '@/lib/supabase/admin';
 
 import { getPublicGymBySlug } from '@/lib/gym-public';
+import { resolveGymPageMetadata } from '@/lib/seo/gym-seo';
 
 import PublicScheduleGrid from '@/components/public/PublicScheduleGrid';
 import ScheduleEmbedSnippet from '@/components/public/ScheduleEmbedSnippet';
@@ -16,7 +17,10 @@ import type { PublicScheduleClass } from '@/lib/public-schedule';
 
 type Props = { params: Promise<{ gymSlug: string }> };
 
-
+export async function generateMetadata({ params }: Props) {
+  const { gymSlug } = await params;
+  return resolveGymPageMetadata(gymSlug, { title: 'Class Schedule', path: '/schedule' });
+}
 
 export default async function GymSchedulePage({ params }: Props) {
 

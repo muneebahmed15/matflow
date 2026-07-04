@@ -4,6 +4,7 @@ import type { PublicGymProfile } from '@/lib/gym-public';
 import { formatGymAddress, gymPrimaryColor } from '@/lib/gym-public';
 import NewsletterSignup from '@/components/gym-public/NewsletterSignup';
 import PublicHeaderExtras from '@/components/gym-public/PublicHeaderExtras';
+import PublicGymImage from '@/components/gym-public/PublicGymImage';
 
 const BASE_NAV = [
   { href: '', label: 'Home' },
@@ -46,8 +47,13 @@ export default function GymPublicShell({ gym, children }: Props) {
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <Link href={base} className="flex items-center gap-3 min-w-0">
             {gym.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={gym.logo_url} alt="" className="h-9 w-9 rounded-lg object-cover" />
+              <PublicGymImage
+                src={gym.logo_url}
+                alt=""
+                width={36}
+                height={36}
+                className="h-9 w-9 rounded-lg object-cover"
+              />
             ) : (
               <div
                 className="h-9 w-9 rounded-lg flex items-center justify-center text-sm font-black text-white"

@@ -4,9 +4,9 @@ import { useCallback, useState } from 'react';
 import { useAsyncMount } from '@/hooks/use-async-mount';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Users, ArrowLeft } from 'lucide-react';
+import { Users, ArrowLeft, CreditCard } from 'lucide-react';
 import PageLoader from '@/components/PageLoader';
-import { getFamilyDetailAction } from '@/app/(dashboard)/actions';
+import { getFamilyDetailAction, setFamilyBillingContactAction } from '@/app/(dashboard)/actions';
 
 const STATUS_STYLES: Record<string, string> = {
   active: 'bg-green-500/10 text-green-400',
@@ -22,6 +22,7 @@ export default function FamilyDetailPage() {
     family_name: string;
     primary_email: string | null;
     created_at: string;
+    billing_member_id: string | null;
   } | null>(null);
   const [members, setMembers] = useState<
     {
@@ -35,6 +36,7 @@ export default function FamilyDetailPage() {
     }[]
   >([]);
   const [loading, setLoading] = useState(true);
+  const [savingBilling, setSavingBilling] = useState(false);
 
   const load = useCallback(async () => {
     const result = await getFamilyDetailAction(id);
@@ -46,6 +48,9 @@ export default function FamilyDetailPage() {
   }, [id]);
 
   useAsyncMount(load, [load]);
+
+  const inputClass =
+    'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 
   if (loading) return <PageLoader />;
 
@@ -77,8 +82,40 @@ export default function FamilyDetailPage() {
       </div>
 
       <p className="text-white/30 text-xs mb-8">
-        Created {new Date(family.created_at).toLocaleDateString()} · {members.length} member{members.length === 1 ? '' : 's'}
+        Created {new Date(family.created_at).toLocaleDateString()} · {members.length} member
+        {members.length === 1 ? '' : 's'}
       </p>
+
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-5 mb-8 space-y-3">
+        <h2 className="font-semibold text-white flex items-center gap-2">
+          <CreditCard size={16} className="text-blue-400" /> Billing contact
+        </h2>
+        <p className="text-white/40 text-sm">
+          The member who receives invoices and is the primary billing contact for this family.
+        </p>
+        <select
+          value={family.billing_member_id ?? ''}
+          disabled={savingBilling || members.length === 0}
+          onChange={async (e) => {
+            setSavingBilling(true);
+            const billingMemberId = e.target.value || null;
+            const result = await setFamilyBillingContactAction(family.id, billingMemberId);
+            if (result.ok && result.data) setFamily((prev) => (prev ? { ...prev, billing_member_id: billingMemberId } : prev));
+            setSavingBilling(false);
+          }}
+          className={inputClass}
+        >
+          <option value="" className="bg-gray-900">
+            Not designated
+          </option>
+          {members.map((m) => (
+            <option key={m.id} value={m.id} className="bg-gray-900">
+              {m.first_name} {m.last_name}
+              {m.email ? ` (${m.email})` : ''}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <h2 className="text-sm font-semibold text-white/40 uppercase tracking-wider mb-3">Members</h2>
       {members.length === 0 ? (
@@ -94,9 +131,14 @@ export default function FamilyDetailPage() {
               <div>
                 <p className="text-white font-medium">
                   {m.first_name} {m.last_name}
-                  {m.auth_user_id && (
+                  {family.billing_member_id === m.id && (
                     <span className="ml-2 text-[10px] uppercase tracking-wide bg-blue-500/15 text-blue-300 px-2 py-0.5 rounded-full">
-                      Portal access
+                      Billing
+                    </span>
+                  )}
+                  {m.auth_user_id && (
+                    <span className="ml-2 text-[10px] uppercase tracking-wide bg-green-500/15 text-green-300 px-2 py-0.5 rounded-full">
+                      Portal
                     </span>
                   )}
                 </p>

@@ -9,7 +9,10 @@ export type FamilyWithCount = Pick<FamilyRow, 'id' | 'family_name' | 'primary_em
   member_count: number;
 };
 
-export type FamilyDetail = Pick<FamilyRow, 'id' | 'family_name' | 'primary_email' | 'created_at'>;
+export type FamilyDetail = Pick<
+  FamilyRow,
+  'id' | 'family_name' | 'primary_email' | 'created_at' | 'billing_member_id'
+>;
 
 export type FamilyMemberSummary = Pick<
   MemberRow,
@@ -46,7 +49,7 @@ export async function getFamilyWithMembers(
   const [{ data: family, error: famErr }, { data: members, error: memErr }] = await Promise.all([
     admin
       .from('families')
-      .select('id, family_name, primary_email, created_at')
+      .select('id, family_name, primary_email, created_at, billing_member_id')
       .eq('id', familyId)
       .eq('gym_id', gymId)
       .maybeSingle(),
@@ -66,4 +69,34 @@ export async function getFamilyWithMembers(
     family: family as FamilyDetail,
     members: (members ?? []) as FamilyMemberSummary[],
   };
+}
+
+export async function setFamilyBillingContact(
+  gymId: string,
+  familyId: string,
+  billingMemberId: string | null
+): Promise<FamilyDetail> {
+  const admin = getAdminClient();
+
+  if (billingMemberId) {
+    const { data: member } = await admin
+      .from('members')
+      .select('id')
+      .eq('id', billingMemberId)
+      .eq('family_id', familyId)
+      .eq('gym_id', gymId)
+      .maybeSingle();
+    if (!member) throw new ServiceError(400, 'Billing contact must be a member of this family.');
+  }
+
+  const { data, error } = await admin
+    .from('families')
+    .update({ billing_member_id: billingMemberId })
+    .eq('id', familyId)
+    .eq('gym_id', gymId)
+    .select('id, family_name, primary_email, created_at, billing_member_id')
+    .single();
+
+  if (error || !data) throw new ServiceError(500, error?.message ?? 'Update failed');
+  return data as FamilyDetail;
 }

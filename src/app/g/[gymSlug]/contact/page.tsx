@@ -2,8 +2,14 @@ import { notFound } from 'next/navigation';
 import { getPublicGymBySlug, formatGymAddress } from '@/lib/gym-public';
 import { listLocations } from '@/services/gym-locations';
 import ContactForm from '@/components/gym-public/ContactForm';
+import { resolveGymPageMetadata } from '@/lib/seo/gym-seo';
 
 type Props = { params: Promise<{ gymSlug: string }> };
+
+export async function generateMetadata({ params }: Props) {
+  const { gymSlug } = await params;
+  return resolveGymPageMetadata(gymSlug, { title: 'Contact', path: '/contact' });
+}
 
 export default async function GymContactPage({ params }: Props) {
   const { gymSlug } = await params;

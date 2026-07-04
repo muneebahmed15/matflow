@@ -12,8 +12,8 @@
 - [x] 4.7 Promote member UI (done)
 - [x] 4.8 Promotion notes field (done)
 - [x] 4.9 Promotion ceremony date separate from promoted_at
-- [ ] 4.10 Promotion certificate PDF generation
-- [ ] 4.11 Bulk promotion event (belt ceremony mode)
+- [x] 4.10 Promotion certificate PDF generation
+- [x] 4.11 Bulk promotion event (belt ceremony mode)
 - [x] 4.12 Undo promotion (admin only, last promotion per member)
 - [ ] 4.13 Promotion approval workflow (coach proposes, admin approves)
 

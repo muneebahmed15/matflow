@@ -57,6 +57,7 @@ export default function SettingsPage() {
       dailyDigestEnabled: settings.daily_digest_enabled,
       logoUrl: settings.logo_url,
       faviconUrl: settings.favicon_url,
+      heroImageUrl: settings.hero_image_url,
       primaryColor: settings.primary_color,
       tagline: settings.tagline,
       aboutText: settings.about_text,
@@ -287,6 +288,16 @@ export default function SettingsPage() {
               className={inputClass}
             />
             <p className="text-white/20 text-xs mt-1">Shown in browser tabs for your public site at /g/{settings.slug}</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Hero background image URL</label>
+            <input
+              value={settings.hero_image_url ?? ''}
+              onChange={(e) => update({ hero_image_url: e.target.value })}
+              placeholder="https://.../hero.jpg"
+              className={inputClass}
+            />
+            <p className="text-white/20 text-xs mt-1">Wide banner behind the home page hero section</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Primary Color</label>
