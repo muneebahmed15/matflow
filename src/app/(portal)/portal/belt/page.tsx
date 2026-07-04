@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { getBeltProgress } from '@/lib/belt-progress';
 import { usePortalMember } from '@/lib/portal-member-context';
 import { ListSkeleton } from '@/components/LoadingSkeleton';
+import PortalEmptyState from '@/components/portal/PortalEmptyState';
+import { Award } from 'lucide-react';
 
 type Promotion = {
   id: string;
@@ -80,7 +82,13 @@ export default function PortalBeltPage() {
       <div>
         <h2 className="font-semibold text-white mb-3">Promotion History</h2>
         {promotions.length === 0 ? (
-          <p className="text-white/30 text-sm">No promotions recorded yet. Keep training!</p>
+          <PortalEmptyState
+            icon={Award}
+            title="No promotions yet"
+            description="Your coach will record belt promotions here as you progress. Keep showing up!"
+            actionLabel="View class schedule"
+            actionHref="/portal/classes"
+          />
         ) : (
           <div className="space-y-2">
             {promotions.map((p) => (

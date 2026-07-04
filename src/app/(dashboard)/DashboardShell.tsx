@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { getCurrentStaffInfo, canAccessRoute, type StaffRole } from '@/lib/permissions'
+import { canAccessRoute, type StaffRole } from '@/lib/permissions'
+import { getDashboardSessionAction } from '@/app/(dashboard)/actions'
 import { LayoutDashboard, Users, UserCheck, Calendar, CreditCard, Settings, LogOut, Menu, X, FileText, Dumbbell, Award, UserPlus, ShieldCheck, Trophy } from 'lucide-react'
 import Logo from '@/components/Logo'
 
@@ -39,16 +40,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       if (!user) { router.push('/login'); return }
       setUser(user)
 
-      const staffInfo = await getCurrentStaffInfo()
-      if (!staffInfo.role) { router.push('/onboarding'); return }
-      setRole(staffInfo.role)
+      const session = await getDashboardSessionAction()
+      if (!session.ok || !session.data) { router.push('/onboarding'); return }
+      setRole(session.data.role)
+      setGymName(session.data.gymName)
 
-      if (staffInfo.gymId) {
-        const { data: gym } = await supabase.from('gyms').select('name').eq('id', staffInfo.gymId).single()
-        if (gym?.name) setGymName(gym.name)
-      }
-
-      if (!canAccessRoute(staffInfo.role, pathname)) {
+      if (!canAccessRoute(session.data.role, pathname)) {
         router.push('/dashboard')
         return
       }

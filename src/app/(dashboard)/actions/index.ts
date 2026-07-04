@@ -1,4 +1,5 @@
 export type { ActionResult } from './_shared';
+export * from './page-data';
 export * from './events';
 export * from './ai';
 export * from './belts';

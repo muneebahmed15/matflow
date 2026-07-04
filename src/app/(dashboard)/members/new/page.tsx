@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getCurrentStaffInfo } from '@/lib/permissions'
 import { createMemberAction, listFamiliesAction } from '@/app/(dashboard)/actions'
 
 interface Family {
@@ -29,8 +28,6 @@ export default function AddMemberPage() {
 
   useEffect(() => {
     void (async () => {
-      const info = await getCurrentStaffInfo()
-      if (!info.gymId) return
       const result = await listFamiliesAction()
       if (result.ok && result.data) setFamilies(result.data)
     })()

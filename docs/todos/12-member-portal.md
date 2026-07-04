@@ -129,7 +129,7 @@
 
 - [ ] 12.43 Error boundaries per section
 
-- [ ] 12.44 Empty states with CTAs
+- [x] 12.44 Empty states with CTAs
 
 
 
@@ -137,7 +137,7 @@
 
 - [x] 12.45 RLS: member sees only own data (done)
 
-- [ ] 12.46 Session timeout warning
+- [x] 12.46 Session timeout warning
 
 - [ ] 12.47 Device management (logout all)
 

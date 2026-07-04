@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { getCurrentStaffInfo } from '@/lib/permissions'
 import { hasCapability } from '@/lib/permissions/capabilities'
 import { Award, Plus, Download, CheckCircle2 } from 'lucide-react'
 import {
@@ -13,6 +11,8 @@ import {
   listBeltRequirementsAction,
   saveBeltRequirementAction,
   exportMembersByBeltCsvAction,
+  getBeltsPageDataAction,
+  getStaffContextAction,
 } from '@/app/(dashboard)/actions'
 import { BELT_COLORS } from '@/lib/belt-colors'
 import { useAppUi } from '@/components/ui/AppUiProvider'
@@ -21,8 +21,8 @@ interface Member {
   id: string
   first_name: string
   last_name: string
-  belt_rank: string
-  email: string
+  belt_rank: string | null
+  email: string | null
 }
 
 interface BeltPromotion {
@@ -55,7 +55,7 @@ interface RequirementRow {
   min_days_at_rank: number
 }
 
-const beltBadge = (belt: string) => BELT_COLORS[belt] ?? 'bg-white/10 text-white'
+const beltBadge = (belt: string | null) => BELT_COLORS[belt ?? ''] ?? 'bg-white/10 text-white'
 
 export default function BeltsPage() {
   const { confirm, error: showError, success: showSuccess } = useAppUi()
@@ -81,26 +81,27 @@ export default function BeltsPage() {
   const [reqAttendance, setReqAttendance] = useState('50')
   const [reqDays, setReqDays] = useState('365')
 
-  const reload = async (gid: string) => {
-    const [{ data: membersData }, { data: promoData }, readyResult, reqResult] = await Promise.all([
-      supabase.from('members').select('id, first_name, last_name, belt_rank, email').eq('gym_id', gid).eq('status', 'active').order('first_name'),
-      supabase.from('belt_promotions').select('*, members(first_name, last_name)').eq('gym_id', gid).order('promoted_at', { ascending: false }).limit(20),
+  const reload = async () => {
+    const [pageResult, readyResult, reqResult] = await Promise.all([
+      getBeltsPageDataAction(),
       getPromotionReadinessAction(),
       listBeltRequirementsAction(),
     ])
-    setMembers(membersData || [])
-    setPromotions(promoData || [])
+    if (pageResult.ok && pageResult.data) {
+      setMembers(pageResult.data.members)
+      setPromotions(pageResult.data.promotions as BeltPromotion[])
+    }
     if (readyResult.ok && readyResult.data) setReadiness(readyResult.data)
     if (reqResult.ok && reqResult.data) setRequirements(reqResult.data)
   }
 
   useEffect(() => {
     const load = async () => {
-      const info = await getCurrentStaffInfo()
-      if (!info.gymId) return
-      setGymId(info.gymId)
-      setIsAdmin(info.role === 'admin')
-      setCanPromote(hasCapability(info.role, 'belts.promote'))
+      const context = await getStaffContextAction()
+      if (!context.ok || !context.data) return
+      setGymId(context.data.gymId)
+      setIsAdmin(context.data.role === 'admin')
+      setCanPromote(hasCapability(context.data.role, 'belts.promote'))
 
       const systemResult = await getGymBeltSystemAction()
       if (systemResult.ok && systemResult.data) {
@@ -108,7 +109,7 @@ export default function BeltsPage() {
         setToBelt(systemResult.data.belts[1] ?? systemResult.data.belts[0])
       }
 
-      await reload(info.gymId)
+      await reload()
       setLoading(false)
     }
     void load()
@@ -122,7 +123,7 @@ export default function BeltsPage() {
 
     const result = await promoteMemberAction({
       memberId: selectedMember,
-      fromBelt: member.belt_rank,
+      fromBelt: member.belt_rank ?? 'white',
       toBelt,
       notes,
       ceremonyDate: ceremonyDate || null,
@@ -132,7 +133,7 @@ export default function BeltsPage() {
       setSubmitting(false)
       return
     }
-    await reload(gymId)
+    await reload()
     setSelectedMember('')
     setNotes('')
     setCeremonyDate('')
@@ -152,7 +153,7 @@ export default function BeltsPage() {
     if (!ok) return
     const result = await undoPromotionAction(promotionId)
     if (!result.ok) { showError(result.error); return }
-    await reload(gymId)
+    await reload()
     showSuccess('Promotion undone')
   }
 
@@ -164,7 +165,7 @@ export default function BeltsPage() {
       minDaysAtRank: parseInt(reqDays, 10) || 0,
     })
     if (!result.ok) { showError(result.error); return }
-    await reload(gymId)
+    await reload()
     showSuccess('Requirement saved')
   }
 
@@ -247,8 +248,8 @@ export default function BeltsPage() {
             <div className="flex items-center gap-4 p-3 bg-white/5 rounded-xl">
               <div>
                 <p className="text-white/40 text-xs mb-1">Current Belt</p>
-                <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${beltBadge(selectedMemberData.belt_rank)}`}>
-                  {selectedMemberData.belt_rank}
+                <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${beltBadge(selectedMemberData.belt_rank ?? 'white')}`}>
+                  {selectedMemberData.belt_rank ?? 'white'}
                 </span>
               </div>
               <div className="text-white/20 text-lg">→</div>

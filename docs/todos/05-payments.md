@@ -3,7 +3,7 @@
 ## Plans
 - [x] 5.1 Plans table with stripe_price_id (done)
 - [x] 5.2 Create plan API route (done)
-- [ ] 5.3 Plans dashboard UI polish
+- [x] 5.3 Plans dashboard UI polish
 - [ ] 5.4 Plan description rich text
 - [x] 5.5 Plan trial period days (`plans.trial_days` → Stripe trial)
 - [ ] 5.6 Plan setup fee

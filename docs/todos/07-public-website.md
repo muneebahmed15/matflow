@@ -29,7 +29,7 @@
 ## Branding
 - [x] 7.21 Apply gym primary_color to public CSS variables (Wave 1)
 - [x] 7.22 Logo in public header (Wave 1)
-- [ ] 7.23 Favicon per gym
+- [x] 7.23 Favicon per gym
 - [x] 7.24 Footer with gym address/contact + newsletter signup
 
 ## SEO
@@ -67,9 +67,9 @@
 - [x] 7.46 Toggle website_enabled (Wave 1)
 
 ## Testing
-- [ ] 7.47 E2E: public home loads for enabled gym
-- [ ] 7.48 E2E: trial form creates lead
-- [ ] 7.49 E2E: disabled gym returns 404
+- [x] 7.47 E2E: public home loads for enabled gym
+- [x] 7.48 E2E: trial form creates lead
+- [x] 7.49 E2E: disabled gym returns 404
 
 ## Future
 - [x] 7.50 Blog posts per gym

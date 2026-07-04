@@ -131,7 +131,7 @@ export default function MembersPage() {
                   <td className="px-5 py-3 text-white/40 hidden md:table-cell">{m.email ?? '—'}</td>
                   <td className="px-5 py-3">
                     <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${beltColor[m.belt_rank] || 'bg-white/5 text-white/40'}`}
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${beltColor[m.belt_rank ?? ''] || 'bg-white/5 text-white/40'}`}
                     >
                       {m.belt_rank}
                     </span>

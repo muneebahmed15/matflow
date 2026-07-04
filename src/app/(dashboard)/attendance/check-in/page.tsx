@@ -1,115 +1,85 @@
-'use client'
+'use client';
 
-import { useEffect, useMemo, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { getCurrentStaffInfo } from '@/lib/permissions'
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getCheckInPageDataAction } from '@/app/(dashboard)/actions';
 
 type Member = {
-  id: string
-  first_name: string
-  last_name: string
-  email: string
-  phone: string | null
-}
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+};
 
 export default function CheckInPage() {
-  const [gymId, setGymId] = useState<string | null>(null)
-  const [members, setMembers] = useState<Member[]>([])
-  const [search, setSearch] = useState('')
-  const [checkedIn, setCheckedIn] = useState<Set<string>>(new Set())
-  const [loading, setLoading] = useState<string | null>(null)
-  const [pageLoading, setPageLoading] = useState(true)
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [gymId, setGymId] = useState<string | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [search, setSearch] = useState('');
+  const [checkedIn, setCheckedIn] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState<string | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const load = useCallback(async () => {
+    const result = await getCheckInPageDataAction();
+    if (result.ok && result.data) {
+      setMembers(result.data.members);
+      setCheckedIn(new Set(result.data.checkedInMemberIds));
+      setGymId(result.data.gymId);
+    }
+    setPageLoading(false);
+  }, []);
 
   useEffect(() => {
-    const load = async () => {
-      const info = await getCurrentStaffInfo()
-      if (!info.gymId) {
-        setPageLoading(false)
-        return
-      }
-      setGymId(info.gymId)
-
-      const [{ data: memberData }, { data: todayAttendance }] = await Promise.all([
-        supabase
-          .from('members')
-          .select('id, first_name, last_name, email, phone')
-          .eq('gym_id', info.gymId)
-          .eq('status', 'active')
-          .order('first_name'),
-        supabase
-          .from('attendance')
-          .select('member_id')
-          .eq('gym_id', info.gymId)
-          .gte('checked_in_at', `${new Date().toISOString().split('T')[0]}T00:00:00`)
-          .lte('checked_in_at', `${new Date().toISOString().split('T')[0]}T23:59:59`),
-      ])
-
-      setMembers(memberData || [])
-      setCheckedIn(new Set((todayAttendance || []).map((a) => a.member_id)))
-      setPageLoading(false)
-    }
-
-    void load()
-  }, [])
+    void load();
+  }, [load]);
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase()
+    const q = search.toLowerCase();
     return members.filter(
       (m) =>
         m.first_name.toLowerCase().includes(q) ||
         m.last_name.toLowerCase().includes(q) ||
         (m.email ?? '').toLowerCase().includes(q)
-    )
-  }, [search, members])
+    );
+  }, [search, members]);
 
   const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 4000)
-  }
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   const handleCheckIn = async (member: Member) => {
-    if (!gymId) return
-    setLoading(member.id)
+    if (!gymId) return;
+    setLoading(member.id);
 
     const res = await fetch('/api/attendance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        member_id: member.id,
-        gym_id: gymId,
-      }),
-    })
+      body: JSON.stringify({ member_id: member.id, gym_id: gymId }),
+    });
 
-    const data = (await res.json()) as { error?: string }
-    setLoading(null)
+    const data = (await res.json()) as { error?: string };
+    setLoading(null);
 
     if (!res.ok) {
       if (res.status === 409) {
-        setCheckedIn((prev) => new Set([...prev, member.id]))
+        setCheckedIn((prev) => new Set([...prev, member.id]));
       }
-      showToast(data.error || 'Check-in failed', 'error')
-      return
+      showToast(data.error || 'Check-in failed', 'error');
+      return;
     }
 
-    setCheckedIn((prev) => new Set([...prev, member.id]))
-    showToast(`${member.first_name} ${member.last_name} checked in`, 'success')
-  }
+    setCheckedIn((prev) => new Set([...prev, member.id]));
+    showToast(`${member.first_name} ${member.last_name} checked in`, 'success');
+  };
 
   if (pageLoading) {
-    return (
-      <div className="p-8 max-w-2xl mx-auto text-center text-white/40 py-12">
-        Loading...
-      </div>
-    )
+    return <div className="p-8 max-w-2xl mx-auto text-center text-white/40 py-12">Loading...</div>;
   }
 
   if (!gymId) {
-    return (
-      <div className="p-8 max-w-2xl mx-auto text-center text-white/40 py-12">
-        No gym access found for your account.
-      </div>
-    )
+    return <div className="p-8 max-w-2xl mx-auto text-center text-white/40 py-12">No gym access found for your account.</div>;
   }
 
   return (
@@ -140,17 +110,12 @@ export default function CheckInPage() {
       />
 
       <div className="space-y-2">
-        {filtered.length === 0 && (
-          <p className="text-white/30 text-sm text-center py-12">No members found.</p>
-        )}
+        {filtered.length === 0 && <p className="text-white/30 text-sm text-center py-12">No members found.</p>}
         {filtered.map((member) => {
-          const done = checkedIn.has(member.id)
-          const busy = loading === member.id
+          const done = checkedIn.has(member.id);
+          const busy = loading === member.id;
           return (
-            <div
-              key={member.id}
-              className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3"
-            >
+            <div key={member.id} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3">
               <div>
                 <p className="text-white font-semibold">
                   {member.first_name} {member.last_name}
@@ -171,9 +136,9 @@ export default function CheckInPage() {
                 {done ? 'Checked In ✓' : busy ? 'Checking...' : 'Check In'}
               </button>
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }

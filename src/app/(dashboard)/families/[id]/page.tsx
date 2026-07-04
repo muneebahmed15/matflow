@@ -1,29 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import { getCurrentStaffInfo } from '@/lib/permissions';
 import { Users, ArrowLeft } from 'lucide-react';
 import PageLoader from '@/components/PageLoader';
-
-type Family = {
-  id: string;
-  family_name: string;
-  primary_email: string | null;
-  created_at: string;
-};
-
-type FamilyMember = {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string | null;
-  status: string;
-  belt_rank: string | null;
-  auth_user_id: string | null;
-};
+import { getFamilyDetailAction } from '@/app/(dashboard)/actions';
 
 const STATUS_STYLES: Record<string, string> = {
   active: 'bg-green-500/10 text-green-400',
@@ -34,35 +16,37 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function FamilyDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [family, setFamily] = useState<Family | null>(null);
-  const [members, setMembers] = useState<FamilyMember[]>([]);
+  const [family, setFamily] = useState<{
+    id: string;
+    family_name: string;
+    primary_email: string | null;
+    created_at: string;
+  } | null>(null);
+  const [members, setMembers] = useState<
+    {
+      id: string;
+      first_name: string;
+      last_name: string;
+      email: string | null;
+      status: string;
+      belt_rank: string | null;
+      auth_user_id: string | null;
+    }[]
+  >([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    void (async () => {
-      const info = await getCurrentStaffInfo();
-      if (!info.gymId) { setLoading(false); return; }
-
-      const [{ data: fam }, { data: mems }] = await Promise.all([
-        supabase
-          .from('families')
-          .select('id, family_name, primary_email, created_at')
-          .eq('id', id)
-          .eq('gym_id', info.gymId)
-          .maybeSingle(),
-        supabase
-          .from('members')
-          .select('id, first_name, last_name, email, status, belt_rank, auth_user_id')
-          .eq('family_id', id)
-          .eq('gym_id', info.gymId)
-          .order('first_name'),
-      ]);
-
-      setFamily((fam as Family) ?? null);
-      setMembers((mems as FamilyMember[]) ?? []);
-      setLoading(false);
-    })();
+  const load = useCallback(async () => {
+    const result = await getFamilyDetailAction(id);
+    if (result.ok && result.data) {
+      setFamily(result.data.family);
+      setMembers(result.data.members);
+    }
+    setLoading(false);
   }, [id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   if (loading) return <PageLoader />;
 

@@ -3,11 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ToggleLeft, ToggleRight } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import {
   getWaiverAction,
   getWaiverSignaturesAction,
   toggleWaiverStatusAction,
+  getStaffContextAction,
 } from '@/app/(dashboard)/actions'
 import type { Waiver } from '@/services/waivers'
 import { formatTimestampInGymTimezone } from '@/lib/gym-public-time'
@@ -38,12 +38,8 @@ export default function WaiverDetailPage() {
       ])
       if (waiverResult.ok && waiverResult.data) {
         setWaiver(waiverResult.data)
-        const { data: gym } = await supabase
-          .from('gyms')
-          .select('timezone')
-          .eq('id', waiverResult.data.gym_id)
-          .maybeSingle()
-        if (gym?.timezone) setGymTimezone(gym.timezone)
+        const context = await getStaffContextAction()
+        if (context.ok && context.data?.timezone) setGymTimezone(context.data.timezone)
       } else if (!waiverResult.ok) showError(waiverResult.error)
       if (sigResult.ok && sigResult.data) setSignatures(sigResult.data as Signature[])
       setLoading(false)

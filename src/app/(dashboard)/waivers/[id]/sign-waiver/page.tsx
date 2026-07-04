@@ -2,71 +2,61 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import {
-  getWaivers,
-  hasSignedWaiver,
-  getMemberSignatures,
-  type Waiver,
-  type WaiverSignature,
-} from '@/lib/waivers';
-import { signWaiverAction } from '@/app/(dashboard)/actions';
+import { getSignWaiverPageDataAction, signWaiverAction } from '@/app/(dashboard)/actions';
+import type { Waiver } from '@/services/waivers';
 import WaiverSignatureBox from '@/components/WaiverSignatureBox';
 
-type Member = { id: string; first_name: string; last_name: string; gym_id: string };
-type SignatureWithWaiver = WaiverSignature & { waivers: { title: string } };
+type SignatureWithWaiver = {
+  id: string;
+  waiver_id: string;
+  signed_at: string;
+  waivers: { title: string };
+};
 
 export default function SignWaiverPage() {
   const { id: memberId } = useParams<{ id: string }>();
   const router = useRouter();
 
-  const [member, setMember] = useState<Member | null>(null);
+  const [member, setMember] = useState<{ id: string; first_name: string; last_name: string; gym_id: string } | null>(null);
   const [waivers, setWaivers] = useState<Waiver[]>([]);
   const [selected, setSelected] = useState<Waiver | null>(null);
   const [alreadySigned, setAlreadySigned] = useState(false);
   const [signedAt, setSignedAt] = useState<string | undefined>();
   const [existingSigs, setExistingSigs] = useState<SignatureWithWaiver[]>([]);
+  const [signedWaiverIds, setSignedWaiverIds] = useState<string[]>([]);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
-      const { data: mem } = await supabase
-        .from('members')
-        .select('id, first_name, last_name, gym_id')
-        .eq('id', memberId)
-        .single();
-
-      if (!mem) return;
-      setMember(mem);
-
-      const gymWaivers = await getWaivers(mem.gym_id);
-      const active = gymWaivers.filter((w) => w.is_active);
-      setWaivers(active);
-
-      const sigs = await getMemberSignatures(memberId);
-      setExistingSigs(sigs as SignatureWithWaiver[]);
-
-      if (active.length > 0) {
-        setSelected(active[0]);
-        const signed = await hasSignedWaiver(active[0].id, memberId);
+    void (async () => {
+      const result = await getSignWaiverPageDataAction(memberId);
+      if (!result.ok || !result.data) {
+        setLoading(false);
+        return;
+      }
+      setMember(result.data.member);
+      setWaivers(result.data.waivers);
+      setExistingSigs(result.data.existingSignatures as SignatureWithWaiver[]);
+      setSignedWaiverIds(result.data.signedWaiverIds);
+      if (result.data.waivers.length > 0) {
+        const first = result.data.waivers[0];
+        setSelected(first);
+        const signed = result.data.signedWaiverIds.includes(first.id);
         setAlreadySigned(signed);
         if (signed) {
-          const match = sigs.find((s) => s.waiver_id === active[0].id);
+          const match = result.data.existingSignatures.find((s) => s.waiver_id === first.id);
           setSignedAt(match?.signed_at);
         }
       }
-
       setLoading(false);
-    }
-    load();
+    })();
   }, [memberId]);
 
-  const handleSelectWaiver = async (waiver: Waiver) => {
+  const handleSelectWaiver = (waiver: Waiver) => {
     setSelected(waiver);
     setSuccess(false);
-    const signed = await hasSignedWaiver(waiver.id, memberId);
+    const signed = signedWaiverIds.includes(waiver.id);
     setAlreadySigned(signed);
     if (signed) {
       const match = existingSigs.find((s) => s.waiver_id === waiver.id);
@@ -90,14 +80,17 @@ export default function SignWaiverPage() {
     }
     setAlreadySigned(true);
     setSignedAt(new Date().toISOString());
+    setSignedWaiverIds((prev) => [...prev, selected.id]);
     setSuccess(true);
   };
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-      <p className="text-gray-500">Loading…</p>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <p className="text-gray-500">Loading…</p>
+      </div>
+    );
+  }
 
   const memberName = member ? `${member.first_name} ${member.last_name}` : '';
 
@@ -145,9 +138,7 @@ export default function SignWaiverPage() {
                 <div className="rounded-xl border border-white/10 bg-white/5 p-5 mb-2">
                   <h2 className="font-semibold mb-3">{selected.title}</h2>
                   <div className="max-h-64 overflow-y-auto pr-1">
-                    <pre className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap font-sans">
-                      {selected.body}
-                    </pre>
+                    <pre className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap font-sans">{selected.body}</pre>
                   </div>
                 </div>
 

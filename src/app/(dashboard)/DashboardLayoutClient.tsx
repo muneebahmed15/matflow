@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { getCurrentStaffInfo, canAccessRoute, type StaffRole } from '@/lib/permissions'
+import { canAccessRoute, type StaffRole } from '@/lib/permissions'
+import { getDashboardSessionAction } from '@/app/(dashboard)/actions'
 import { LayoutDashboard, Users, UserCheck, Calendar, CreditCard, Settings, LogOut, Menu, X, FileText, Dumbbell, Award, UserPlus, ShieldCheck, Upload, Megaphone, ShoppingBag, Sparkles, Globe, ScrollText, UsersRound, Bot, Inbox } from 'lucide-react'
 import Logo from '@/components/Logo'
 import { AppUiProvider } from '@/components/ui/AppUiProvider'
@@ -49,27 +50,20 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
       if (!user) { router.push('/login'); return }
       setUser(user)
 
-      const staffInfo = await getCurrentStaffInfo()
-      if (!staffInfo.role) {
+      const session = await getDashboardSessionAction()
+      if (!session.ok || !session.data) {
         router.push('/onboarding')
         return
       }
-      setRole(staffInfo.role)
+      setRole(session.data.role)
 
-      if (staffInfo.gymId) {
-        const { data: gym } = await supabase
-          .from('gyms')
-          .select('name, setup_completed_at')
-          .eq('id', staffInfo.gymId)
-          .single()
-        if (gym?.name) setGymName(gym.name)
-        if (!gym?.setup_completed_at) {
-          router.push('/setup')
-          return
-        }
+      setGymName(session.data.gymName)
+      if (!session.data.setupCompletedAt) {
+        router.push('/setup')
+        return
       }
 
-      if (!canAccessRoute(staffInfo.role, pathname)) {
+      if (!canAccessRoute(session.data.role, pathname)) {
         router.push('/dashboard')
         return
       }

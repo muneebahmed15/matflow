@@ -55,6 +55,7 @@ export default function SettingsPage() {
       aiFrontDeskEnabled: settings.ai_front_desk_enabled,
       dailyDigestEnabled: settings.daily_digest_enabled,
       logoUrl: settings.logo_url,
+      faviconUrl: settings.favicon_url,
       primaryColor: settings.primary_color,
       tagline: settings.tagline,
       aboutText: settings.about_text,
@@ -205,6 +206,16 @@ export default function SettingsPage() {
               placeholder="https://..."
               className={inputClass}
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Favicon URL</label>
+            <input
+              value={settings.favicon_url ?? ''}
+              onChange={(e) => update({ favicon_url: e.target.value })}
+              placeholder="https://.../favicon.ico"
+              className={inputClass}
+            />
+            <p className="text-white/20 text-xs mt-1">Shown in browser tabs for your public site at /g/{settings.slug}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Primary Color</label>

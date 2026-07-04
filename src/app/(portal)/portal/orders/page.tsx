@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { Package } from 'lucide-react';
 import { usePortalMember } from '@/lib/portal-member-context';
 import { ListSkeleton } from '@/components/LoadingSkeleton';
+import PortalEmptyState from '@/components/portal/PortalEmptyState';
 
 type Order = {
   id: string;
@@ -47,10 +48,13 @@ export default function PortalOrdersPage() {
         </p>
       </div>
       {orders.length === 0 ? (
-        <div className="text-center py-12 text-white/30">
-          <Package size={40} className="mx-auto mb-3 opacity-30" />
-          No orders yet.
-        </div>
+        <PortalEmptyState
+          icon={Package}
+          title="No orders yet"
+          description="When you purchase gear from the gym store, your orders will appear here."
+          actionLabel="Back to portal home"
+          actionHref="/portal"
+        />
       ) : (
         <div className="space-y-3">
           {orders.map((o) => (

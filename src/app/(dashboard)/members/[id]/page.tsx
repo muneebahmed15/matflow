@@ -1,12 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import { useParams, useRouter } from 'next/navigation'
-import { getMemberSignatures } from '@/lib/waivers'
 import { redirectTo } from '@/lib/navigation'
-import { getCurrentStaffInfo } from '@/lib/permissions'
-import { inviteMemberToPortalAction, sendWaiverLinkAction, archiveMemberAction, updateMemberStripesAction, getMemberTimelineAction } from '@/app/(dashboard)/actions'
+import {
+  inviteMemberToPortalAction,
+  sendWaiverLinkAction,
+  archiveMemberAction,
+  updateMemberStripesAction,
+  getMemberTimelineAction,
+  getMemberDetailPageDataAction,
+  updateMemberAction,
+} from '@/app/(dashboard)/actions'
 import MemberNotesPanel from '@/components/members/MemberNotesPanel'
 import MemberEmergencyContactsPanel from '@/components/members/MemberEmergencyContactsPanel'
 
@@ -28,11 +33,11 @@ const TIMELINE_COLORS: Record<string, string> = {
 
 interface Member {
   id: string; first_name: string; last_name: string
-  email: string; phone: string; belt_rank: string; status: string
+  email: string; phone: string; belt_rank: string | null; status: string
   stripe_count?: number
 }
 interface Plan {
-  id: string; name: string; stripe_price_id: string; price_cents: number; interval: string
+  id: string; name: string; stripe_price_id: string | null; price_cents: number | null; interval: string
 }
 interface AttendanceRecord {
   id: string; checked_in_at: string
@@ -65,31 +70,18 @@ export default function MemberDetailPage() {
     let cancelled = false
 
     async function loadMember() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || cancelled) return
-      const staffInfo = await getCurrentStaffInfo()
-      if (staffInfo.gymId && !cancelled) {
-        setGymId(staffInfo.gymId)
-        const { data: plansData } = await supabase
-          .from('plans')
-          .select('id, name, stripe_price_id, price_cents, interval')
-          .eq('gym_id', staffInfo.gymId)
-        if (!cancelled) setPlans(plansData || [])
-      }
-      const { data: memberData } = await supabase.from('members').select('*').eq('id', id).single()
-      if (memberData && !cancelled) setMember(memberData)
-      const { data: attendanceData } = await supabase
-        .from('attendance')
-        .select('id, checked_in_at')
-        .eq('member_id', id)
-        .order('checked_in_at', { ascending: false })
-        .limit(10)
-      if (!cancelled) setAttendance(attendanceData || [])
-      const sigs = await getMemberSignatures(id)
-      if (!cancelled) {
-        setSignatures(sigs as WaiverSig[])
+      const result = await getMemberDetailPageDataAction(id)
+      if (cancelled) return
+      if (!result.ok || !result.data) {
         setLoading(false)
+        return
       }
+      setGymId(result.data.member.gym_id)
+      setMember(result.data.member as Member)
+      setPlans(result.data.plans)
+      setAttendance(result.data.attendance)
+      setSignatures(result.data.signatures as WaiverSig[])
+      setLoading(false)
     }
 
     void loadMember()
@@ -105,8 +97,8 @@ export default function MemberDetailPage() {
     })()
   }, [activeTab, timelineLoaded, id])
 
-  async function handleSubscribe(stripePriceId: string) {
-    if (!member || !gymId) return
+  async function handleSubscribe(stripePriceId: string | null) {
+    if (!member || !gymId || !stripePriceId) return
     setSubscribing(true)
     try {
       const res = await fetch('/api/stripe/create-checkout', {
@@ -128,8 +120,8 @@ export default function MemberDetailPage() {
 
   const handleEdit = async (field: string, value: string) => {
     if (!member) return
-    const { error } = await supabase.from('members').update({ [field]: value }).eq('id', member.id)
-    if (!error) setMember({ ...member, [field]: value })
+    const result = await updateMemberAction(member.id, { [field]: value })
+    if (result.ok && result.data) setMember(result.data as Member)
   }
 
   const handleArchive = async () => {
@@ -228,7 +220,7 @@ export default function MemberDetailPage() {
           </div>
           <div className="flex justify-between border-b border-white/10 pb-3">
             <span className="text-gray-400 text-sm">Belt Rank</span>
-            <select value={member.belt_rank} onChange={(e) => handleEdit('belt_rank', e.target.value)}
+            <select value={member.belt_rank ?? 'white'} onChange={(e) => handleEdit('belt_rank', e.target.value)}
               className="bg-transparent text-white text-sm capitalize cursor-pointer">
               {['white','yellow','orange','green','blue','purple','brown','black'].map(b => (
                 <option key={b} value={b} className="bg-gray-900">{b}</option>
@@ -389,7 +381,7 @@ export default function MemberDetailPage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => handleSubscribe(plan.stripe_price_id)}
+                  onClick={() => { if (plan.stripe_price_id) void handleSubscribe(plan.stripe_price_id) }}
                   disabled={subscribing || !plan.stripe_price_id}
                   className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-700 transition disabled:opacity-50">
                   {subscribing ? 'Loading...' : 'Subscribe'}

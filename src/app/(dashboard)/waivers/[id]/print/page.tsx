@@ -2,43 +2,34 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import { getCurrentStaffInfo } from '@/lib/permissions';
+import { getWaiverPrintDataAction } from '@/app/(dashboard)/actions';
 import { renderWaiverMergeFields } from '@/lib/waiver-templates';
-
-type Waiver = {
-  id: string;
-  title: string;
-  body: string;
-  version?: number;
-  created_at: string;
-};
 
 export default function WaiverPrintPage() {
   const { id } = useParams<{ id: string }>();
-  const [waiver, setWaiver] = useState<Waiver | null>(null);
+  const [waiver, setWaiver] = useState<{
+    id: string;
+    title: string;
+    body: string;
+    version: number | null;
+    created_at: string;
+  } | null>(null);
   const [gymName, setGymName] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     void (async () => {
-      const info = await getCurrentStaffInfo();
-      if (!info.gymId) { setLoading(false); return; }
-
-      const [{ data: w }, { data: gym }] = await Promise.all([
-        supabase.from('waivers').select('id, title, body, version, created_at').eq('id', id).eq('gym_id', info.gymId).maybeSingle(),
-        supabase.from('gyms').select('name').eq('id', info.gymId).maybeSingle(),
-      ]);
-
-      setWaiver((w as Waiver) ?? null);
-      setGymName(gym?.name ?? '');
+      const result = await getWaiverPrintDataAction(id);
+      if (result.ok && result.data) {
+        setWaiver(result.data.waiver);
+        setGymName(result.data.gymName);
+      }
       setLoading(false);
     })();
   }, [id]);
 
   useEffect(() => {
     if (!loading && waiver) {
-      // Give the browser a beat to paint before opening the print dialog.
       const t = setTimeout(() => window.print(), 400);
       return () => clearTimeout(t);
     }

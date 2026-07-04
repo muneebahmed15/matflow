@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePortalMember } from '@/lib/portal-member-context';
 import { ListSkeleton } from '@/components/LoadingSkeleton';
+import PortalEmptyState from '@/components/portal/PortalEmptyState';
+import { Users } from 'lucide-react';
 
 type FamilyBilling = {
   family: { family_name: string; primary_email: string | null };
@@ -35,7 +37,16 @@ export default function PortalFamilyPage() {
         <p className="text-white/40 text-sm mt-1">Switch profiles and view shared billing.</p>
       </div>
 
-      <div className="space-y-2">
+      {familyMembers.length === 0 ? (
+        <PortalEmptyState
+          icon={Users}
+          title="No family profiles"
+          description="Ask your gym to link family members to your account for easy profile switching."
+          actionLabel="Contact gym"
+          actionHref="/portal/profile"
+        />
+      ) : (
+        <div className="space-y-2">
         {familyMembers.map((m) => (
           <button
             key={m.id}
@@ -55,7 +66,8 @@ export default function PortalFamilyPage() {
             )}
           </button>
         ))}
-      </div>
+        </div>
+      )}
 
       {billing && (
         <div className="bg-[#111] border border-white/10 rounded-2xl p-5 space-y-3">

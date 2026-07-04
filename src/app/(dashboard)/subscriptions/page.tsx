@@ -1,125 +1,118 @@
-'use client'
+'use client';
 
-import Link from 'next/link'
-import { useEffect, useState, Suspense } from 'react'
-import { supabase } from '@/lib/supabase'
-import { getCurrentStaffInfo } from '@/lib/permissions'
-import { CreditCard, CheckCircle, XCircle, Download, AlertTriangle, Plus } from 'lucide-react'
-import { useSearchParams } from 'next/navigation'
+import Link from 'next/link';
+import { useEffect, useState, Suspense } from 'react';
+import { CreditCard, CheckCircle, XCircle, Download, AlertTriangle, Plus } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import {
   getRevenueMetricsAction,
   exportSubscriptionsCsvAction,
   createManualSubscriptionAction,
-} from '@/app/(dashboard)/actions'
-import { useAppUi } from '@/components/ui/AppUiProvider'
+  getSubscriptionsPageDataAction,
+} from '@/app/(dashboard)/actions';
+import { useAppUi } from '@/components/ui/AppUiProvider';
 
 type Subscription = {
-  id: string; status: string; current_period_end: string | null
-  stripe_subscription_id: string | null
-  payment_method?: string | null
-  members: { first_name: string; last_name: string; email: string } | null
-  plans: { name: string; price: number; interval: string } | null
-}
+  id: string;
+  status: string;
+  current_period_end: string | null;
+  stripe_subscription_id: string | null;
+  payment_method?: string | null;
+  members: { first_name: string; last_name: string; email: string } | null;
+  plans: { name: string; price: number; interval: string } | null;
+};
 
 type Metrics = {
-  mrrCents: number
-  activeSubscriptions: number
-  pastDueCount: number
-  churnRate30d: number
-  revenueByPlan: { planName: string; subscribers: number; mrrCents: number }[]
-}
+  mrrCents: number;
+  activeSubscriptions: number;
+  pastDueCount: number;
+  churnRate30d: number;
+  revenueByPlan: { planName: string; subscribers: number; mrrCents: number }[];
+};
 
-type Option = { id: string; label: string }
+type Option = { id: string; label: string };
 
 function SubscriptionsContent() {
-  const searchParams = useSearchParams()
-  const { error: showError, success: showSuccess } = useAppUi()
-  const success = searchParams.get('success')
-  const cancelled = searchParams.get('cancelled')
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
-  const [metrics, setMetrics] = useState<Metrics | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [showManual, setShowManual] = useState(false)
-  const [memberOptions, setMemberOptions] = useState<Option[]>([])
-  const [planOptions, setPlanOptions] = useState<Option[]>([])
-  const [manualMember, setManualMember] = useState('')
-  const [manualPlan, setManualPlan] = useState('')
-  const [manualMethod, setManualMethod] = useState<'cash' | 'check' | 'other'>('cash')
-  const [submitting, setSubmitting] = useState(false)
-  const [selectedSub, setSelectedSub] = useState<Subscription | null>(null)
+  const searchParams = useSearchParams();
+  const { error: showError, success: showSuccess } = useAppUi();
+  const success = searchParams.get('success');
+  const cancelled = searchParams.get('cancelled');
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showManual, setShowManual] = useState(false);
+  const [memberOptions, setMemberOptions] = useState<Option[]>([]);
+  const [planOptions, setPlanOptions] = useState<Option[]>([]);
+  const [manualMember, setManualMember] = useState('');
+  const [manualPlan, setManualPlan] = useState('');
+  const [manualMethod, setManualMethod] = useState<'cash' | 'check' | 'other'>('cash');
+  const [submitting, setSubmitting] = useState(false);
+  const [selectedSub, setSelectedSub] = useState<Subscription | null>(null);
 
   const load = async () => {
-    const info = await getCurrentStaffInfo()
-    if (!info.gymId) {
-      setLoading(false)
-      return
-    }
-    const [{ data }, metricsResult, { data: membersData }, { data: plansData }] = await Promise.all([
-      supabase
-        .from('subscriptions')
-        .select('id, status, current_period_end, stripe_subscription_id, payment_method, members(first_name, last_name, email), plans(name, price, interval)')
-        .eq('gym_id', info.gymId)
-        .order('created_at', { ascending: false }),
+    const [pageResult, metricsResult] = await Promise.all([
+      getSubscriptionsPageDataAction(),
       getRevenueMetricsAction(),
-      supabase.from('members').select('id, first_name, last_name').eq('gym_id', info.gymId).eq('status', 'active').order('first_name'),
-      supabase.from('plans').select('id, name').eq('gym_id', info.gymId).eq('is_active', true).order('name'),
-    ])
-    setSubscriptions((data ?? []) as unknown as Subscription[])
-    if (metricsResult.ok && metricsResult.data) setMetrics(metricsResult.data)
-    setMemberOptions((membersData ?? []).map((m) => ({ id: m.id, label: `${m.first_name} ${m.last_name}` })))
-    setPlanOptions((plansData ?? []).map((p) => ({ id: p.id, label: p.name })))
-    setLoading(false)
-  }
+    ]);
+    if (pageResult.ok && pageResult.data) {
+      setSubscriptions(pageResult.data.subscriptions);
+      setMemberOptions(pageResult.data.memberOptions);
+      setPlanOptions(pageResult.data.planOptions.map((p) => ({ id: p.id, label: p.name })));
+    }
+    if (metricsResult.ok && metricsResult.data) setMetrics(metricsResult.data);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    void load()
-  }, [])
+    void load();
+  }, []);
 
   const handleExport = async () => {
-    const result = await exportSubscriptionsCsvAction()
+    const result = await exportSubscriptionsCsvAction();
     if (!result.ok || !result.data) {
-      showError(!result.ok ? result.error : 'Export failed')
-      return
+      showError(!result.ok ? result.error : 'Export failed');
+      return;
     }
-    const blob = new Blob([result.data], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'subscriptions.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+    const blob = new Blob([result.data], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'subscriptions.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleManualCreate = async () => {
-    if (!manualMember || !manualPlan) return
-    setSubmitting(true)
+    if (!manualMember || !manualPlan) return;
+    setSubmitting(true);
     const result = await createManualSubscriptionAction({
       memberId: manualMember,
       planId: manualPlan,
       paymentMethod: manualMethod,
-    })
-    setSubmitting(false)
+    });
+    setSubmitting(false);
     if (!result.ok) {
-      showError(result.error)
-      return
+      showError(result.error);
+      return;
     }
-    showSuccess('Manual subscription added')
-    setShowManual(false)
-    setManualMember('')
-    setManualPlan('')
-    await load()
-  }
+    showSuccess('Manual subscription added');
+    setShowManual(false);
+    setManualMember('');
+    setManualPlan('');
+    await load();
+  };
 
   const statusColor = (s: string) => {
-    if (s === 'active') return 'bg-green-500/10 text-green-400 border-green-500/20'
-    if (s === 'cancelled' || s === 'canceled') return 'bg-red-500/10 text-red-400 border-red-500/20'
-    if (s === 'past_due') return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-    return 'bg-white/5 text-white/40 border-white/10'
-  }
+    if (s === 'active') return 'bg-green-500/10 text-green-400 border-green-500/20';
+    if (s === 'cancelled' || s === 'canceled') return 'bg-red-500/10 text-red-400 border-red-500/20';
+    if (s === 'past_due') return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+    return 'bg-white/5 text-white/40 border-white/10';
+  };
 
-  const inputClass = 'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+  const inputClass =
+    'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 
-  if (loading) return <div className="p-8 text-gray-400">Loading...</div>
+  if (loading) return <div className="p-8 text-gray-400">Loading...</div>;
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">
@@ -129,10 +122,16 @@ function SubscriptionsContent() {
           <p className="text-white/40 text-sm mt-1">All member billing subscriptions.</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => void handleExport()} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+          <button
+            onClick={() => void handleExport()}
+            className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 text-sm font-semibold px-4 py-2.5 rounded-xl transition"
+          >
             <Download size={16} /> Export CSV
           </button>
-          <button onClick={() => setShowManual(!showManual)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+          <button
+            onClick={() => setShowManual(!showManual)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition"
+          >
             <Plus size={16} /> Manual
           </button>
         </div>
@@ -152,9 +151,13 @@ function SubscriptionsContent() {
             <p className="text-white/40 text-xs">Churn (30d)</p>
             <p className="text-2xl font-bold text-white mt-1">{metrics.churnRate30d}%</p>
           </div>
-          <div className={`rounded-2xl p-4 border ${metrics.pastDueCount > 0 ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-[#111] border-white/10'}`}>
+          <div
+            className={`rounded-2xl p-4 border ${metrics.pastDueCount > 0 ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-[#111] border-white/10'}`}
+          >
             <p className={`text-xs ${metrics.pastDueCount > 0 ? 'text-yellow-300' : 'text-white/40'}`}>Past due</p>
-            <p className={`text-2xl font-bold mt-1 ${metrics.pastDueCount > 0 ? 'text-yellow-300' : 'text-white'}`}>{metrics.pastDueCount}</p>
+            <p className={`text-2xl font-bold mt-1 ${metrics.pastDueCount > 0 ? 'text-yellow-300' : 'text-white'}`}>
+              {metrics.pastDueCount}
+            </p>
           </div>
         </div>
       )}
@@ -163,7 +166,8 @@ function SubscriptionsContent() {
         <div className="mb-6 flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-3">
           <AlertTriangle size={16} className="text-yellow-400 shrink-0" />
           <p className="text-yellow-300 text-sm">
-            {metrics.pastDueCount} subscription{metrics.pastDueCount === 1 ? '' : 's'} past due — members are blocked from check-in until payment is resolved.
+            {metrics.pastDueCount} subscription{metrics.pastDueCount === 1 ? '' : 's'} past due — members are blocked from
+            check-in until payment is resolved.
           </p>
         </div>
       )}
@@ -175,7 +179,9 @@ function SubscriptionsContent() {
             {metrics.revenueByPlan.map((p) => (
               <div key={p.planName} className="flex justify-between text-sm">
                 <span className="text-white">{p.planName}</span>
-                <span className="text-white/50">{p.subscribers} · ${(p.mrrCents / 100).toLocaleString()}/mo</span>
+                <span className="text-white/50">
+                  {p.subscribers} · ${(p.mrrCents / 100).toLocaleString()}/mo
+                </span>
               </div>
             ))}
           </div>
@@ -189,31 +195,59 @@ function SubscriptionsContent() {
             <div>
               <label className="block text-xs text-gray-400 mb-1">Member</label>
               <select value={manualMember} onChange={(e) => setManualMember(e.target.value)} className={inputClass}>
-                <option value="" className="bg-gray-900">Select...</option>
-                {memberOptions.map((m) => <option key={m.id} value={m.id} className="bg-gray-900">{m.label}</option>)}
+                <option value="" className="bg-gray-900">
+                  Select...
+                </option>
+                {memberOptions.map((m) => (
+                  <option key={m.id} value={m.id} className="bg-gray-900">
+                    {m.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
               <label className="block text-xs text-gray-400 mb-1">Plan</label>
               <select value={manualPlan} onChange={(e) => setManualPlan(e.target.value)} className={inputClass}>
-                <option value="" className="bg-gray-900">Select...</option>
-                {planOptions.map((p) => <option key={p.id} value={p.id} className="bg-gray-900">{p.label}</option>)}
+                <option value="" className="bg-gray-900">
+                  Select...
+                </option>
+                {planOptions.map((p) => (
+                  <option key={p.id} value={p.id} className="bg-gray-900">
+                    {p.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
               <label className="block text-xs text-gray-400 mb-1">Payment method</label>
-              <select value={manualMethod} onChange={(e) => setManualMethod(e.target.value as 'cash' | 'check' | 'other')} className={inputClass}>
-                <option value="cash" className="bg-gray-900">Cash</option>
-                <option value="check" className="bg-gray-900">Check</option>
-                <option value="other" className="bg-gray-900">Other</option>
+              <select
+                value={manualMethod}
+                onChange={(e) => setManualMethod(e.target.value as 'cash' | 'check' | 'other')}
+                className={inputClass}
+              >
+                <option value="cash" className="bg-gray-900">
+                  Cash
+                </option>
+                <option value="check" className="bg-gray-900">
+                  Check
+                </option>
+                <option value="other" className="bg-gray-900">
+                  Other
+                </option>
               </select>
             </div>
           </div>
           <div className="flex gap-3">
-            <button onClick={() => void handleManualCreate()} disabled={submitting || !manualMember || !manualPlan} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
+            <button
+              onClick={() => void handleManualCreate()}
+              disabled={submitting || !manualMember || !manualPlan}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition"
+            >
               {submitting ? 'Saving...' : 'Add Subscription'}
             </button>
-            <button onClick={() => setShowManual(false)} className="px-4 border border-white/10 text-gray-400 rounded-xl hover:bg-white/5 transition">Cancel</button>
+            <button onClick={() => setShowManual(false)} className="px-4 border border-white/10 text-gray-400 rounded-xl hover:bg-white/5 transition">
+              Cancel
+            </button>
           </div>
         </div>
       )}
@@ -236,7 +270,9 @@ function SubscriptionsContent() {
           <CreditCard size={40} className="text-white/20 mx-auto mb-4" />
           <p className="text-white/40 font-medium">No subscriptions yet</p>
           <p className="text-white/20 text-sm mt-1">Subscribe a member from their profile page.</p>
-          <Link href="/members" className="mt-6 inline-block text-blue-400 text-sm hover:underline">Go to Members →</Link>
+          <Link href="/members" className="mt-6 inline-block text-blue-400 text-sm hover:underline">
+            Go to Members →
+          </Link>
         </div>
       ) : (
         <div className="space-y-3">
@@ -277,12 +313,7 @@ function SubscriptionsContent() {
 
       {selectedSub && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/60"
-            aria-label="Close"
-            onClick={() => setSelectedSub(null)}
-          />
+          <button type="button" className="absolute inset-0 bg-black/60" aria-label="Close" onClick={() => setSelectedSub(null)} />
           <div className="relative w-full max-w-md bg-[#111] border-l border-white/10 p-6 overflow-y-auto">
             <div className="flex items-start justify-between mb-6">
               <h2 className="text-xl font-bold text-white">Subscription details</h2>
@@ -294,9 +325,7 @@ function SubscriptionsContent() {
               <div>
                 <p className="text-white/40 text-xs uppercase tracking-wide mb-1">Member</p>
                 <p className="text-white font-medium">
-                  {selectedSub.members
-                    ? `${selectedSub.members.first_name} ${selectedSub.members.last_name}`
-                    : 'Unknown'}
+                  {selectedSub.members ? `${selectedSub.members.first_name} ${selectedSub.members.last_name}` : 'Unknown'}
                 </p>
                 <p className="text-white/40">{selectedSub.members?.email}</p>
               </div>
@@ -350,7 +379,7 @@ function SubscriptionsContent() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 export default function SubscriptionsPage() {
@@ -358,5 +387,5 @@ export default function SubscriptionsPage() {
     <Suspense fallback={<div className="p-8 text-gray-400">Loading...</div>}>
       <SubscriptionsContent />
     </Suspense>
-  )
+  );
 }

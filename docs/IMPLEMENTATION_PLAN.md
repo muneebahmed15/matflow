@@ -54,7 +54,7 @@ These items are being implemented in the current sprint:
 - [x] Class waitlist UI on classes page
 - [x] Waiver signature expiry on sign
 - [x] Unit tests: `gym-public`, updated `gym` service tests
-- [ ] Apply migration to Supabase (`npm run db:start` + `npm run db:reset` locally, or `npm run db:push` remote)
+- [x] Apply migration to Supabase (`npm run db:start` + `npm run db:reset` locally, or `npm run db:push` remote)
 - [x] RLS integration tests for family portal waiver access (requires `SUPABASE_TEST_*`)
 - [x] E2E: waiver blocks check-in until signed (`npm run test:e2e:waiver`)
 - [ ] Remaining 600+ todos across Waves 2–4

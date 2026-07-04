@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
-import { getCurrentStaffInfo } from '@/lib/permissions';
 import { Users } from 'lucide-react';
+import { listFamiliesPageDataAction } from '@/app/(dashboard)/actions';
 
 type FamilyRow = {
   id: string;
@@ -17,29 +16,15 @@ export default function FamiliesPage() {
   const [families, setFamilies] = useState<FamilyRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    void (async () => {
-      const info = await getCurrentStaffInfo();
-      if (!info.gymId) return;
-
-      const { data: fams } = await supabase
-        .from('families')
-        .select('id, family_name, primary_email')
-        .eq('gym_id', info.gymId)
-        .order('family_name');
-
-      const rows: FamilyRow[] = [];
-      for (const f of fams ?? []) {
-        const { count } = await supabase
-          .from('members')
-          .select('*', { count: 'exact', head: true })
-          .eq('family_id', f.id);
-        rows.push({ ...f, member_count: count ?? 0 });
-      }
-      setFamilies(rows);
-      setLoading(false);
-    })();
+  const load = useCallback(async () => {
+    const result = await listFamiliesPageDataAction();
+    if (result.ok && result.data) setFamilies(result.data);
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   return (
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
@@ -65,7 +50,9 @@ export default function FamiliesPage() {
                 <p className="text-white font-medium">{f.family_name}</p>
                 {f.primary_email && <p className="text-white/30 text-xs">{f.primary_email}</p>}
               </div>
-              <span className="text-white/40 text-sm">{f.member_count} member{f.member_count === 1 ? '' : 's'}</span>
+              <span className="text-white/40 text-sm">
+                {f.member_count} member{f.member_count === 1 ? '' : 's'}
+              </span>
             </Link>
           ))}
         </div>

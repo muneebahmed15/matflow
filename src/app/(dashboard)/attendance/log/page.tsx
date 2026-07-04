@@ -1,55 +1,43 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useCallback, useEffect, useState } from 'react';
+import { listAttendanceLogAction } from '@/app/(dashboard)/actions';
 
 type AttendanceRecord = {
-  id: string
-  checked_in_at: string
+  id: string;
+  checked_in_at: string;
   members: {
-    first_name: string
-    last_name: string
-    email: string
-  }
-}
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+};
 
 export default function AttendanceLogPage() {
-  const [gymId, setGymId] = useState<string | null>(null)
-  const [records, setRecords] = useState<AttendanceRecord[]>([])
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
-  const [loading, setLoading] = useState(true)
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [loading, setLoading] = useState(true);
+  const [hasAccess, setHasAccess] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const result = await listAttendanceLogAction(date);
+    if (result.ok && result.data) {
+      setRecords(result.data);
+      setHasAccess(true);
+    } else if (!result.ok) {
+      setHasAccess(false);
+    }
+    setLoading(false);
+  }, [date]);
 
   useEffect(() => {
-    const loadGym = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: gym } = await supabase
-        .from('gyms')
-        .select('id')
-        .eq('owner_id', user.id)
-        .single()
-      if (gym) setGymId(gym.id)
-    }
-    loadGym()
-  }, [])
+    void load();
+  }, [load]);
 
-  useEffect(() => {
-    if (!gymId) return
-    const load = async () => {
-      setLoading(true)
-      const { data } = await supabase
-        .from('attendance')
-        .select('id, checked_in_at, members(first_name, last_name, email)')
-        .eq('gym_id', gymId)
-        .gte('checked_in_at', `${date}T00:00:00`)
-        .lte('checked_in_at', `${date}T23:59:59`)
-        .order('checked_in_at', { ascending: false })
-
-      setRecords((data ?? []) as unknown as AttendanceRecord[])
-      setLoading(false)
-    }
-    load()
-  }, [gymId, date])
+  if (!hasAccess && !loading) {
+    return <div className="p-8 max-w-3xl mx-auto text-white/40">No gym access found for your account.</div>;
+  }
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
@@ -73,10 +61,7 @@ export default function AttendanceLogPage() {
 
       <div className="space-y-2">
         {records.map((r) => (
-          <div
-            key={r.id}
-            className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3"
-          >
+          <div key={r.id} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3">
             <div>
               <p className="text-white font-semibold">
                 {r.members.first_name} {r.members.last_name}
@@ -90,5 +75,5 @@ export default function AttendanceLogPage() {
         ))}
       </div>
     </div>
-  )
+  );
 }
