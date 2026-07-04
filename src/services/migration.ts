@@ -3,6 +3,7 @@ import { ServiceError } from '@/services/errors';
 import { createMember } from '@/services/members';
 
 export const MAX_IMPORT_ROWS = 5000;
+export const IMPORT_BATCH_SIZE = 25;
 
 export type ImportJob = {
   id: string;
@@ -143,6 +144,133 @@ export async function importMembersFromRows(
   return { jobId: job.id, success, errors };
 }
 
+export async function createImportJob(
+  gymId: string,
+  importType: string,
+  totalRows: number,
+  options: { fileName?: string; createdBy?: string }
+): Promise<string> {
+  const admin = getAdminClient();
+  const { data: job, error } = await admin
+    .from('import_jobs')
+    .insert({
+      gym_id: gymId,
+      import_type: importType,
+      status: 'processing',
+      file_name: options.fileName ?? null,
+      total_rows: totalRows,
+      created_by: options.createdBy ?? null,
+    })
+    .select('id')
+    .single();
+
+  if (error || !job) throw new ServiceError(500, error?.message ?? 'Failed to create import job');
+  return job.id;
+}
+
+export async function completeImportJob(
+  jobId: string,
+  success: number,
+  errors: { row: number; message: string }[]
+): Promise<void> {
+  const admin = getAdminClient();
+  const { error } = await admin
+    .from('import_jobs')
+    .update({
+      status: success === 0 && errors.length > 0 ? 'failed' : 'completed',
+      success_rows: success,
+      error_rows: errors.length,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', jobId);
+
+  if (error) throw new ServiceError(500, error.message);
+}
+
+export async function importMembersBatch(
+  gymId: string,
+  jobId: string,
+  rows: MemberImportRow[],
+  startIndex: number
+): Promise<{ success: number; errors: { row: number; message: string }[] }> {
+  const admin = getAdminClient();
+  const errors: { row: number; message: string }[] = [];
+  let success = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = startIndex + i + 2;
+
+    if (!row.first_name?.trim() || !row.last_name?.trim()) {
+      errors.push({ row: rowNum, message: 'first_name and last_name are required' });
+      continue;
+    }
+
+    try {
+      if (row.external_id) {
+        const { data: existing } = await admin
+          .from('members')
+          .select('id')
+          .eq('gym_id', gymId)
+          .eq('external_id', row.external_id)
+          .maybeSingle();
+
+        if (existing) {
+          errors.push({ row: rowNum, message: `Duplicate external_id: ${row.external_id}` });
+          continue;
+        }
+      }
+
+      const member = await createMember({
+        gymId,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        email: row.email,
+        phone: row.phone,
+        beltRank: row.belt_rank ?? 'white',
+        status: row.status ?? 'active',
+        familyOption: 'none',
+      });
+
+      if (row.external_id) {
+        await admin
+          .from('members')
+          .update({ external_id: row.external_id, import_job_id: jobId })
+          .eq('id', member.id);
+      } else {
+        await admin.from('members').update({ import_job_id: jobId }).eq('id', member.id);
+      }
+
+      success++;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Import failed';
+      errors.push({ row: rowNum, message });
+      await admin.from('import_row_errors').insert({
+        job_id: jobId,
+        row_number: rowNum,
+        row_data: row,
+        error_message: message,
+      });
+    }
+  }
+
+  const { data: job } = await admin
+    .from('import_jobs')
+    .select('success_rows, error_rows')
+    .eq('id', jobId)
+    .single();
+
+  await admin
+    .from('import_jobs')
+    .update({
+      success_rows: (job?.success_rows ?? 0) + success,
+      error_rows: (job?.error_rows ?? 0) + errors.length,
+    })
+    .eq('id', jobId);
+
+  return { success, errors };
+}
+
 export type LeadImportRow = {
   first_name: string;
   last_name: string;
@@ -152,6 +280,68 @@ export type LeadImportRow = {
   status?: string;
   notes?: string;
 };
+
+export async function importLeadsBatch(
+  gymId: string,
+  jobId: string,
+  rows: LeadImportRow[],
+  startIndex: number
+): Promise<{ success: number; errors: { row: number; message: string }[] }> {
+  const admin = getAdminClient();
+  const { createLead } = await import('@/services/leads');
+  const errors: { row: number; message: string }[] = [];
+  let success = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = startIndex + i + 2;
+
+    if (!row.first_name?.trim() || !row.last_name?.trim()) {
+      errors.push({ row: rowNum, message: 'first_name and last_name are required' });
+      continue;
+    }
+
+    try {
+      const lead = await createLead({
+        gymId,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        email: row.email,
+        phone: row.phone,
+        source: row.source ?? 'import',
+        notes: row.notes,
+        skipAutomation: true,
+      });
+      await admin.from('leads').update({ import_job_id: jobId }).eq('id', lead.id);
+      success++;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Import failed';
+      errors.push({ row: rowNum, message });
+      await admin.from('import_row_errors').insert({
+        job_id: jobId,
+        row_number: rowNum,
+        row_data: row,
+        error_message: message,
+      });
+    }
+  }
+
+  const { data: job } = await admin
+    .from('import_jobs')
+    .select('success_rows, error_rows')
+    .eq('id', jobId)
+    .single();
+
+  await admin
+    .from('import_jobs')
+    .update({
+      success_rows: (job?.success_rows ?? 0) + success,
+      error_rows: (job?.error_rows ?? 0) + errors.length,
+    })
+    .eq('id', jobId);
+
+  return { success, errors };
+}
 
 export async function importLeadsFromRows(
   gymId: string,

@@ -32,7 +32,7 @@
 
 - [x] 3.12 `instructor_staff_id` FK to staff_roles + staff picker UI
 
-- [ ] 3.13 Substitute instructor field
+- [x] 3.13 Substitute instructor field
 
 - [ ] 3.14 Instructor conflict detection
 
@@ -146,5 +146,5 @@
 
 ## Testing
 
-- [ ] 3.52 Unit tests for waitlist ordering logic
+- [x] 3.52 Unit tests for waitlist ordering logic
 

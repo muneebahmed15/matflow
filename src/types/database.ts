@@ -590,6 +590,8 @@ export type Database = {
           id: string
           instructor: string | null
           session_date: string
+          substitute_instructor: string | null
+          substitute_staff_id: string | null
         }
         Insert: {
           class_id: string
@@ -598,6 +600,8 @@ export type Database = {
           id?: string
           instructor?: string | null
           session_date: string
+          substitute_instructor?: string | null
+          substitute_staff_id?: string | null
         }
         Update: {
           class_id?: string
@@ -606,6 +610,8 @@ export type Database = {
           id?: string
           instructor?: string | null
           session_date?: string
+          substitute_instructor?: string | null
+          substitute_staff_id?: string | null
         }
         Relationships: [
           {
@@ -929,6 +935,7 @@ export type Database = {
           id: string
           name: string
           open_count: number
+          ad_spend_cents: number
           scheduled_at: string | null
           sent_at: string | null
           sent_count: number
@@ -944,6 +951,7 @@ export type Database = {
           id?: string
           name: string
           open_count?: number
+          ad_spend_cents?: number
           scheduled_at?: string | null
           sent_at?: string | null
           sent_count?: number
@@ -959,6 +967,7 @@ export type Database = {
           id?: string
           name?: string
           open_count?: number
+          ad_spend_cents?: number
           scheduled_at?: string | null
           sent_at?: string | null
           sent_count?: number

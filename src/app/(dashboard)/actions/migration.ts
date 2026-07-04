@@ -23,7 +23,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 
 
 
-import { importMembersFromRows, listImportJobs, importLeadsFromRows, getImportJobErrors, rollbackImportJob, type ImportJob } from '@/services/migration';
+import { importMembersFromRows, listImportJobs, importLeadsFromRows, getImportJobErrors, rollbackImportJob, createImportJob, completeImportJob, importMembersBatch, importLeadsBatch, IMPORT_BATCH_SIZE, type ImportJob } from '@/services/migration';
 
 
 
@@ -206,4 +206,85 @@ export async function getImportErrorsAction(jobId: string) {
     return toActionError(error);
   }
 }
+
+
+export async function startImportJobAction(input: {
+  importType: 'members' | 'leads' | 'attendance' | 'belt_history';
+  fileName?: string;
+  totalRows: number;
+}): Promise<ActionResult<{ jobId: string }>> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const jobId = await createImportJob(auth.gymId, input.importType, input.totalRows, {
+      fileName: input.fileName,
+      createdBy: auth.user.id,
+    });
+    return { ok: true, data: { jobId } };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+
+export async function importMembersBatchAction(input: {
+  jobId: string;
+  rows: {
+    first_name: string;
+    last_name: string;
+    email?: string;
+    phone?: string;
+    belt_rank?: string;
+    status?: string;
+    external_id?: string;
+  }[];
+  startIndex: number;
+}): Promise<ActionResult<{ success: number; errors: { row: number; message: string }[] }>> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const result = await importMembersBatch(auth.gymId, input.jobId, input.rows, input.startIndex);
+    return { ok: true, data: result };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+
+export async function importLeadsBatchAction(input: {
+  jobId: string;
+  rows: {
+    first_name: string;
+    last_name: string;
+    email?: string;
+    phone?: string;
+    source?: string;
+    notes?: string;
+  }[];
+  startIndex: number;
+}): Promise<ActionResult<{ success: number; errors: { row: number; message: string }[] }>> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const result = await importLeadsBatch(auth.gymId, input.jobId, input.rows, input.startIndex);
+    return { ok: true, data: result };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+
+export async function finalizeImportJobAction(input: {
+  jobId: string;
+  success: number;
+  errors: { row: number; message: string }[];
+}): Promise<ActionResult> {
+  try {
+    await requireStaffSession({ adminOnly: true });
+    await completeImportJob(input.jobId, input.success, input.errors);
+    revalidatePath('/migration');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export { IMPORT_BATCH_SIZE };
 

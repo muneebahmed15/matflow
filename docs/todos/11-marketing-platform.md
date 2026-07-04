@@ -48,7 +48,7 @@
 ## Ads — Future
 - [ ] 11.32 Google Ads conversion pixel hook
 - [x] 11.33 Meta Ads pixel hook (MarketingPixels)
-- [~] 11.34 ROAS dashboard placeholder (banner in marketing UI)
+- [x] 11.34 ROAS dashboard (campaign engagement + ad spend)
 
 ## Analytics
 - [x] 11.35 Marketing dashboard page

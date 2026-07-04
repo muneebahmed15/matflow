@@ -3,6 +3,11 @@ import { getPublicEnv } from '@/lib/env';
 import { sendTransactionalEmail, waitlistPromotedEmail } from '@/lib/email/resend';
 import { ServiceError } from '@/services/errors';
 
+/** Next waitlist position after the current highest waiting entry. */
+export function nextWaitlistPosition(lastPosition: number | null | undefined): number {
+  return (lastPosition ?? 0) + 1;
+}
+
 export type ClassWaitlistEntry = {
   id: string;
   gym_id: string;
@@ -76,7 +81,7 @@ export async function addMemberToWaitlist(input: {
     .limit(1)
     .maybeSingle();
 
-  const position = (last?.position ?? 0) + 1;
+  const position = nextWaitlistPosition(last?.position);
 
   const { data, error } = await admin
     .from('class_waitlist')

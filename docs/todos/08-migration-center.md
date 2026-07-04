@@ -26,7 +26,7 @@
 
 - [x] 8.9 Dry-run import (no commit)
 
-- [ ] 8.10 Commit import with progress bar
+- [x] 8.10 Commit import with progress bar
 
 - [~] 8.11 Duplicate email handling strategy (service-level)
 

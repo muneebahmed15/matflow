@@ -489,7 +489,14 @@ export default function ClassesPage() {
                           </button>
                         </div>
                       )}
-                      <ClassSessionPanel classId={cls.id} className={cls.name} instructor={cls.instructor} members={members} />
+                      <ClassSessionPanel
+                        classId={cls.id}
+                        className={cls.name}
+                        instructor={cls.instructor}
+                        members={members}
+                        staff={staff}
+                        canManage={canManageClasses}
+                      />
                       <ClassWaitlistPanel classId={cls.id} className={cls.name} members={members} />
                     </div>
                   </div>

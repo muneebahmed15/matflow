@@ -26,7 +26,7 @@ import { getMember } from '@/services/members';
 
 
 
-import { listCampaigns, createCampaign, sendCampaign, requestReview } from '@/services/marketing';
+import { listCampaigns, createCampaign, sendCampaign, requestReview, updateCampaignAdSpend } from '@/services/marketing';
 
 
 
@@ -103,6 +103,21 @@ export async function cancelScheduledCampaignAction(campaignId: string): Promise
     const auth = await requireStaffSession({ adminOnly: true });
     const { cancelScheduledCampaign } = await import('@/services/marketing');
     await cancelScheduledCampaign(auth.gymId, campaignId);
+    revalidatePath('/marketing');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+
+export async function updateCampaignAdSpendAction(
+  campaignId: string,
+  adSpendCents: number
+): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    await updateCampaignAdSpend(auth.gymId, campaignId, adSpendCents);
     revalidatePath('/marketing');
     return { ok: true };
   } catch (error) {

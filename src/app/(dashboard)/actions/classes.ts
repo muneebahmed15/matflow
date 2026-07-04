@@ -35,7 +35,7 @@ import { addMemberToWaitlist, listClassWaitlist, removeFromWaitlist, type ClassW
 
 
 
-import { getOrCreateTodaySession, listSessionAttendance, markSessionAttendance, removeSessionAttendance } from '@/services/class-sessions';
+import { getOrCreateTodaySession, listSessionAttendance, markSessionAttendance, removeSessionAttendance, updateSessionSubstitute } from '@/services/class-sessions';
 
 
 
@@ -236,6 +236,21 @@ export async function duplicateClassAction(
     await duplicateClass(auth.gymId, classId, targetDayOfWeek);
     revalidatePath('/classes');
     return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+
+export async function updateClassSessionSubstituteAction(
+  sessionId: string,
+  input: { substituteInstructor?: string | null; substituteStaffId?: string | null }
+) {
+  try {
+    const auth = await requireStaffSession({ capability: 'classes.manage' });
+    const session = await updateSessionSubstitute(auth.gymId, sessionId, input);
+    revalidatePath('/classes');
+    return { ok: true as const, data: session };
   } catch (error) {
     return toActionError(error);
   }

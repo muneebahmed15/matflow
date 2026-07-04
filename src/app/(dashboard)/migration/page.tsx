@@ -4,13 +4,18 @@ import { useState } from 'react';
 import { useAsyncMount } from '@/hooks/use-async-mount';
 import { Upload, Download, FileWarning } from 'lucide-react';
 import {
+  finalizeImportJobAction,
   getImportErrorsAction,
   importAttendanceCsvAction,
   importBeltHistoryCsvAction,
+  importLeadsBatchAction,
   importLeadsCsvAction,
+  importMembersBatchAction,
   importMembersCsvAction,
+  IMPORT_BATCH_SIZE,
   listImportJobsAction,
   rollbackImportJobAction,
+  startImportJobAction,
 } from '@/app/(dashboard)/actions';
 import {
   parseCsv,
@@ -70,9 +75,13 @@ export default function MigrationPage() {
   const [importType, setImportType] = useState<ImportType>('members');
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [committing, setCommitting] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<string | null>(null);
-  const [dryRun, setDryRun] = useState(true);
+  const [dryRunResult, setDryRunResult] = useState<string | null>(null);
   const [preview, setPreview] = useState<Record<string, string>[]>([]);
+  const [parsedRows, setParsedRows] = useState<Record<string, string>[]>([]);
+  const [fileName, setFileName] = useState('');
   const [rollingBack, setRollingBack] = useState<string | null>(null);
 
   const load = async () => {
@@ -83,40 +92,129 @@ export default function MigrationPage() {
 
   useAsyncMount(load, []);
 
-  const handleFile = async (file: File, commit: boolean) => {
+  const resetUpload = () => {
+    setPreview([]);
+    setParsedRows([]);
+    setFileName('');
+    setDryRunResult(null);
+    setResult(null);
+    setProgress(0);
+  };
+
+  const handleFile = async (file: File) => {
     setImporting(true);
     setResult(null);
+    setDryRunResult(null);
+    setProgress(0);
     const text = await file.text();
     const rows = parseCsv(text);
     const { objects } = csvRowsToObjects(rows, COLUMN_MAPS[importType]);
-    setPreview(objects.slice(0, 10) as Record<string, string>[]);
-
-    const payload = {
-      fileName: file.name,
-      dryRun: commit ? false : dryRun,
-    };
+    const typedRows = objects as Record<string, string>[];
+    setPreview(typedRows.slice(0, 10));
+    setParsedRows(typedRows);
+    setFileName(file.name);
 
     /* eslint-disable @typescript-eslint/no-explicit-any */
     const action =
       importType === 'members'
-        ? importMembersCsvAction({ rows: objects as any, ...payload })
+        ? importMembersCsvAction({ rows: objects as any, fileName: file.name, dryRun: true })
         : importType === 'leads'
-          ? importLeadsCsvAction({ rows: objects as any, ...payload })
+          ? importLeadsCsvAction({ rows: objects as any, fileName: file.name, dryRun: true })
           : importType === 'attendance'
-            ? importAttendanceCsvAction({ rows: objects as any, ...payload })
-            : importBeltHistoryCsvAction({ rows: objects as any, ...payload });
+            ? importAttendanceCsvAction({ rows: objects as any, fileName: file.name, dryRun: true })
+            : importBeltHistoryCsvAction({ rows: objects as any, fileName: file.name, dryRun: true });
     /* eslint-enable @typescript-eslint/no-explicit-any */
 
     const res = await action;
     setImporting(false);
     if (!res.ok) {
-      setResult(`Error: ${res.error}`);
+      setDryRunResult(`Error: ${res.error}`);
       return;
     }
     const d = res.data!;
-    setResult(
-      `${commit || !dryRun ? 'Import' : 'Dry run'} complete: ${d.success} succeeded, ${d.errors.length} errors.`
+    setDryRunResult(
+      `Validation complete: ${d.success} rows OK, ${d.errors.length} errors. Review preview, then commit to import.`
     );
+  };
+
+  const handleCommit = async () => {
+    if (parsedRows.length === 0) return;
+    setCommitting(true);
+    setResult(null);
+    setProgress(0);
+
+    let totalSuccess = 0;
+    const allErrors: { row: number; message: string }[] = [];
+
+    if (importType === 'members' || importType === 'leads') {
+      const startRes = await startImportJobAction({
+        importType,
+        fileName,
+        totalRows: parsedRows.length,
+      });
+      if (!startRes.ok) {
+        setCommitting(false);
+        setResult(`Error: ${startRes.error}`);
+        return;
+      }
+      if (!startRes.data) {
+        setCommitting(false);
+        setResult('Error: Failed to start import job.');
+        return;
+      }
+
+      const jobId = startRes.data.jobId;
+      for (let i = 0; i < parsedRows.length; i += IMPORT_BATCH_SIZE) {
+        const batch = parsedRows.slice(i, i + IMPORT_BATCH_SIZE);
+        const batchAction =
+          importType === 'members'
+            ? importMembersBatchAction({ jobId, rows: batch as never, startIndex: i })
+            : importLeadsBatchAction({ jobId, rows: batch as never, startIndex: i });
+        const res = await batchAction;
+        if (!res.ok) {
+          setCommitting(false);
+          setResult(`Error: ${res.error}`);
+          return;
+        }
+        if (!res.data) {
+          setCommitting(false);
+          setResult('Error: Import batch failed.');
+          return;
+        }
+        totalSuccess += res.data.success;
+        allErrors.push(...res.data.errors);
+        setProgress(Math.round(((i + batch.length) / parsedRows.length) * 100));
+      }
+
+      await finalizeImportJobAction({ jobId, success: totalSuccess, errors: allErrors });
+    } else {
+      setProgress(20);
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      const action =
+        importType === 'attendance'
+          ? importAttendanceCsvAction({ rows: parsedRows as any, fileName, dryRun: false })
+          : importBeltHistoryCsvAction({ rows: parsedRows as any, fileName, dryRun: false });
+      /* eslint-enable @typescript-eslint/no-explicit-any */
+      setProgress(60);
+      const res = await action;
+      if (!res.ok) {
+        setCommitting(false);
+        setResult(`Error: ${res.error}`);
+        return;
+      }
+      if (!res.data) {
+        setCommitting(false);
+        setResult('Error: Import failed.');
+        return;
+      }
+      totalSuccess = res.data.success;
+      allErrors.push(...res.data.errors);
+      setProgress(100);
+    }
+
+    setCommitting(false);
+    setResult(`Import complete: ${totalSuccess} succeeded, ${allErrors.length} errors.`);
+    resetUpload();
     void load();
   };
 
@@ -157,6 +255,9 @@ export default function MigrationPage() {
     void load();
   };
 
+  const stepIndex =
+    parsedRows.length === 0 ? 0 : dryRunResult && !result ? 2 : committing || result ? 3 : 1;
+
   return (
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
       <h1 className="text-3xl font-extrabold mb-2">Migration Center</h1>
@@ -165,30 +266,26 @@ export default function MigrationPage() {
       </p>
 
       <ol className="flex gap-2 mb-6 text-xs">
-        {['Choose type', 'Upload CSV', 'Preview', 'Commit'].map((label, i) => {
-          const active =
-            (i === 0) ||
-            (i === 1 && preview.length === 0 && !result) ||
-            (i === 2 && preview.length > 0 && !result) ||
-            (i === 3 && Boolean(result));
-          return (
-            <li
-              key={label}
-              className={`flex-1 rounded-lg px-2 py-2 text-center border ${
-                active ? 'border-blue-500/40 bg-blue-500/10 text-white' : 'border-white/10 text-white/30'
-              }`}
-            >
-              {i + 1}. {label}
-            </li>
-          );
-        })}
+        {['Choose type', 'Upload CSV', 'Preview', 'Commit'].map((label, i) => (
+          <li
+            key={label}
+            className={`flex-1 rounded-lg px-2 py-2 text-center border ${
+              i <= stepIndex ? 'border-blue-500/40 bg-blue-500/10 text-white' : 'border-white/10 text-white/30'
+            }`}
+          >
+            {i + 1}. {label}
+          </li>
+        ))}
       </ol>
 
       <div className="flex gap-2 mb-6 flex-wrap">
         {(['members', 'leads', 'attendance', 'belt_history'] as ImportType[]).map((t) => (
           <button
             key={t}
-            onClick={() => { setImportType(t); setPreview([]); }}
+            onClick={() => {
+              setImportType(t);
+              resetUpload();
+            }}
             className={`px-4 py-2 rounded-xl text-sm font-medium capitalize ${
               importType === t ? 'bg-blue-600 text-white' : 'bg-white/5 text-white/50'
             }`}
@@ -205,22 +302,39 @@ export default function MigrationPage() {
         >
           <Download size={16} /> Download {importType} CSV template
         </button>
-        <label className="flex items-center gap-2 text-sm text-white/60">
-          <input type="checkbox" checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} />
-          Dry run (validate only, no writes)
-        </label>
         <label className="flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-xl p-10 cursor-pointer hover:border-blue-500/50 transition">
           <Upload size={32} className="text-white/20 mb-2" />
-          <span className="text-white/40 text-sm">{importing ? 'Importing...' : 'Upload CSV'}</span>
+          <span className="text-white/40 text-sm">{importing ? 'Validating...' : 'Upload CSV to validate'}</span>
           <input
             type="file"
             accept=".csv,text/csv"
             className="hidden"
-            disabled={importing}
-            onChange={(e) => e.target.files?.[0] && void handleFile(e.target.files[0], false)}
+            disabled={importing || committing}
+            onChange={(e) => e.target.files?.[0] && void handleFile(e.target.files[0])}
           />
         </label>
-        {result && <p className="text-sm text-white/60">{result}</p>}
+        {dryRunResult && <p className="text-sm text-white/60">{dryRunResult}</p>}
+        {(committing || progress > 0) && (
+          <div>
+            <div className="flex justify-between text-xs text-white/40 mb-1">
+              <span>{committing ? 'Importing...' : 'Complete'}</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+        )}
+        {parsedRows.length > 0 && !committing && (
+          <button
+            onClick={() => void handleCommit()}
+            disabled={Boolean(dryRunResult?.startsWith('Error'))}
+            className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition"
+          >
+            Commit import ({parsedRows.length} rows)
+          </button>
+        )}
+        {result && <p className="text-sm text-green-400/80">{result}</p>}
       </div>
 
       {preview.length > 0 && (

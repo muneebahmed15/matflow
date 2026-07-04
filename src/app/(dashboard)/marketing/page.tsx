@@ -11,12 +11,24 @@ import {
   cancelScheduledCampaignAction,
   getMarketingFunnelAction,
   getLeadSourceStatsAction,
+  updateCampaignAdSpendAction,
 } from '@/app/(dashboard)/actions';
 import { CAMPAIGN_TEMPLATES } from '@/lib/campaign-templates';
+import { computeCampaignRoas, summarizeCampaignRoas } from '@/lib/campaign-roas';
 
 export default function MarketingPage() {
   const [campaigns, setCampaigns] = useState<
-    { id: string; name: string; subject: string; audience: string; status: string; sent_count: number; open_count?: number; click_count?: number }[]
+    {
+      id: string;
+      name: string;
+      subject: string;
+      audience: string;
+      status: string;
+      sent_count: number;
+      open_count?: number;
+      click_count?: number;
+      ad_spend_cents?: number;
+    }[]
   >([]);
   const [funnel, setFunnel] = useState({
     leads: 0,
@@ -79,6 +91,22 @@ export default function MarketingPage() {
     'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 
   const funnelTotal = funnel.leads || 1;
+  const sentCampaigns = campaigns.filter((c) => c.status === 'sent' && c.sent_count > 0);
+  const roasSummary = summarizeCampaignRoas(
+    sentCampaigns.map((c) => ({
+      sent_count: c.sent_count,
+      open_count: c.open_count ?? 0,
+      click_count: c.click_count ?? 0,
+      ad_spend_cents: c.ad_spend_cents ?? 0,
+    }))
+  );
+
+  const saveAdSpend = async (campaignId: string, dollars: string) => {
+    const cents = Math.round(parseFloat(dollars || '0') * 100);
+    if (Number.isNaN(cents)) return;
+    await updateCampaignAdSpendAction(campaignId, cents);
+    void load();
+  };
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">
@@ -163,8 +191,72 @@ export default function MarketingPage() {
         </div>
       </div>
 
-      <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4 mb-8 text-sm text-yellow-200/80">
-        Email open/click tracking and ROAS reporting are placeholders — connect ad spend in a future release.
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <BarChart3 size={18} className="text-green-400" />
+          <h2 className="font-semibold text-white">Campaign ROAS</h2>
+        </div>
+        <p className="text-white/40 text-xs mb-4">
+          Track email engagement and optional ad spend. Enter spend on sent campaigns to see clicks per dollar.
+        </p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          {[
+            { label: 'Emails sent', value: roasSummary.totalSent },
+            { label: 'Avg open rate', value: `${Math.round(roasSummary.avgOpenRate * 100)}%` },
+            { label: 'Avg click rate', value: `${Math.round(roasSummary.avgClickRate * 100)}%` },
+            {
+              label: 'Clicks / $',
+              value: roasSummary.aggregateClicksPerDollar != null
+                ? roasSummary.aggregateClicksPerDollar.toFixed(2)
+                : '—',
+            },
+          ].map((stat) => (
+            <div key={stat.label} className="bg-white/5 rounded-xl p-3">
+              <p className="text-white/40 text-xs">{stat.label}</p>
+              <p className="text-lg font-bold text-white mt-1">{stat.value}</p>
+            </div>
+          ))}
+        </div>
+        {sentCampaigns.length === 0 ? (
+          <p className="text-white/30 text-sm">Send a campaign to see ROAS metrics.</p>
+        ) : (
+          <div className="space-y-2">
+            {sentCampaigns.map((c) => {
+              const metrics = computeCampaignRoas({
+                sent_count: c.sent_count,
+                open_count: c.open_count ?? 0,
+                click_count: c.click_count ?? 0,
+                ad_spend_cents: c.ad_spend_cents ?? 0,
+              });
+              return (
+                <div
+                  key={c.id}
+                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-sm"
+                >
+                  <div>
+                    <p className="text-white font-medium">{c.name}</p>
+                    <p className="text-white/40 text-xs">
+                      {c.sent_count} sent · {Math.round(metrics.openRate * 100)}% opens ·{' '}
+                      {Math.round(metrics.clickRate * 100)}% clicks
+                      {metrics.clicksPerDollar != null && ` · ${metrics.clicksPerDollar.toFixed(2)} clicks/$`}
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 text-xs text-white/50">
+                    Ad spend $
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      defaultValue={((c.ad_spend_cents ?? 0) / 100).toFixed(2)}
+                      onBlur={(e) => void saveAdSpend(c.id, e.target.value)}
+                      className="w-24 bg-black/30 border border-white/10 rounded-lg px-2 py-1 text-white"
+                    />
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8 space-y-3">

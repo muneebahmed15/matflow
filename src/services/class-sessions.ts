@@ -1,5 +1,6 @@
 import { getAdminClient } from '@/lib/supabase/admin';
 import { ServiceError } from '@/services/errors';
+import { effectiveSessionInstructor } from '@/lib/class-sessions-display';
 
 export type ClassSession = {
   id: string;
@@ -7,8 +8,12 @@ export type ClassSession = {
   class_id: string;
   session_date: string;
   instructor: string | null;
+  substitute_instructor: string | null;
+  substitute_staff_id: string | null;
   created_at: string;
 };
+
+export { effectiveSessionInstructor } from '@/lib/class-sessions-display';
 
 export async function getOrCreateTodaySession(
   gymId: string,
@@ -89,4 +94,30 @@ export async function removeSessionAttendance(
     .eq('gym_id', gymId);
 
   if (error) throw new ServiceError(500, error.message);
+}
+
+export async function updateSessionSubstitute(
+  gymId: string,
+  sessionId: string,
+  input: { substituteInstructor?: string | null; substituteStaffId?: string | null }
+): Promise<ClassSession> {
+  const admin = getAdminClient();
+  const updates: Record<string, unknown> = {};
+  if (input.substituteInstructor !== undefined) {
+    updates.substitute_instructor = input.substituteInstructor?.trim() || null;
+  }
+  if (input.substituteStaffId !== undefined) {
+    updates.substitute_staff_id = input.substituteStaffId;
+  }
+
+  const { data, error } = await admin
+    .from('class_sessions')
+    .update(updates)
+    .eq('id', sessionId)
+    .eq('gym_id', gymId)
+    .select('*')
+    .single();
+
+  if (error) throw new ServiceError(500, error.message);
+  return data as ClassSession;
 }

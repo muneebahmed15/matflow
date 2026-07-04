@@ -16,6 +16,7 @@ export type EmailCampaign = {
   sent_count: number;
   open_count: number;
   click_count: number;
+  ad_spend_cents: number;
   created_at: string;
 };
 
@@ -272,4 +273,21 @@ export async function requestReview(
     gym_id: gymId,
     member_id: memberId,
   });
+}
+
+export async function updateCampaignAdSpend(
+  gymId: string,
+  campaignId: string,
+  adSpendCents: number
+): Promise<void> {
+  if (adSpendCents < 0) throw new ServiceError(400, 'Ad spend cannot be negative.');
+
+  const admin = getAdminClient();
+  const { error } = await admin
+    .from('email_campaigns')
+    .update({ ad_spend_cents: Math.round(adSpendCents) })
+    .eq('id', campaignId)
+    .eq('gym_id', gymId);
+
+  if (error) throw new ServiceError(500, error.message);
 }
