@@ -1,9 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const { mockFrom, cancel, update, invoicesList, refundsCreate } = vi.hoisted(() => ({
+const { mockFrom, cancel, update, retrieve, invoicesList, refundsCreate } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   cancel: vi.fn(),
   update: vi.fn(),
+  retrieve: vi.fn(),
   invoicesList: vi.fn(),
   refundsCreate: vi.fn(),
 }));
@@ -11,14 +12,16 @@ const { mockFrom, cancel, update, invoicesList, refundsCreate } = vi.hoisted(() 
 vi.mock('@/lib/supabase/admin', () => ({ getAdminClient: () => ({ from: mockFrom }) }));
 vi.mock('@/lib/stripe', () => ({
   stripe: {
-    subscriptions: { cancel, update },
+    subscriptions: { cancel, update, retrieve },
     invoices: { list: invoicesList },
     refunds: { create: refundsCreate },
   },
 }));
+vi.mock('@/services/audit', () => ({ logAuditEvent: vi.fn() }));
 
 import {
   cancelSubscription,
+  changeSubscriptionPlan,
   refundLatestSubscriptionPayment,
   setSubscriptionPause,
 } from '@/services/stripe-subscriptions';
@@ -37,6 +40,50 @@ function chain(result: { data?: unknown; error?: unknown } = { data: null, error
   builder.__calls = calls;
   return builder as typeof builder & { __calls: unknown[][] };
 }
+
+describe('changeSubscriptionPlan', () => {
+  beforeEach(() => {
+    mockFrom.mockReset();
+    retrieve.mockReset();
+    update.mockReset();
+  });
+
+  it('updates Stripe with proration and syncs plan_id in the database', async () => {
+    retrieve.mockResolvedValue({ items: { data: [{ id: 'si_123' }] } });
+    update.mockResolvedValue({});
+    const dbChain = chain();
+    mockFrom.mockReturnValueOnce(dbChain);
+
+    await changeSubscriptionPlan({
+      gymId: 'gym-1',
+      subscriptionId: 'sub-row-1',
+      stripeSubscriptionId: 'sub_stripe_1',
+      newStripePriceId: 'price_new',
+      newPlanId: 'plan-new',
+    });
+
+    expect(retrieve).toHaveBeenCalledWith('sub_stripe_1');
+    expect(update).toHaveBeenCalledWith('sub_stripe_1', {
+      items: [{ id: 'si_123', price: 'price_new' }],
+      proration_behavior: 'create_prorations',
+    });
+    expect(dbChain.__calls[0][0]).toMatchObject({ plan_id: 'plan-new' });
+  });
+
+  it('throws when Stripe subscription has no billable items', async () => {
+    retrieve.mockResolvedValue({ items: { data: [] } });
+
+    await expect(
+      changeSubscriptionPlan({
+        gymId: 'gym-1',
+        subscriptionId: 'sub-row-1',
+        stripeSubscriptionId: 'sub_stripe_1',
+        newStripePriceId: 'price_new',
+        newPlanId: 'plan-new',
+      })
+    ).rejects.toMatchObject({ status: 400 });
+  });
+});
 
 describe('cancelSubscription', () => {
   beforeEach(() => {

@@ -8,7 +8,7 @@ import { requireStaffSession } from '@/lib/auth/staff';
 
 
 
-import { createClass, deleteClass, duplicateClass, listClassesForStaff } from '@/services/classes';
+import { createClass, createClassSeries, deleteClass, deleteClassSeries, duplicateClass, listClassesForStaff } from '@/services/classes';
 
 import { getInstructorScopedClassIds } from '@/services/instructor-scope';
 
@@ -70,6 +70,27 @@ export async function createClassAction(input: {
 }
 
 
+export async function createClassSeriesAction(input: {
+  name: string;
+  description?: string;
+  instructor: string;
+  instructorStaffId?: string | null;
+  daysOfWeek: string[];
+  startTime: string;
+  endTime: string;
+  capacity: number;
+}): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ capability: 'classes.manage' });
+    await createClassSeries({ ...input, gymId: auth.gymId });
+    revalidatePath('/classes');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+
 export async function listClassesAction(): Promise<
   ActionResult<Database['public']['Tables']['classes']['Row'][]>
 > {
@@ -116,6 +137,18 @@ export async function deleteClassAction(classId: string): Promise<ActionResult> 
   try {
     const auth = await requireStaffSession();
     await deleteClass(auth.gymId, classId);
+    revalidatePath('/classes');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+
+export async function deleteClassSeriesAction(seriesId: string): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ capability: 'classes.manage' });
+    await deleteClassSeries(auth.gymId, seriesId);
     revalidatePath('/classes');
     return { ok: true };
   } catch (error) {

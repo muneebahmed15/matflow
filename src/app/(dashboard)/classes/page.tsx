@@ -6,7 +6,9 @@ import { hasCapability } from '@/lib/permissions/capabilities';
 import { Dumbbell, Plus } from 'lucide-react';
 import {
   createClassAction,
+  createClassSeriesAction,
   deleteClassAction,
+  deleteClassSeriesAction,
   duplicateClassAction,
   getClassAttendanceReportAction,
   getEnrollmentCountsAction,
@@ -16,6 +18,7 @@ import {
   listStaffAction,
   updateClassAction,
 } from '@/app/(dashboard)/actions';
+import { CLASS_WEEKDAYS, formatSeriesLabel } from '@/lib/class-recurrence';
 import { formatClassTime } from '@/lib/gym-public-time';
 import { useAppUi } from '@/components/ui/AppUiProvider';
 import PageLoader from '@/components/PageLoader';
@@ -44,9 +47,11 @@ interface Class {
   start_time: string;
   end_time: string;
   capacity: number;
+  series_id: string | null;
+  recurrence_rule: string | null;
 }
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const DAYS = CLASS_WEEKDAYS;
 
 export default function ClassesPage() {
   const { confirm, error: showError } = useAppUi();
@@ -70,6 +75,8 @@ export default function ClassesPage() {
   const [capacity, setCapacity] = useState('20');
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isSeries, setIsSeries] = useState(false);
+  const [seriesDays, setSeriesDays] = useState<string[]>(['Monday', 'Wednesday']);
 
   const reloadClasses = async () => {
     const result = await listClassesAction();
@@ -145,6 +152,14 @@ export default function ClassesPage() {
     setEndTime('10:00');
     setCapacity('20');
     setEditingId(null);
+    setIsSeries(false);
+    setSeriesDays(['Monday', 'Wednesday']);
+  };
+
+  const toggleSeriesDay = (dayName: string) => {
+    setSeriesDays((prev) =>
+      prev.includes(dayName) ? prev.filter((d) => d !== dayName) : [...prev, dayName]
+    );
   };
 
   const handleStaffPick = (staffId: string) => {
@@ -158,18 +173,24 @@ export default function ClassesPage() {
       setError('Name and instructor are required.');
       return;
     }
+    if (isSeries && seriesDays.length < 2) {
+      setError('Select at least two days for a weekly series.');
+      return;
+    }
     setSubmitting(true);
     setError('');
-    const result = await createClassAction({
+    const payload = {
       name,
       description: description || undefined,
       instructor,
       instructorStaffId: instructorStaffId || null,
-      dayOfWeek: day,
       startTime,
       endTime,
       capacity: parseInt(capacity, 10),
-    });
+    };
+    const result = isSeries
+      ? await createClassSeriesAction({ ...payload, daysOfWeek: seriesDays })
+      : await createClassAction({ ...payload, dayOfWeek: day });
     setSubmitting(false);
     if (!result.ok) {
       setError(result.error);
@@ -214,6 +235,19 @@ export default function ClassesPage() {
     await reloadClasses();
     resetForm();
     setShowForm(false);
+  };
+
+  const handleDeleteSeries = async (seriesId: string) => {
+    const ok = await confirm({
+      title: 'Delete weekly series',
+      message: 'This removes every class in the series from your schedule.',
+      confirmLabel: 'Delete series',
+      destructive: true,
+    });
+    if (!ok) return;
+    const result = await deleteClassSeriesAction(seriesId);
+    if (result.ok) await reloadClasses();
+    else showError(result.error);
   };
 
   const handleDelete = async (id: string) => {
@@ -307,16 +341,55 @@ export default function ClassesPage() {
             />
           </div>
           <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Day</label>
-              <select value={day} onChange={(e) => setDay(e.target.value)} className={inputClass}>
-                {DAYS.map((d) => (
-                  <option key={d} value={d} className="bg-gray-900">
-                    {d}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {!editingId && (
+              <div className="col-span-3">
+                <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isSeries}
+                    onChange={(e) => setIsSeries(e.target.checked)}
+                    className="rounded border-white/20 bg-white/5"
+                  />
+                  Weekly series (same class on multiple days)
+                </label>
+              </div>
+            )}
+            {isSeries && !editingId ? (
+              <div className="col-span-3">
+                <label className="block text-sm font-medium text-gray-300 mb-2">Days</label>
+                <div className="flex flex-wrap gap-2">
+                  {DAYS.map((d) => (
+                    <label
+                      key={d}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer border transition ${
+                        seriesDays.includes(d)
+                          ? 'bg-blue-600/20 border-blue-500/40 text-blue-300'
+                          : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={seriesDays.includes(d)}
+                        onChange={() => toggleSeriesDay(d)}
+                      />
+                      {d.slice(0, 3)}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Day</label>
+                <select value={day} onChange={(e) => setDay(e.target.value)} className={inputClass}>
+                  {DAYS.map((d) => (
+                    <option key={d} value={d} className="bg-gray-900">
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Start Time</label>
               <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={inputClass} />
@@ -373,7 +446,14 @@ export default function ClassesPage() {
                         <Dumbbell size={16} className="text-blue-400" />
                       </div>
                       <div>
-                        <p className="font-semibold text-white">{cls.name}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-white">{cls.name}</p>
+                          {cls.series_id && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                              {formatSeriesLabel(cls.recurrence_rule)}
+                            </span>
+                          )}
+                        </div>
                         {cls.description && <p className="text-xs text-white/40 mt-0.5">{cls.description}</p>}
                         <p className="text-xs text-white/30">
                           {cls.instructor} · {formatClassTime(cls.start_time, gymTimezone)} –{' '}
@@ -396,6 +476,14 @@ export default function ClassesPage() {
                           <button onClick={() => void handleDuplicate(cls)} className="text-white/30 hover:text-blue-400 text-xs transition">
                             Duplicate
                           </button>
+                          {cls.series_id && (
+                            <button
+                              onClick={() => void handleDeleteSeries(cls.series_id!)}
+                              className="text-white/30 hover:text-red-400 text-xs transition"
+                            >
+                              Delete series
+                            </button>
+                          )}
                           <button onClick={() => handleDelete(cls.id)} className="text-white/20 hover:text-red-400 text-xs transition">
                             Remove
                           </button>

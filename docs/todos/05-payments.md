@@ -16,7 +16,7 @@
 - [x] 5.11 Member portal subscribe flow (done)
 - [x] 5.12 Staff-initiated checkout from member profile (done)
 - [x] 5.13 Promo codes / coupons (checkout allow_promotion_codes)
-- [ ] 5.14 Proration on plan change
+- [x] 5.14 Proration on plan change
 - [ ] 5.15 Tax calculation (Stripe Tax)
 
 ## Subscriptions

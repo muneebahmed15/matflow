@@ -4,6 +4,46 @@ import { stripe } from '@/lib/stripe';
 import { ServiceError } from '@/services/errors';
 import { logAuditEvent } from '@/services/audit';
 
+export type ChangeSubscriptionPlanInput = {
+  gymId: string;
+  subscriptionId: string;
+  stripeSubscriptionId: string;
+  newStripePriceId: string;
+  newPlanId: string;
+};
+
+export async function changeSubscriptionPlan(input: ChangeSubscriptionPlanInput): Promise<void> {
+  const stripeSub = await stripe.subscriptions.retrieve(input.stripeSubscriptionId);
+  const itemId = stripeSub.items.data[0]?.id;
+  if (!itemId) throw new ServiceError(400, 'Subscription has no billable items.');
+
+  await stripe.subscriptions.update(input.stripeSubscriptionId, {
+    items: [{ id: itemId, price: input.newStripePriceId }],
+    proration_behavior: 'create_prorations',
+  });
+
+  const admin = getAdminClient();
+  const { error } = await admin
+    .from('subscriptions')
+    .update({ plan_id: input.newPlanId })
+    .eq('id', input.subscriptionId)
+    .eq('gym_id', input.gymId);
+
+  if (error) throw new ServiceError(500, error.message);
+
+  try {
+    await logAuditEvent({
+      gymId: input.gymId,
+      action: 'subscription.plan_changed',
+      entityType: 'subscription',
+      entityId: input.subscriptionId,
+      payload: { newPlanId: input.newPlanId, newStripePriceId: input.newStripePriceId },
+    });
+  } catch {
+    // Audit is best-effort
+  }
+}
+
 export type CancelSubscriptionInput = {
   gymId: string;
   subscriptionId: string;

@@ -696,6 +696,8 @@ export type Database = {
           is_active: boolean
           location_id: string | null
           name: string
+          recurrence_rule: string | null
+          series_id: string | null
           start_time: string | null
         }
         Insert: {
@@ -711,6 +713,8 @@ export type Database = {
           is_active?: boolean
           location_id?: string | null
           name: string
+          recurrence_rule?: string | null
+          series_id?: string | null
           start_time?: string | null
         }
         Update: {
@@ -726,6 +730,8 @@ export type Database = {
           is_active?: boolean
           location_id?: string | null
           name?: string
+          recurrence_rule?: string | null
+          series_id?: string | null
           start_time?: string | null
         }
         Relationships: [

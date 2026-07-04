@@ -1,6 +1,8 @@
 import { getAdminClient } from '@/lib/supabase/admin';
 import type { Database } from '@/types/database';
 import { ServiceError } from '@/services/errors';
+import { buildWeeklyRecurrenceRule, sortDays } from '@/lib/class-recurrence';
+import { randomUUID } from 'crypto';
 
 type ClassRow = Database['public']['Tables']['classes']['Row'];
 
@@ -58,6 +60,44 @@ export async function createClass(input: CreateClassInput): Promise<ClassRow> {
 
   if (error) throw new ServiceError(500, error.message);
   return data;
+}
+
+export type CreateClassSeriesInput = Omit<CreateClassInput, 'dayOfWeek'> & { daysOfWeek: string[] };
+
+export async function createClassSeries(
+  input: CreateClassSeriesInput
+): Promise<ClassRow[]> {
+  const days = sortDays(input.daysOfWeek);
+  if (days.length < 2) {
+    throw new ServiceError(400, 'Select at least two days for a recurring series.');
+  }
+
+  const admin = getAdminClient();
+  const seriesId = randomUUID();
+  const recurrenceRule = buildWeeklyRecurrenceRule(days);
+  const rows = days.map((dayOfWeek) => ({
+    gym_id: input.gymId,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    instructor: input.instructor.trim(),
+    instructor_staff_id: input.instructorStaffId ?? null,
+    day_of_week: dayOfWeek,
+    start_time: input.startTime,
+    end_time: input.endTime,
+    capacity: input.capacity,
+    series_id: seriesId,
+    recurrence_rule: recurrenceRule,
+  }));
+
+  const { data, error } = await admin.from('classes').insert(rows).select('*');
+  if (error) throw new ServiceError(500, error.message);
+  return (data ?? []) as ClassRow[];
+}
+
+export async function deleteClassSeries(gymId: string, seriesId: string): Promise<void> {
+  const admin = getAdminClient();
+  const { error } = await admin.from('classes').delete().eq('gym_id', gymId).eq('series_id', seriesId);
+  if (error) throw new ServiceError(500, error.message);
 }
 
 export async function deleteClass(gymId: string, classId: string): Promise<void> {

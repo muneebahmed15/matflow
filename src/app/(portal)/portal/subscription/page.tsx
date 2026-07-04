@@ -11,6 +11,7 @@ import { ListSkeleton } from '@/components/LoadingSkeleton'
 interface Subscription {
   id: string
   status: string
+  plan_id: string | null
   stripe_subscription_id: string | null
   current_period_end: string | null
   plans: { name: string; price_cents: number; interval: string } | null
@@ -32,6 +33,7 @@ export default function PortalSubscriptionPage() {
   const [subscribing, setSubscribing] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [pausing, setPausing] = useState(false)
+  const [switchingPlanId, setSwitchingPlanId] = useState<string | null>(null)
   const [cancelMsg, setCancelMsg] = useState('')
   const [invoices, setInvoices] = useState<
     { id: string; number: string | null; status: string | null; amount_cents: number; created: number; pdf_url: string | null }[]
@@ -44,25 +46,25 @@ export default function PortalSubscriptionPage() {
     const load = async () => {
       const { data: sub } = await supabase
         .from('subscriptions')
-        .select('id, status, stripe_subscription_id, current_period_end, plans(name, price_cents, interval)')
+        .select('id, status, plan_id, stripe_subscription_id, current_period_end, plans(name, price_cents, interval)')
         .eq('member_id', activeMember.id)
         .in('status', ['active', 'past_due', 'trialing', 'paused'])
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
       setSubscription(sub as Subscription | null)
-      if (sub) {
-        const invRes = await fetch(`/api/portal/invoices?member_id=${activeMember.id}`)
-        const invData = await invRes.json()
-        if (invData.invoices) setInvoices(invData.invoices)
-      }
-      if (!sub && billingAllowed) {
+      if (billingAllowed) {
         const { data: plansData } = await supabase
           .from('plans')
           .select('id, name, stripe_price_id, price_cents, interval')
           .eq('gym_id', activeMember.gym_id)
           .eq('is_active', true)
         setPlans(plansData || [])
+      }
+      if (sub) {
+        const invRes = await fetch(`/api/portal/invoices?member_id=${activeMember.id}`)
+        const invData = await invRes.json()
+        if (invData.invoices) setInvoices(invData.invoices)
       }
       setLoading(false)
     }
@@ -105,6 +107,34 @@ export default function PortalSubscriptionPage() {
     setCancelling(false)
     if (res.ok) {
       setCancelMsg('Cancellation scheduled. Your membership stays active until the end of the billing period.')
+    }
+  }
+
+  const handleChangePlan = async (plan: Plan) => {
+    if (!subscription?.stripe_subscription_id || !activeMember || !billingAllowed) return
+    if (subscription.plan_id === plan.id) return
+    if (!confirm(`Switch to ${plan.name}? Stripe will prorate your next invoice.`)) return
+    setSwitchingPlanId(plan.id)
+    setCancelMsg('')
+    const res = await fetch('/api/portal/change-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subscription_id: subscription.id,
+        stripe_subscription_id: subscription.stripe_subscription_id,
+        new_plan_id: plan.id,
+        new_stripe_price_id: plan.stripe_price_id,
+        member_id: activeMember.id,
+      }),
+    })
+    setSwitchingPlanId(null)
+    if (res.ok) {
+      setCancelMsg(`Switched to ${plan.name}. Your next invoice reflects the prorated change.`)
+      setSubscription({
+        ...subscription,
+        plan_id: plan.id,
+        plans: { name: plan.name, price_cents: plan.price_cents, interval: plan.interval },
+      })
     }
   }
 
@@ -215,6 +245,34 @@ export default function PortalSubscriptionPage() {
             </>
           )}
           {cancelMsg && <p className="text-green-400 text-xs mt-2">{cancelMsg}</p>}
+          {billingAllowed && plans.filter((p) => p.id !== subscription.plan_id).length > 0 && (
+            <div className="mt-6 border-t border-white/10 pt-4 space-y-3">
+              <p className="text-sm font-medium text-white">Switch plan</p>
+              <p className="text-white/30 text-xs">Changes take effect immediately; Stripe prorates your next invoice.</p>
+              {plans
+                .filter((p) => p.id !== subscription.plan_id)
+                .map((plan) => (
+                  <div
+                    key={plan.id}
+                    className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 flex items-center justify-between"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-white">{plan.name}</p>
+                      <p className="text-white/40 text-xs">
+                        ${(plan.price_cents / 100).toFixed(2)} / {plan.interval}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => void handleChangePlan(plan)}
+                      disabled={Boolean(switchingPlanId) || subscription.status === 'paused'}
+                      className="text-blue-400 hover:text-blue-300 text-xs font-semibold disabled:opacity-50"
+                    >
+                      {switchingPlanId === plan.id ? 'Switching...' : 'Switch'}
+                    </button>
+                  </div>
+                ))}
+            </div>
+          )}
         </div>
       ) : billingAllowed ? (
         <div className="space-y-4">

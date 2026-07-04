@@ -74,3 +74,11 @@ export const refundSchema = z.object({
   amount_cents: z.number().int().positive().optional(),
   reason: z.string().max(2000).optional(),
 });
+
+export const changePlanSchema = z.object({
+  subscription_id: uuid(),
+  stripe_subscription_id: z.string().min(1),
+  new_plan_id: uuid(),
+  new_stripe_price_id: z.string().min(1),
+  member_id: uuid().optional(),
+});

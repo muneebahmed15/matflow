@@ -16,7 +16,7 @@
 
 - [x] 3.6 Duplicate class to another day
 
-- [ ] 3.7 Recurring class series (RRULE or template)
+- [x] 3.7 Recurring class series (RRULE or template)
 
 - [ ] 3.8 One-off class exceptions (cancellations)
 
