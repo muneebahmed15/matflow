@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { Plus, Trash2, User } from 'lucide-react';
 import {
   createEmergencyContactAction,
@@ -28,9 +29,7 @@ export default function MemberEmergencyContactsPanel({ memberId }: Props) {
     setLoading(false);
   };
 
-  useEffect(() => {
-    void load();
-  }, [memberId]);
+  useAsyncMount(load, [memberId]);
 
   const handleAdd = async () => {
     setSubmitting(true);

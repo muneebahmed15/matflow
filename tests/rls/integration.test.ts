@@ -88,6 +88,53 @@ describe.skipIf(!enabled)('RLS integration', () => {
       await fixture.cleanup();
     }
   });
+
+  it('portal member can read own member row but not another member in the same gym', async () => {
+    const fixture = await seedPortalMemberFixture();
+
+    try {
+      const portal = await signInPortalMemberRls(fixture.primaryEmail, fixture.primaryPassword);
+
+      const { data: own, error: ownError } = await portal
+        .from('members')
+        .select('id, email')
+        .eq('id', fixture.memberId)
+        .maybeSingle();
+
+      expect(ownError).toBeNull();
+      expect(own?.id).toBe(fixture.memberId);
+
+      const { data: other, error: otherError } = await portal
+        .from('members')
+        .select('id')
+        .eq('id', fixture.otherMemberId)
+        .maybeSingle();
+
+      expect(otherError).toBeNull();
+      expect(other).toBeNull();
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it('portal member cannot update another member profile row', async () => {
+    const fixture = await seedPortalMemberFixture();
+
+    try {
+      const portal = await signInPortalMemberRls(fixture.primaryEmail, fixture.primaryPassword);
+
+      const { data, error } = await portal
+        .from('members')
+        .update({ first_name: 'Hacked' })
+        .eq('id', fixture.otherMemberId)
+        .select('id');
+
+      expect(error).toBeNull();
+      expect(data?.length ?? 0).toBe(0);
+    } finally {
+      await fixture.cleanup();
+    }
+  });
 });
 
 describe('RLS test harness', () => {

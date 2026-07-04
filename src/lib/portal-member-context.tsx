@@ -1,14 +1,7 @@
 'use client';
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode,  } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { supabase } from '@/lib/supabase';
 
 export type PortalMember = {
@@ -81,9 +74,7 @@ export function PortalMemberProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useAsyncMount(load, [load]);
 
   const setActiveMemberId = useCallback((id: string) => {
     setActiveMemberIdState(id);

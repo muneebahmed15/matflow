@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useClientMount } from '@/hooks/use-async-mount';
 import { ShoppingCart, X } from 'lucide-react';
 
 type Product = {
@@ -28,7 +29,7 @@ export default function PublicShopCatalog({ gymId, gymSlug, accent, products }: 
   const [checkingOut, setCheckingOut] = useState(false);
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
+  useClientMount(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('success') === 'true') {
       setMessage('Order placed! Check your email for confirmation.');
@@ -39,7 +40,7 @@ export default function PublicShopCatalog({ gymId, gymSlug, accent, products }: 
     }
   }, [gymSlug]);
 
-  useEffect(() => {
+  useClientMount(() => {
     try {
       const raw = localStorage.getItem(CART_KEY(gymSlug));
       if (!raw) return;

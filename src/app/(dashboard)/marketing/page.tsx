@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { Megaphone, Send, BarChart3 } from 'lucide-react';
 import {
   createCampaignAction,
@@ -43,9 +44,7 @@ export default function MarketingPage() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    void load();
-  }, []);
+  useAsyncMount(load, []);
 
   const create = async () => {
     const res = await createCampaignAction({ name, subject, bodyHtml, audience });

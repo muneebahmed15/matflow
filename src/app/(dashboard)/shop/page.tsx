@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { ShoppingBag } from 'lucide-react';
 import { createProductAction, listProductsAction, listOrdersAction, fulfillOrderAction } from '@/app/(dashboard)/actions';
 
@@ -23,9 +24,7 @@ export default function ShopAdminPage() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    void load();
-  }, []);
+  useAsyncMount(load, []);
 
   const add = async () => {
     const cents = Math.round(parseFloat(price) * 100);

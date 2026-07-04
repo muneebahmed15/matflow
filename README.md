@@ -70,6 +70,33 @@ Optional: `SUPABASE_TEST_*` vars for RLS integration tests (`npm run test:rls`).
 2. Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
 3. Copy signing secret to `STRIPE_WEBHOOK_SECRET`
 
+## Cron jobs
+
+Scheduled jobs are defined in `vercel.json` and run as `GET /api/cron/*` routes. Every route is guarded by `requireCronSecret` (`src/lib/auth/cron.ts`), which requires an `Authorization: Bearer $CRON_SECRET` header.
+
+| Path | Schedule (UTC) | Purpose |
+|------|----------------|---------|
+| `/api/cron/daily-digest` | `0 13 * * *` (13:00) | Daily owner action recommendations email |
+| `/api/cron/waiver-expiry-reminders` | `0 14 * * *` (14:00) | Notify members with waivers expiring within 7 days |
+| `/api/cron/lead-reminders` | `0 15 * * *` (15:00) | Trial/lead follow-up reminders |
+| `/api/cron/campaigns` | `0 16 * * *` (16:00) | Send due marketing campaigns |
+
+**Setup:**
+
+1. Generate a secret: `openssl rand -hex 32`.
+2. Add it as `CRON_SECRET` in Vercel (Production + Preview) and to `.env.local` for local runs.
+3. Vercel Cron automatically attaches `Authorization: Bearer $CRON_SECRET` to scheduled invocations once the env var is set — no extra wiring needed.
+
+**Behavior without the secret:** routes return `503 CRON_SECRET is not configured`. A wrong/missing token returns `401`.
+
+**Test locally:**
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/daily-digest
+```
+
+> Note: `vercel.json` uses daily schedules. Sub-daily cron frequency requires a Vercel Pro plan.
+
 ## Roles
 
 | Role | Access |
@@ -96,6 +123,10 @@ Optional: `SUPABASE_TEST_*` vars for RLS integration tests (`npm run test:rls`).
 | `NEXT_PUBLIC_APP_URL` | Production URL, e.g. `https://your-app.vercel.app` |
 | `RESEND_API_KEY` | Required for staff invites / member email in prod |
 | `RESEND_FROM_EMAIL` | Verified sender, e.g. `MatsFlow <onboarding@yourdomain.com>` |
+| `CRON_SECRET` | Bearer token for `/api/cron/*`; cron routes return 503 until set (see [Cron jobs](#cron-jobs)) |
+| `UPSTASH_REDIS_REST_URL` | Distributed rate limiting (falls back to in-memory if unset) |
+| `UPSTASH_REDIS_REST_TOKEN` | Distributed rate limiting |
+| `UNSUBSCRIBE_SECRET` | HMAC secret for marketing unsubscribe links |
 
 4. Deploy. After first deploy, set Stripe webhook URL to `https://YOUR_DOMAIN/api/stripe/webhook`.
 

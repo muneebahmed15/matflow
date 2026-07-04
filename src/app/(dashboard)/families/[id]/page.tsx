@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Users, ArrowLeft } from 'lucide-react';
@@ -44,9 +45,7 @@ export default function FamilyDetailPage() {
     setLoading(false);
   }, [id]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useAsyncMount(load, [load]);
 
   if (loading) return <PageLoader />;
 

@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { Trophy, Plus } from 'lucide-react';
 import EmptyState from '@/components/EmptyState';
 import {
@@ -43,9 +44,7 @@ export default function CompetitionsPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
+  useAsyncMount(loadData, [loadData]);
 
   const handleSubmit = async () => {
     if (!name.trim()) {

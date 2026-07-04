@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { Upload, Download, FileWarning } from 'lucide-react';
 import {
   getImportErrorsAction,
@@ -80,9 +81,7 @@ export default function MigrationPage() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    void load();
-  }, []);
+  useAsyncMount(load, []);
 
   const handleFile = async (file: File, commit: boolean) => {
     setImporting(true);

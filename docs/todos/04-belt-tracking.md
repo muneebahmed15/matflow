@@ -5,7 +5,7 @@
 - [x] 4.2 `members.stripe_count` integer (Wave 1)
 - [x] 4.3 Belt system per gym (BJJ adult/kids, Karate, TKD presets via `gyms.belt_system`)
 - [x] 4.4 Custom belt order configuration (`gyms.belt_custom_order` jsonb)
-- [ ] 4.5 Belt colors config in gym settings
+- [x] 4.5 Belt colors config in gym settings
 
 ## Promotions
 - [x] 4.6 `belt_promotions` history table (done)

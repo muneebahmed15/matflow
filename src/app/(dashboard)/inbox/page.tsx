@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import Link from 'next/link';
 import { Inbox, MessageCircle, UserPlus } from 'lucide-react';
 import {
@@ -32,9 +33,7 @@ export default function InboxPage() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    void load();
-  }, []);
+  useAsyncMount(load, []);
 
   const selectItem = async (item: InboxItem) => {
     setSelected(item);

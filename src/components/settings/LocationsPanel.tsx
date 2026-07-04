@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { createLocationAction, deleteLocationAction, listLocationsAction } from '@/app/(dashboard)/actions';
 import type { GymLocation } from '@/services/gym-locations';
 
@@ -16,9 +17,7 @@ export default function LocationsPanel() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    void load();
-  }, []);
+  useAsyncMount(load, []);
 
   const add = async () => {
     if (!name.trim()) return;

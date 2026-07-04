@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { hasCapability } from '@/lib/permissions/capabilities';
 import { Dumbbell, Plus } from 'lucide-react';
 import {
@@ -132,9 +133,7 @@ export default function ClassesPage() {
     setLoading(false);
   }, [showError]);
 
-  useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+  useAsyncMount(loadPage, [loadPage]);
 
   const resetForm = () => {
     setName('');

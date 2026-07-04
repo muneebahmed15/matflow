@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { listAttendanceLogAction } from '@/app/(dashboard)/actions';
 
 type AttendanceRecord = {
@@ -31,9 +32,7 @@ export default function AttendanceLogPage() {
     setLoading(false);
   }, [date]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useAsyncMount(load, [load]);
 
   if (!hasAccess && !loading) {
     return <div className="p-8 max-w-3xl mx-auto text-white/40">No gym access found for your account.</div>;

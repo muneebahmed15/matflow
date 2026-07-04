@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { Users, UserCheck, CreditCard, FileText } from 'lucide-react';
 import { StatsSkeleton } from '@/components/LoadingSkeleton';
 import BusinessInsightsWidget from '@/components/dashboard/BusinessInsightsWidget';
@@ -27,9 +28,7 @@ export default function DashboardPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useAsyncMount(load, [load]);
 
   const statCards = [
     {

@@ -32,11 +32,32 @@ export type GymSettings = Pick<GymRow, 'id' | 'name' | 'slug' | 'kiosk_enabled'>
   require_waiver_for_checkin: boolean;
   timezone: string;
   belt_system: string;
+  belt_custom_order: string[] | null;
+  belt_color_overrides: Record<string, string> | null;
   booking_cancel_hours: number;
 };
 
 const GYM_SETTINGS_COLUMNS =
-  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, review_checkin_threshold, require_waiver_for_checkin, timezone, belt_system, booking_cancel_hours';
+  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, review_checkin_threshold, require_waiver_for_checkin, timezone, belt_system, belt_custom_order, belt_color_overrides, booking_cancel_hours';
+
+function parseGymSettingsRow(data: Record<string, unknown>): GymSettings {
+  const customOrder = data.belt_custom_order;
+  const colorOverrides = data.belt_color_overrides;
+  return {
+    ...(data as GymSettings),
+    belt_custom_order: Array.isArray(customOrder)
+      ? customOrder.filter((b): b is string => typeof b === 'string')
+      : null,
+    belt_color_overrides:
+      colorOverrides && typeof colorOverrides === 'object' && !Array.isArray(colorOverrides)
+        ? Object.fromEntries(
+            Object.entries(colorOverrides as Record<string, unknown>).filter(
+              (entry): entry is [string, string] => typeof entry[1] === 'string'
+            )
+          )
+        : null,
+  };
+}
 
 export async function getGymSettings(gymId: string): Promise<GymSettings> {
   const admin = getAdminClient();
@@ -47,7 +68,7 @@ export async function getGymSettings(gymId: string): Promise<GymSettings> {
     .single();
 
   if (error || !data) throw new ServiceError(404, 'Gym not found');
-  return data as GymSettings;
+  return parseGymSettingsRow(data as Record<string, unknown>);
 }
 
 export type UpdateGymSettingsInput = {
@@ -79,6 +100,8 @@ export type UpdateGymSettingsInput = {
   requireWaiverForCheckin?: boolean;
   timezone?: string;
   beltSystem?: string;
+  beltCustomOrder?: string[] | null;
+  beltColorOverrides?: Record<string, string> | null;
   bookingCancelHours?: number;
 };
 
@@ -121,6 +144,21 @@ export async function updateGymSettings(
     }
   }
 
+  const beltCustomOrder =
+    input.beltCustomOrder?.map((belt) => belt.trim().toLowerCase()).filter(Boolean) ?? null;
+  if (beltCustomOrder && beltCustomOrder.length > 0 && beltCustomOrder.length < 2) {
+    throw new ServiceError(400, 'Custom belt order needs at least two belts.');
+  }
+
+  const beltColorOverrides = input.beltColorOverrides ?? null;
+  if (beltColorOverrides) {
+    for (const [belt, color] of Object.entries(beltColorOverrides)) {
+      if (color && !/^#[0-9A-Fa-f]{6}$/.test(color)) {
+        throw new ServiceError(400, `Invalid hex color for belt "${belt}". Use format #RRGGBB.`);
+      }
+    }
+  }
+
   const { data, error } = await admin
     .from('gyms')
     .update({
@@ -152,6 +190,8 @@ export async function updateGymSettings(
       require_waiver_for_checkin: input.requireWaiverForCheckin ?? true,
       timezone: input.timezone?.trim() || 'America/New_York',
       belt_system: input.beltSystem?.trim() || 'bjj_adult',
+      belt_custom_order: beltCustomOrder && beltCustomOrder.length >= 2 ? beltCustomOrder : null,
+      belt_color_overrides: beltColorOverrides,
       booking_cancel_hours: Math.max(0, input.bookingCancelHours ?? 2),
     })
     .eq('id', gymId)
@@ -172,7 +212,7 @@ export async function updateGymSettings(
     // Audit is best-effort
   }
 
-  return data as GymSettings;
+  return parseGymSettingsRow(data as Record<string, unknown>);
 }
 
 export async function getGymName(gymId: string): Promise<string | null> {
@@ -191,5 +231,5 @@ export async function completeGymSetup(gymId: string): Promise<GymSettings> {
     .single();
 
   if (error) throw new ServiceError(500, error.message);
-  return data as GymSettings;
+  return parseGymSettingsRow(data as Record<string, unknown>);
 }

@@ -14,6 +14,7 @@ export type GymProgram = {
 export type GymCoach = {
   id: string;
   gym_id: string;
+  staff_role_id: string | null;
   name: string;
   bio: string | null;
   photo_url: string | null;
@@ -78,12 +79,24 @@ export async function createCoach(input: {
   photoUrl?: string;
   beltRank?: string;
   specialties?: string;
+  staffRoleId?: string | null;
 }): Promise<GymCoach> {
   const admin = getAdminClient();
+  if (input.staffRoleId) {
+    const { data: staff } = await admin
+      .from('staff_roles')
+      .select('id')
+      .eq('id', input.staffRoleId)
+      .eq('gym_id', input.gymId)
+      .maybeSingle();
+    if (!staff) throw new ServiceError(400, 'Selected staff member not found for this gym.');
+  }
+
   const { data, error } = await admin
     .from('gym_coaches')
     .insert({
       gym_id: input.gymId,
+      staff_role_id: input.staffRoleId ?? null,
       name: input.name.trim(),
       bio: input.bio?.trim() || null,
       photo_url: input.photoUrl?.trim() || null,
@@ -143,15 +156,27 @@ export async function updateCoach(input: {
   photoUrl?: string | null;
   beltRank?: string | null;
   specialties?: string | null;
+  staffRoleId?: string | null;
   isActive?: boolean;
 }): Promise<GymCoach> {
   const admin = getAdminClient();
+  if (input.staffRoleId) {
+    const { data: staff } = await admin
+      .from('staff_roles')
+      .select('id')
+      .eq('id', input.staffRoleId)
+      .eq('gym_id', input.gymId)
+      .maybeSingle();
+    if (!staff) throw new ServiceError(400, 'Selected staff member not found for this gym.');
+  }
+
   const updates: Record<string, unknown> = {};
   if (input.name !== undefined) updates.name = input.name.trim();
   if (input.bio !== undefined) updates.bio = input.bio?.trim() || null;
   if (input.photoUrl !== undefined) updates.photo_url = input.photoUrl?.trim() || null;
   if (input.beltRank !== undefined) updates.belt_rank = input.beltRank?.trim() || null;
   if (input.specialties !== undefined) updates.specialties = input.specialties?.trim() || null;
+  if (input.staffRoleId !== undefined) updates.staff_role_id = input.staffRoleId;
   if (input.isActive !== undefined) updates.is_active = input.isActive;
 
   const { data, error } = await admin

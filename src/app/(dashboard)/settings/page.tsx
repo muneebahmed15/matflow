@@ -1,11 +1,14 @@
 'use client'
 
+import { useState } from 'react'
+import { useAsyncMount, useClientMount } from '@/hooks/use-async-mount'
 import { redirectTo } from '@/lib/navigation'
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ExternalLink, Globe, Monitor } from 'lucide-react'
 import { getGymSettingsAction, updateGymSettingsAction, getGbpStatusAction, syncDirectoryListingsAction } from '@/app/(dashboard)/actions'
 import type { GymSettings } from '@/services/gym'
+import { resolveBeltSystem } from '@/lib/belt-systems'
+import { defaultBeltHex, getBeltBadgeStyle } from '@/lib/belt-colors'
 import LocationsPanel from '@/components/settings/LocationsPanel'
 
 export default function SettingsPage() {
@@ -18,23 +21,18 @@ export default function SettingsPage() {
   const [origin, setOrigin] = useState('')
   const [gbpStatus, setGbpStatus] = useState<{ connected: boolean; oauthUrl: string | null } | null>(null)
 
-  useEffect(() => {
-    setOrigin(window.location.origin)
-  }, [])
+  useClientMount(() => setOrigin(window.location.origin), [])
 
-  useEffect(() => {
-    const load = async () => {
-      const { supabase } = await import('@/lib/supabase')
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) setUserEmail(user.email || '')
+  useAsyncMount(async () => {
+    const { supabase } = await import('@/lib/supabase')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) setUserEmail(user.email || '')
 
-      const result = await getGymSettingsAction()
-      if (result.ok && result.data) setSettings(result.data)
-      const gbp = await getGbpStatusAction()
-      if (gbp.ok && gbp.data) setGbpStatus({ connected: gbp.data.connected, oauthUrl: gbp.data.oauthUrl })
-      setLoading(false)
-    }
-    void load()
+    const result = await getGymSettingsAction()
+    if (result.ok && result.data) setSettings(result.data)
+    const gbp = await getGbpStatusAction()
+    if (gbp.ok && gbp.data) setGbpStatus({ connected: gbp.data.connected, oauthUrl: gbp.data.oauthUrl })
+    setLoading(false)
   }, [])
 
   const update = (patch: Partial<GymSettings>) => {
@@ -75,6 +73,8 @@ export default function SettingsPage() {
       requireWaiverForCheckin: settings.require_waiver_for_checkin,
       timezone: settings.timezone ?? 'America/New_York',
       beltSystem: settings.belt_system ?? 'bjj_adult',
+      beltCustomOrder: settings.belt_custom_order,
+      beltColorOverrides: settings.belt_color_overrides,
       bookingCancelHours: settings.booking_cancel_hours ?? 2,
     })
     setSaving(false)
@@ -164,6 +164,49 @@ export default function SettingsPage() {
               <option value="tkd" className="bg-gray-900">Taekwondo</option>
             </select>
             <p className="text-white/20 text-xs mt-1">Controls belt order and valid ranks for promotions.</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Custom belt order (optional)</label>
+            <textarea
+              value={(settings.belt_custom_order ?? []).join('\n')}
+              onChange={(e) => {
+                const lines = e.target.value
+                  .split('\n')
+                  .map((line) => line.trim().toLowerCase())
+                  .filter(Boolean)
+                update({ belt_custom_order: lines.length > 0 ? lines : null })
+              }}
+              rows={4}
+              placeholder={'white\nblue\npurple\nbrown\nblack'}
+              className={inputClass}
+            />
+            <p className="text-white/20 text-xs mt-1">One belt per line. Leave empty to use the preset order above.</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Belt colors</label>
+            <div className="space-y-2">
+              {resolveBeltSystem(settings.belt_system, settings.belt_custom_order).belts.map((belt) => {
+                const badge = getBeltBadgeStyle(belt, settings.belt_color_overrides)
+                return (
+                  <div key={belt} className="flex items-center justify-between gap-3">
+                    <span className={badge.className} style={badge.style}>
+                      {belt}
+                    </span>
+                    <input
+                      type="color"
+                      value={settings.belt_color_overrides?.[belt] ?? defaultBeltHex(belt)}
+                      onChange={(e) => {
+                        const next = { ...(settings.belt_color_overrides ?? {}), [belt]: e.target.value }
+                        update({ belt_color_overrides: next })
+                      }}
+                      className="h-9 w-14 rounded-lg border border-white/10 bg-transparent cursor-pointer"
+                      aria-label={`Color for ${belt} belt`}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+            <p className="text-white/20 text-xs mt-1">Overrides badge colors on member lists and the portal.</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Booking cancellation window (hours)</label>

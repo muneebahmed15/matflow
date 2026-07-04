@@ -24,7 +24,7 @@
 - [x] 7.17 Admin CMS (`/website-content` page)
 - [~] 7.18 Logo URL upload (no dedicated hero image)
 - [x] 7.19 Programs list create/delete (no edit)
-- [~] 7.20 Coach bios CRUD (not linked to staff_roles)
+- [x] 7.20 Coach bios CRUD (linked to staff_roles via `staff_role_id`)
 
 ## Branding
 - [x] 7.21 Apply gym primary_color to public CSS variables (Wave 1)

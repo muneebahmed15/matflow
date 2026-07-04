@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import Link from 'next/link';
 import { Users } from 'lucide-react';
 import { listFamiliesPageDataAction } from '@/app/(dashboard)/actions';
@@ -22,9 +23,7 @@ export default function FamiliesPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useAsyncMount(load, [load]);
 
   return (
     <div className="p-6 md:p-8 max-w-3xl mx-auto">

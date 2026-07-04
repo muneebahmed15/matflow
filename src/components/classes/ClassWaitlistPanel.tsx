@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { Users } from 'lucide-react';
 import {
   addToClassWaitlistAction,
@@ -32,7 +33,7 @@ export default function ClassWaitlistPanel({ classId, className, members }: Prop
     setLoading(false);
   };
 
-  useEffect(() => {
+  useAsyncMount(() => {
     if (open) void load();
   }, [open, classId]);
 

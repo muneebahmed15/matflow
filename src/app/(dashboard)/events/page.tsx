@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { Calendar, Plus } from 'lucide-react';
 import EmptyState from '@/components/EmptyState';
 import {
@@ -38,9 +39,7 @@ export default function EventsPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    void loadEvents();
-  }, [loadEvents]);
+  useAsyncMount(loadEvents, [loadEvents]);
 
   const handleSubmit = async () => {
     if (!title.trim() || !eventDate) {

@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { UserPlus, Plus, ArrowRight } from 'lucide-react';
 import {
   convertLeadAction,
@@ -74,9 +75,7 @@ export default function LeadsPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    void loadLeads();
-  }, [loadLeads]);
+  useAsyncMount(loadLeads, [loadLeads]);
 
   const handleSubmit = async () => {
     if (!firstName || !lastName) {

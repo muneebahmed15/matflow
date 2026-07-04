@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { getBusinessInsightsAction, refreshBusinessSnapshotAction } from '@/app/(dashboard)/actions';
 import Link from 'next/link';
 import { StatsSkeleton } from '@/components/LoadingSkeleton';
@@ -18,9 +19,7 @@ export default function BusinessInsightsWidget() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    void load();
-  }, []);
+  useAsyncMount(load, []);
 
   const refresh = async () => {
     setLoading(true);

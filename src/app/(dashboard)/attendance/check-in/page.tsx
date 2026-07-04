@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { getCheckInPageDataAction } from '@/app/(dashboard)/actions';
 
 type Member = {
@@ -30,9 +31,7 @@ export default function CheckInPage() {
     setPageLoading(false);
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useAsyncMount(load, [load]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();

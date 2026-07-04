@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import {
   getClassSessionAction,
   markClassSessionAttendanceAction,
@@ -36,7 +37,7 @@ export default function ClassSessionPanel({ classId, className, instructor, memb
     setLoading(false);
   };
 
-  useEffect(() => {
+  useAsyncMount(() => {
     if (open) void load();
   }, [open, classId]);
 

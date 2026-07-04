@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { Calendar } from 'lucide-react';
@@ -97,9 +98,7 @@ export default function PortalClassesPage() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    void load();
-  }, [activeMember]);
+  useAsyncMount(load, [activeMember]);
 
   const toggleWaitlist = async (classId: string, onList: boolean) => {
     if (!activeMember) return;

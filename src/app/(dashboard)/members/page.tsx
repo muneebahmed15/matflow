@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import Link from 'next/link';
 import { Users, Plus, Search, Download } from 'lucide-react';
 import { exportMembersCsvAction, listMembersAction } from '@/app/(dashboard)/actions';
@@ -24,9 +25,7 @@ export default function MembersPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    void loadMembers();
-  }, [loadMembers]);
+  useAsyncMount(loadMembers, [loadMembers]);
 
   const handleExport = async () => {
     setExporting(true);

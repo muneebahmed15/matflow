@@ -127,7 +127,7 @@
 
 - [x] 12.42 Consistent loading skeletons
 
-- [ ] 12.43 Error boundaries per section
+- [x] 12.43 Error boundaries per section
 
 - [x] 12.44 Empty states with CTAs
 
@@ -145,11 +145,11 @@
 
 ## Testing
 
-- [ ] 12.48 E2E golden path: login → view attendance
+- [x] 12.48 E2E golden path: login → view attendance (`e2e/portal-golden-path.spec.ts`)
 
 - [x] 12.49 Component tests for SubscriptionActions
 
-- [ ] 12.50 Portal RLS integration tests
+- [x] 12.50 Portal RLS integration tests (members read/update isolation in `tests/rls/integration.test.ts`)
 
 
 

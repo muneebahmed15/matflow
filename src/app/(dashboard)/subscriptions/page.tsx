@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, Suspense } from 'react';
+import { useState, Suspense } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { CreditCard, CheckCircle, XCircle, Download, AlertTriangle, Plus } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -63,9 +64,7 @@ function SubscriptionsContent() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    void load();
-  }, []);
+  useAsyncMount(load, []);
 
   const handleExport = async () => {
     const result = await exportSubscriptionsCsvAction();

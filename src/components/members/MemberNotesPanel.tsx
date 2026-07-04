@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAsyncMount } from '@/hooks/use-async-mount';
 import { Pin, Trash2 } from 'lucide-react';
 import {
   createMemberNoteAction,
@@ -32,9 +33,7 @@ export default function MemberNotesPanel({ memberId }: Props) {
     setLoading(false);
   };
 
-  useEffect(() => {
-    void load();
-  }, [memberId]);
+  useAsyncMount(load, [memberId]);
 
   const handleAdd = async () => {
     if (!body.trim()) return;
