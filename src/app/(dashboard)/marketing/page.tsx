@@ -12,9 +12,15 @@ import {
   getMarketingFunnelAction,
   getLeadSourceStatsAction,
   updateCampaignAdSpendAction,
+  getReviewConversionStatsAction,
+  listSmsCampaignsAction,
+  createSmsCampaignAction,
+  sendSmsCampaignAction,
+  getGymSettingsAction,
 } from '@/app/(dashboard)/actions';
 import { CAMPAIGN_TEMPLATES } from '@/lib/campaign-templates';
 import { computeCampaignRoas, summarizeCampaignRoas } from '@/lib/campaign-roas';
+import { smsSegmentInfo } from '@/lib/sms-segments';
 
 export default function MarketingPage() {
   const [campaigns, setCampaigns] = useState<
@@ -43,16 +49,39 @@ export default function MarketingPage() {
   const [bodyHtml, setBodyHtml] = useState('');
   const [audience, setAudience] = useState('active_members');
   const [loading, setLoading] = useState(true);
+  const [marketingEnabled, setMarketingEnabled] = useState(true);
+  const [reviewStats, setReviewStats] = useState({ sent: 0, clicked: 0, completed: 0 });
+  const [smsCampaigns, setSmsCampaigns] = useState<
+    { id: string; name: string; body: string; audience: string; status: string; sent_count: number }[]
+  >([]);
+  const [smsName, setSmsName] = useState('');
+  const [smsBody, setSmsBody] = useState('');
+  const [smsAudience, setSmsAudience] = useState('active_members');
+
+  const smsPreview = smsSegmentInfo(smsBody);
 
   const load = async () => {
-    const [campaignRes, funnelRes, sourceRes] = await Promise.all([
+    const settingsRes = await getGymSettingsAction();
+    if (settingsRes.ok && settingsRes.data) {
+      setMarketingEnabled(settingsRes.data.marketing_enabled);
+      if (!settingsRes.data.marketing_enabled) {
+        setLoading(false);
+        return;
+      }
+    }
+
+    const [campaignRes, funnelRes, sourceRes, reviewRes, smsRes] = await Promise.all([
       listCampaignsAction(),
       getMarketingFunnelAction(),
       getLeadSourceStatsAction(),
+      getReviewConversionStatsAction(),
+      listSmsCampaignsAction(),
     ]);
     if (campaignRes.ok && campaignRes.data) setCampaigns(campaignRes.data);
     if (funnelRes.ok && funnelRes.data) setFunnel(funnelRes.data);
     if (sourceRes.ok && sourceRes.data) setSources(sourceRes.data);
+    if (reviewRes.ok && reviewRes.data) setReviewStats(reviewRes.data);
+    if (smsRes.ok && smsRes.data) setSmsCampaigns(smsRes.data);
     setLoading(false);
   };
 
@@ -112,6 +141,27 @@ export default function MarketingPage() {
     <div className="p-6 md:p-8 max-w-4xl mx-auto">
       <h1 className="text-3xl font-extrabold mb-2">Marketing</h1>
       <p className="text-white/40 text-sm mb-8">Campaigns, funnel analytics, and lead sources.</p>
+
+      {!marketingEnabled ? (
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-8 text-center">
+          <p className="text-white/50 text-sm">
+            Enable the Marketing module in Settings → Features to use campaigns and SMS tools.
+          </p>
+        </div>
+      ) : (
+        <>
+      <div className="grid sm:grid-cols-3 gap-4 mb-8">
+        {[
+          { label: 'Review requests sent', value: reviewStats.sent },
+          { label: 'Review link clicks', value: reviewStats.clicked },
+          { label: 'Reviews completed', value: reviewStats.completed },
+        ].map((stat) => (
+          <div key={stat.label} className="bg-[#111] border border-white/10 rounded-2xl p-5">
+            <p className="text-white/40 text-xs uppercase tracking-wide">{stat.label}</p>
+            <p className="text-2xl font-bold mt-1 text-white">{stat.value}</p>
+          </div>
+        ))}
+      </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
@@ -315,6 +365,60 @@ export default function MarketingPage() {
             </div>
           ))}
         </div>
+      )}
+
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8 space-y-3">
+        <h2 className="font-semibold text-white">SMS Campaign</h2>
+        <input value={smsName} onChange={(e) => setSmsName(e.target.value)} placeholder="Campaign name" className={inputClass} />
+        <textarea value={smsBody} onChange={(e) => setSmsBody(e.target.value)} placeholder="SMS message" rows={3} className={inputClass} />
+        <p className="text-white/40 text-xs">
+          {smsPreview.length} chars · {smsPreview.segments} segment(s) · {smsPreview.encoding.toUpperCase()}
+        </p>
+        <select value={smsAudience} onChange={(e) => setSmsAudience(e.target.value)} className={inputClass}>
+          <option value="active_members" className="bg-gray-900">Active members (SMS consent)</option>
+          <option value="inactive_members" className="bg-gray-900">Inactive members</option>
+          <option value="leads" className="bg-gray-900">Leads</option>
+        </select>
+        <button
+          type="button"
+          onClick={async () => {
+            const res = await createSmsCampaignAction({ name: smsName, body: smsBody, audience: smsAudience });
+            if (res.ok) {
+              setSmsName('');
+              setSmsBody('');
+              void load();
+            }
+          }}
+          className="bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-xl"
+        >
+          Save SMS draft
+        </button>
+        <div className="space-y-2 pt-2">
+          {smsCampaigns.map((c) => (
+            <div key={c.id} className="flex justify-between items-center bg-white/5 rounded-xl px-4 py-3 text-sm">
+              <div>
+                <p className="text-white font-medium">{c.name}</p>
+                <p className="text-white/40 text-xs truncate max-w-md">{c.body}</p>
+              </div>
+              {c.status === 'draft' ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await sendSmsCampaignAction(c.id);
+                    void load();
+                  }}
+                  className="text-blue-400 text-xs hover:text-blue-300"
+                >
+                  Send via Twilio
+                </button>
+              ) : (
+                <span className="text-white/40 text-xs">{c.sent_count} sent</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+        </>
       )}
     </div>
   );

@@ -52,4 +52,3 @@ export async function generateMetadata({ params }: { params: Promise<{ gymSlug: 
 
   return buildGymPageMetadata(gym, {});
 }
-

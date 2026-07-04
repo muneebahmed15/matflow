@@ -34,7 +34,7 @@
 - [x] 1.25 Slug collision handling with numeric suffix
 - [x] 1.26 Default gym name from user metadata
 - [x] 1.27 Onboard rollback if staff_roles insert fails
-- [ ] 1.28 Post-onboard redirect to dashboard setup wizard
+- [x] 1.28 Post-onboard redirect to dashboard setup wizard (onboarding → `/setup`; auth callback → `/setup` when incomplete)
 - [x] 1.29 Idempotent onboard — 409 if gym exists
 
 ## Branding & Settings
@@ -55,8 +55,8 @@
 
 ## Multi-Location
 - [x] 1.42 CRUD gym locations in settings (LocationsPanel)
-- [ ] 1.43 Default location on gym create
-- [ ] 1.44 Filter dashboard data by location (optional)
+- [x] 1.43 Default location on gym create (`/api/gym/onboard` inserts primary `gym_locations` row)
+- [x] 1.44 Filter dashboard data by location (optional) — location filter bar + classes scoped by `location_id`
 - [x] 1.45 Public site shows location addresses (contact + location pages)
 
 ## Observability
@@ -68,4 +68,4 @@
 
 ## Enterprise / Future
 - [x] 1.51 White-label: hide MatsFlow branding flag
-- [ ] 1.52 API keys table for enterprise integrations
+- [x] 1.52 API keys table for enterprise integrations (`gym_api_keys` + Settings panel)

@@ -117,7 +117,7 @@
 
 - [x] 12.39 Add to home screen prompt
 
-- [ ] 12.40 Push notifications (future)
+- [x] 12.40 Push notifications (future) — subscription scaffold + portal profile UI + `push_subscriptions` table
 
 
 

@@ -32,6 +32,8 @@ export default function PortalProfilePage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [signingOutAll, setSigningOutAll] = useState(false);
+  const [pushStatus, setPushStatus] = useState<'unsupported' | 'off' | 'on'>('off');
+  const [pushLoading, setPushLoading] = useState(false);
 
   const editAllowed = activeMember ? canEditProfile(activeMember.portal_role) : false;
 
@@ -266,6 +268,68 @@ export default function PortalProfilePage() {
               Add Emergency Contact
             </button>
           </>
+        )}
+      </div>
+
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-3">
+        <h2 className="font-semibold text-white">Push notifications</h2>
+        <p className="text-white/40 text-sm">
+          Get class reminders and gym updates on this device. Requires a supported browser and permission.
+        </p>
+        {pushStatus === 'unsupported' ? (
+          <p className="text-white/30 text-sm">Push notifications are not supported in this browser.</p>
+        ) : (
+          <button
+            type="button"
+            disabled={pushLoading || !editAllowed}
+            onClick={async () => {
+              setPushLoading(true);
+              try {
+                if (pushStatus === 'on') {
+                  const reg = await navigator.serviceWorker.getRegistration();
+                  const sub = await reg?.pushManager.getSubscription();
+                  if (sub) {
+                    await fetch(`/api/portal/push-subscribe?endpoint=${encodeURIComponent(sub.endpoint)}`, {
+                      method: 'DELETE',
+                    });
+                    await sub.unsubscribe();
+                  }
+                  setPushStatus('off');
+                  return;
+                }
+                if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                  setPushStatus('unsupported');
+                  return;
+                }
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') return;
+                const reg = await navigator.serviceWorker.register('/portal-sw.js').catch(() => null);
+                if (!reg) return;
+                const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+                const sub = await reg.pushManager.subscribe({
+                  userVisibleOnly: true,
+                  applicationServerKey: vapidKey
+                    ? Uint8Array.from(atob(vapidKey.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))
+                    : undefined,
+                });
+                const json = sub.toJSON();
+                await fetch('/api/portal/push-subscribe', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    endpoint: json.endpoint,
+                    keys: json.keys,
+                  }),
+                });
+                setPushStatus('on');
+              } finally {
+                setPushLoading(false);
+              }
+            }}
+            className="w-full bg-white/10 hover:bg-white/15 disabled:opacity-50 text-white text-sm font-semibold py-2.5 rounded-xl"
+          >
+            {pushLoading ? 'Working...' : pushStatus === 'on' ? 'Disable push notifications' : 'Enable push notifications'}
+          </button>
         )}
       </div>
 

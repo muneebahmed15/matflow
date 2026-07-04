@@ -38,14 +38,13 @@ async function assertInstructorScheduleClear(
   }
 }
 
-export async function listClasses(gymId: string): Promise<ClassRow[]> {
+export async function listClasses(gymId: string, locationId?: string | null): Promise<ClassRow[]> {
   const admin = getAdminClient();
-  const { data, error } = await admin
-    .from('classes')
-    .select('*')
-    .eq('gym_id', gymId)
-    .order('day_of_week')
-    .order('start_time');
+  let query = admin.from('classes').select('*').eq('gym_id', gymId);
+  if (locationId) {
+    query = query.or(`location_id.eq.${locationId},location_id.is.null`);
+  }
+  const { data, error } = await query.order('day_of_week').order('start_time');
 
   if (error) throw new ServiceError(500, error.message);
   return data ?? [];
@@ -53,9 +52,10 @@ export async function listClasses(gymId: string): Promise<ClassRow[]> {
 
 export async function listClassesForStaff(
   gymId: string,
-  scopedClassIds: string[] | null
+  scopedClassIds: string[] | null,
+  locationId?: string | null
 ): Promise<ClassRow[]> {
-  const classes = await listClasses(gymId);
+  const classes = await listClasses(gymId, locationId);
   if (scopedClassIds === null) return classes;
   return classes.filter((c) => scopedClassIds.includes(c.id));
 }

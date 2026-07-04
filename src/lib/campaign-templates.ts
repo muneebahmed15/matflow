@@ -39,4 +39,12 @@ export const CAMPAIGN_TEMPLATES: CampaignTemplate[] = [
       '<p>Hi {{first_name}},</p><p>Your membership payment did not go through. Please update your billing so you can keep checking in without interruption.</p>',
     audience: 'past_due',
   },
+  {
+    id: 'promotion',
+    name: 'Promotion announcement',
+    subject: 'Special offer at {{gym_name}} — limited time!',
+    bodyHtml:
+      '<p>Hi {{first_name}},</p><p>We are running a special promotion this month at {{gym_name}}. Lock in your spot before it fills up.</p><p><strong>Offer details:</strong> Add your promotion terms here.</p><p>See you on the mats!</p>',
+    audience: 'all_members',
+  },
 ];

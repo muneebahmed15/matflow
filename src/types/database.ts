@@ -1198,6 +1198,50 @@ export type Database = {
           },
         ]
       }
+      sms_campaigns: {
+        Row: {
+          audience: string
+          body: string
+          created_at: string
+          gym_id: string
+          id: string
+          name: string
+          sent_at: string | null
+          sent_count: number
+          status: string
+        }
+        Insert: {
+          audience?: string
+          body: string
+          created_at?: string
+          gym_id: string
+          id?: string
+          name: string
+          sent_at?: string | null
+          sent_count?: number
+          status?: string
+        }
+        Update: {
+          audience?: string
+          body?: string
+          created_at?: string
+          gym_id?: string
+          id?: string
+          name?: string
+          sent_at?: string | null
+          sent_count?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_campaigns_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       emergency_contacts: {
         Row: {
           created_at: string
@@ -1543,6 +1587,47 @@ export type Database = {
           },
         ]
       }
+      gym_api_keys: {
+        Row: {
+          created_at: string
+          gym_id: string
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          revoked_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          gym_id: string
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          revoked_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          gym_id?: string
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gym_api_keys_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gym_programs: {
         Row: {
           age_group: string | null
@@ -1663,6 +1748,12 @@ export type Database = {
           white_label_enabled: boolean
           setup_completed_at: string | null
           favicon_url: string | null
+          hero_ab_enabled: boolean
+          hero_variant_b_headline: string | null
+          hero_variant_b_subheadline: string | null
+          marketing_enabled: boolean
+          public_translations: Json
+          seo_keywords: string[] | null
         }
         Insert: {
           about_text?: string | null
@@ -2158,6 +2249,51 @@ export type Database = {
           },
         ]
       }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          gym_id: string
+          id: string
+          member_id: string
+          p256dh: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          gym_id: string
+          id?: string
+          member_id: string
+          p256dh: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          gym_id?: string
+          id?: string
+          member_id?: string
+          p256dh?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string
@@ -2424,6 +2560,7 @@ export type Database = {
       review_requests: {
         Row: {
           completed_at: string | null
+          link_clicked_at: string | null
           gym_id: string
           id: string
           member_id: string
@@ -2431,6 +2568,7 @@ export type Database = {
         }
         Insert: {
           completed_at?: string | null
+          link_clicked_at?: string | null
           gym_id: string
           id?: string
           member_id: string
@@ -2438,6 +2576,7 @@ export type Database = {
         }
         Update: {
           completed_at?: string | null
+          link_clicked_at?: string | null
           gym_id?: string
           id?: string
           member_id?: string

@@ -3,13 +3,13 @@
 ## SEO
 - [x] 11.1 Platform sitemap (done)
 - [x] 11.2 Per-gym meta tags
-- [ ] 11.3 Keyword suggestions in CMS
+- [x] 11.3 Keyword suggestions in CMS (`suggestSeoKeywords` + Website Content panel)
 - [x] 11.4 Auto-generated location pages (`/g/[slug]/locations/[locationSlug]`)
 - [x] 11.5 Schema.org markup per gym (LocalBusiness JSON-LD)
 
 ## Google Business Profile
 - [x] 11.6 GBP OAuth connection (`src/services/gbp.ts` + settings UI)
-- [ ] 11.7 Sync hours from class schedule
+- [x] 11.7 Sync hours from class schedule (`syncGbpHoursFromSchedule` + Settings button)
 - [ ] 11.8 Post updates from dashboard
 - [ ] 11.9 Reply to reviews from MatsFlow
 
@@ -29,19 +29,18 @@
 - [x] 11.20 Unsubscribe compliance (HMAC one-click unsubscribe + opt-out filtering)
 
 ## SMS Campaigns
-- [ ] 11.21 SMS campaign builder
-- [x] 11.22 Consent checkbox on forms (trial + contact)
-- [ ] 11.23 Twilio send integration
-- [ ] 11.24 Character count / segment preview
+- [x] 11.21 SMS campaign builder (`sms_campaigns` table + Marketing page)
+- [x] 11.23 Twilio send integration (`sendSmsCampaign` via existing Twilio lib)
+- [x] 11.24 Character count / segment preview (`smsSegmentInfo` in UI)
 
 ## Review Requests
 - [x] 11.25 Auto-request after N check-ins (review-automation service)
 - [x] 11.26 Google review link generator
-- [ ] 11.27 Track review conversion
+- [x] 11.27 Track review conversion (`link_clicked_at` + tracked review-click URL + dashboard stats)
 
 ## Social Content
 - [ ] 11.28 AI generate Instagram caption
-- [ ] 11.29 Promotion announcement template
+- [x] 11.29 Promotion announcement template (campaign template)
 - [ ] 11.30 Export image with gym branding
 - [ ] 11.31 Schedule posts (Buffer integration future)
 
@@ -78,4 +77,4 @@
 - [ ] 11.49 Import existing GBP data
 - [x] 11.50 First email campaign template
 - [x] 11.51 Review request after Nth check-in (configurable `review_checkin_threshold`, default 5)
-- [ ] 11.52 Marketing module feature flag
+- [x] 11.52 Marketing module feature flag (`gyms.marketing_enabled` + nav gate)

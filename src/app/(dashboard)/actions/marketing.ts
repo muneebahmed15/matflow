@@ -26,7 +26,8 @@ import { getMember } from '@/services/members';
 
 
 
-import { listCampaigns, createCampaign, sendCampaign, requestReview, updateCampaignAdSpend } from '@/services/marketing';
+import { listCampaigns, createCampaign, sendCampaign, requestReview, updateCampaignAdSpend, getReviewConversionStats } from '@/services/marketing';
+import { createSmsCampaign, listSmsCampaigns, sendSmsCampaign } from '@/services/sms-campaigns';
 
 
 
@@ -132,6 +133,48 @@ export async function requestReviewAction(memberId: string): Promise<ActionResul
     await getMember(auth.gymId, memberId);
     await requestReview(auth.gymId, memberId);
     return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function getReviewConversionStatsAction() {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    return { ok: true as const, data: await getReviewConversionStats(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function listSmsCampaignsAction() {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    return { ok: true as const, data: await listSmsCampaigns(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function createSmsCampaignAction(input: {
+  name: string;
+  body: string;
+  audience: string;
+}) {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const campaign = await createSmsCampaign({ ...input, gymId: auth.gymId });
+    revalidatePath('/marketing');
+    return { ok: true as const, data: campaign };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function sendSmsCampaignAction(campaignId: string) {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    return { ok: true as const, data: await sendSmsCampaign(auth.gymId, campaignId) };
   } catch (error) {
     return toActionError(error);
   }

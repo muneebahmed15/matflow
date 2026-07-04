@@ -99,13 +99,13 @@ export async function createClassSeriesAction(input: {
 }
 
 
-export async function listClassesAction(): Promise<
+export async function listClassesAction(locationId?: string | null): Promise<
   ActionResult<Database['public']['Tables']['classes']['Row'][]>
 > {
   try {
     const auth = await requireStaffSession();
     const scoped = await getInstructorScopedClassIds(auth);
-    const classes = await listClassesForStaff(auth.gymId, scoped);
+    const classes = await listClassesForStaff(auth.gymId, scoped, locationId);
     return { ok: true, data: classes };
   } catch (error) {
     return toActionError(error);

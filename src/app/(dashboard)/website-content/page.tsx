@@ -17,6 +17,9 @@ import {
   publishBlogPostAction,
   deleteBlogPostAction,
   listStaffAction,
+  suggestSeoKeywordsAction,
+  getGymSettingsAction,
+  updateGymSettingsAction,
 } from '@/app/(dashboard)/actions';
 
 type StaffOption = { id: string; full_name: string; role: string };
@@ -47,6 +50,8 @@ export default function WebsiteContentPage() {
   const [editCoachName, setEditCoachName] = useState('');
   const [editCoachBio, setEditCoachBio] = useState('');
   const [editCoachStaffId, setEditCoachStaffId] = useState('');
+  const [keywordSuggestions, setKeywordSuggestions] = useState<string[]>([]);
+  const [savedKeywords, setSavedKeywords] = useState<string[]>([]);
 
   const load = async () => {
     const [progRes, coachRes, blogRes, staffRes] = await Promise.all([
@@ -60,6 +65,10 @@ export default function WebsiteContentPage() {
     if (blogRes.ok && blogRes.data) setBlogPosts(blogRes.data);
     if (staffRes.ok && staffRes.data) {
       setStaff(staffRes.data.map((s) => ({ id: s.id, full_name: s.full_name, role: s.role })));
+    }
+    const settingsRes = await getGymSettingsAction();
+    if (settingsRes.ok && settingsRes.data?.seo_keywords) {
+      setSavedKeywords(settingsRes.data.seo_keywords);
     }
   };
 
@@ -104,6 +113,50 @@ export default function WebsiteContentPage() {
         <h1 className="text-3xl font-extrabold mb-2">Website Content</h1>
         <p className="text-white/40 text-sm">Manage public pages at /g/your-slug</p>
       </div>
+
+      <section className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-3">
+        <h2 className="font-semibold text-white">SEO keywords</h2>
+        <p className="text-white/40 text-sm">Suggested from gym name, city, programs, and tagline.</p>
+        <button
+          type="button"
+          onClick={async () => {
+            const res = await suggestSeoKeywordsAction();
+            if (res.ok && res.data) setKeywordSuggestions(res.data);
+          }}
+          className="bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-xl"
+        >
+          Generate suggestions
+        </button>
+        {(keywordSuggestions.length > 0 || savedKeywords.length > 0) && (
+          <div className="flex flex-wrap gap-2 pt-2">
+            {(keywordSuggestions.length > 0 ? keywordSuggestions : savedKeywords).map((kw) => (
+              <span key={kw} className="text-xs bg-white/5 border border-white/10 rounded-full px-3 py-1 text-white/70">
+                {kw}
+              </span>
+            ))}
+          </div>
+        )}
+        {keywordSuggestions.length > 0 && (
+          <button
+            type="button"
+            onClick={async () => {
+              const settingsRes = await getGymSettingsAction();
+              if (!settingsRes.ok || !settingsRes.data) return;
+              const s = settingsRes.data;
+              await updateGymSettingsAction({
+                name: s.name,
+                slug: s.slug,
+                kioskEnabled: s.kiosk_enabled,
+                seoKeywords: keywordSuggestions,
+              });
+              setSavedKeywords(keywordSuggestions);
+            }}
+            className="text-blue-400 text-sm hover:text-blue-300"
+          >
+            Save keywords to gym
+          </button>
+        )}
+      </section>
 
       <section className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-3">
         <h2 className="font-semibold text-white">Programs</h2>

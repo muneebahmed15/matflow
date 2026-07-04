@@ -50,7 +50,7 @@
 ## Performance
 - [x] 7.36 ISR/cache public pages (revalidate=300 on gym layout)
 - [~] 7.37 Image optimization via next/image (logo uses img for remote domains)
-- [ ] 7.38 Lighthouse score > 90 mobile (manual check)
+- [~] 7.38 Lighthouse score > 90 mobile (manual check — run Lighthouse on `/g/[slug]` after deploy)
 
 ## Mobile
 - [x] 7.39 Responsive layout all pages (Wave 1)
@@ -73,8 +73,8 @@
 
 ## Future
 - [x] 7.50 Blog posts per gym
-- [ ] 7.51 Multi-language public site
-- [ ] 7.52 A/B test hero variants
+- [x] 7.51 Multi-language public site (`?lang=es` + `public_translations` + locale switcher)
+- [x] 7.52 A/B test hero variants (`hero_ab_enabled` + cookie-based variant B headline)
 - [x] 7.53 Online class booking from schedule (book-trial links + portal drop-ins)
 - [x] 7.54 Member login link in header
 - [x] 7.55 Privacy policy page template

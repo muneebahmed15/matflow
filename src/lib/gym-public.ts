@@ -11,6 +11,7 @@ export type PublicGymProfile = {
   favicon_url: string | null;
   primary_color: string | null;
   timezone: string;
+  locale: string;
   contact_email: string | null;
   contact_phone: string | null;
   address_line1: string | null;
@@ -23,10 +24,14 @@ export type PublicGymProfile = {
   ai_front_desk_enabled: boolean;
   ga4_measurement_id: string | null;
   meta_pixel_id: string | null;
+  hero_ab_enabled: boolean;
+  hero_variant_b_headline: string | null;
+  hero_variant_b_subheadline: string | null;
+  public_translations: Record<string, unknown>;
 };
 
 const PUBLIC_GYM_COLUMNS =
-  'id, name, slug, tagline, about_text, logo_url, favicon_url, primary_color, timezone, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, website_enabled, store_enabled, ai_front_desk_enabled, white_label_enabled, ga4_measurement_id, meta_pixel_id';
+  'id, name, slug, tagline, about_text, logo_url, favicon_url, primary_color, timezone, locale, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, website_enabled, store_enabled, ai_front_desk_enabled, white_label_enabled, ga4_measurement_id, meta_pixel_id, hero_ab_enabled, hero_variant_b_headline, hero_variant_b_subheadline, public_translations';
 
 /** Load a gym for public website rendering. Returns null if not found or website disabled. */
 export async function getPublicGymBySlug(slug: string): Promise<PublicGymProfile | null> {

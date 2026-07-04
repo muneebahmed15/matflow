@@ -10,6 +10,7 @@ import { LayoutDashboard, Users, UserCheck, Calendar, CreditCard, Settings, LogO
 import Logo from '@/components/Logo'
 import { AppUiProvider } from '@/components/ui/AppUiProvider'
 import PageLoader from '@/components/PageLoader'
+import LocationFilterBar from '@/components/dashboard/LocationFilterBar'
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, adminOnly: false },
@@ -41,6 +42,7 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
   const [user, setUser] = useState<User | null>(null)
   const [gymName, setGymName] = useState('My Gym')
   const [role, setRole] = useState<StaffRole | null>(null)
+  const [marketingEnabled, setMarketingEnabled] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [checked, setChecked] = useState(false)
 
@@ -56,6 +58,7 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
         return
       }
       setRole(session.data.role)
+      setMarketingEnabled(session.data.marketingEnabled)
 
       setGymName(session.data.gymName)
       if (!session.data.setupCompletedAt) {
@@ -83,7 +86,10 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
     return pathname.startsWith(href)
   }
 
-  const visibleNavItems = navItems.filter((item) => canAccessRoute(role, item.href))
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.href === '/marketing' && !marketingEnabled) return false
+    return canAccessRoute(role, item.href)
+  })
 
   if (!checked) {
     return (
@@ -142,6 +148,7 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
             <span className="font-bold">MatsFlow</span>
           </div>
         </div>
+        <LocationFilterBar />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAsyncMount } from '@/hooks/use-async-mount';
 import { hasCapability } from '@/lib/permissions/capabilities';
 import { Dumbbell, Plus } from 'lucide-react';
@@ -37,6 +37,7 @@ import ClassWaitlistPanel from '@/components/classes/ClassWaitlistPanel';
 import ClassSessionPanel from '@/components/classes/ClassSessionPanel';
 import SeasonalTemplatesPanel from '@/components/classes/SeasonalTemplatesPanel';
 import ClassStaffAccessPanel from '@/components/classes/ClassStaffAccessPanel';
+import { getDashboardLocationFilter } from '@/components/dashboard/LocationFilterBar';
 import type { StaffRole } from '@/lib/permissions/capabilities';
 
 interface MemberOption {
@@ -107,11 +108,12 @@ export default function ClassesPage() {
   const [copySourceGymId, setCopySourceGymId] = useState('');
   const [copyingSchedule, setCopyingSchedule] = useState(false);
 
-  const reloadClasses = async () => {
-    const result = await listClassesAction();
+  const reloadClasses = useCallback(async () => {
+    const locationId = getDashboardLocationFilter();
+    const result = await listClassesAction(locationId);
     if (result.ok && result.data) setClasses(result.data as Class[]);
     else if (!result.ok) showError(result.error);
-  };
+  }, [showError]);
 
   const loadPage = useCallback(async () => {
     const contextResult = await getStaffContextAction();
@@ -127,9 +129,10 @@ export default function ClassesPage() {
     setGymTimezone(timezone);
     setCanManageClasses(hasCapability(role, 'classes.manage'));
 
+    const locationId = getDashboardLocationFilter();
     const [classResult, staffResult, countsResult, reportResult, revenueResult, membersResult, exceptionsResult, templatesResult] =
       await Promise.all([
-        listClassesAction(),
+        listClassesAction(locationId),
         listStaffAction(),
         getEnrollmentCountsAction(),
         getClassAttendanceReportAction(30),
@@ -201,6 +204,12 @@ export default function ClassesPage() {
   }, [showError]);
 
   useAsyncMount(loadPage, [loadPage]);
+
+  useEffect(() => {
+    const onFilter = () => void reloadClasses();
+    window.addEventListener('matflow-location-filter', onFilter);
+    return () => window.removeEventListener('matflow-location-filter', onFilter);
+  }, [reloadClasses]);
 
   const instructorConflicts = useMemo(
     () =>

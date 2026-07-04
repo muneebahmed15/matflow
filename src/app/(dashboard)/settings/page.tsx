@@ -5,11 +5,12 @@ import { useAsyncMount, useClientMount } from '@/hooks/use-async-mount'
 import { redirectTo } from '@/lib/navigation'
 import Link from 'next/link'
 import { ExternalLink, Globe, Monitor } from 'lucide-react'
-import { getGymSettingsAction, updateGymSettingsAction, getGbpStatusAction, syncDirectoryListingsAction } from '@/app/(dashboard)/actions'
+import { getGymSettingsAction, updateGymSettingsAction, getGbpStatusAction, syncDirectoryListingsAction, syncGbpHoursAction } from '@/app/(dashboard)/actions'
 import type { GymSettings } from '@/services/gym'
 import { resolveBeltSystem } from '@/lib/belt-systems'
 import { defaultBeltHex, getBeltBadgeStyle } from '@/lib/belt-colors'
 import LocationsPanel from '@/components/settings/LocationsPanel'
+import ApiKeysPanel from '@/components/settings/ApiKeysPanel'
 import ScheduleEmbedSnippet from '@/components/public/ScheduleEmbedSnippet'
 import CalendarSubscribeSnippet from '@/components/public/CalendarSubscribeSnippet'
 
@@ -79,6 +80,13 @@ export default function SettingsPage() {
       beltColorOverrides: settings.belt_color_overrides,
       bookingCancelHours: settings.booking_cancel_hours ?? 2,
       classReminderHours: settings.class_reminder_hours ?? 2,
+      marketingEnabled: settings.marketing_enabled,
+      heroAbEnabled: settings.hero_ab_enabled,
+      heroVariantBHeadline: settings.hero_variant_b_headline,
+      heroVariantBSubheadline: settings.hero_variant_b_subheadline,
+      seoKeywords: settings.seo_keywords,
+      publicTranslations: settings.public_translations,
+      locale: settings.locale,
     })
     setSaving(false)
     if (!result.ok) {
@@ -475,12 +483,100 @@ export default function SettingsPage() {
           >
             Sync directory listings (Yext/Moz)
           </button>
+          <button
+            onClick={async () => {
+              const res = await syncGbpHoursAction()
+              if (res.ok && res.data) alert(res.data.message)
+            }}
+            className="block text-sm text-blue-400 hover:text-blue-300"
+          >
+            Sync hours from class schedule
+          </button>
+        </div>
+
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-4">
+          <h2 className="font-semibold text-white">Public site A/B & translations</h2>
+          <label className="flex items-center justify-between gap-4 py-2">
+            <span className="text-gray-300 text-sm">Hero A/B test</span>
+            <input
+              type="checkbox"
+              checked={settings.hero_ab_enabled}
+              onChange={(e) => update({ hero_ab_enabled: e.target.checked })}
+              className="h-4 w-4 rounded accent-blue-500"
+            />
+          </label>
+          <input
+            value={settings.hero_variant_b_headline ?? ''}
+            onChange={(e) => update({ hero_variant_b_headline: e.target.value || null })}
+            placeholder="Variant B headline (optional)"
+            className={inputClass}
+          />
+          <input
+            value={settings.hero_variant_b_subheadline ?? ''}
+            onChange={(e) => update({ hero_variant_b_subheadline: e.target.value || null })}
+            placeholder="Variant B subheadline (optional)"
+            className={inputClass}
+          />
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Spanish tagline</label>
+            <input
+              value={(settings.public_translations as { es?: { tagline?: string } })?.es?.tagline ?? ''}
+              onChange={(e) =>
+                update({
+                  public_translations: {
+                    ...settings.public_translations,
+                    es: {
+                      ...(settings.public_translations as { es?: Record<string, string> })?.es,
+                      tagline: e.target.value,
+                    },
+                  },
+                })
+              }
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Spanish about text</label>
+            <textarea
+              value={(settings.public_translations as { es?: { about_text?: string } })?.es?.about_text ?? ''}
+              onChange={(e) =>
+                update({
+                  public_translations: {
+                    ...settings.public_translations,
+                    es: {
+                      ...(settings.public_translations as { es?: Record<string, string> })?.es,
+                      about_text: e.target.value,
+                    },
+                  },
+                })
+              }
+              rows={3}
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-4">
+          <h2 className="font-semibold text-white">API keys</h2>
+          <ApiKeysPanel />
         </div>
 
         <LocationsPanel />
 
         <div className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-4">
           <h2 className="font-semibold text-white">Features</h2>
+          <label className="flex items-center justify-between gap-4 py-3 border-b border-white/10">
+            <div>
+              <span className="text-gray-300 text-sm">Marketing module</span>
+              <p className="text-white/30 text-xs">Campaigns, SMS, and review tools in dashboard</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.marketing_enabled}
+              onChange={(e) => update({ marketing_enabled: e.target.checked })}
+              className="h-4 w-4 rounded accent-blue-500"
+            />
+          </label>
           <label className="flex items-center justify-between gap-4 py-3 border-b border-white/10">
             <div>
               <span className="text-gray-300 text-sm">Online store</span>

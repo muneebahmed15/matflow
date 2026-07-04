@@ -40,7 +40,10 @@ import { listLocations, createLocation, deleteLocation } from '@/services/gym-lo
 
 
 
-import { getGbpConnectionStatus, getGbpOAuthUrl, syncDirectoryListings } from '@/services/gbp';
+import { getGbpConnectionStatus, getGbpOAuthUrl, syncDirectoryListings, syncGbpHoursFromSchedule, previewGbpHoursFromSchedule } from '@/services/gbp';
+import { createApiKey, listApiKeys, revokeApiKey } from '@/services/api-keys';
+import { suggestSeoKeywords } from '@/lib/seo-keywords';
+import { listPrograms } from '@/services/gym-content';
 
 
 
@@ -120,6 +123,13 @@ export async function updateGymSettingsAction(input: {
   beltColorOverrides?: Record<string, string> | null;
   bookingCancelHours?: number;
   classReminderHours?: number;
+  marketingEnabled?: boolean;
+  heroAbEnabled?: boolean;
+  heroVariantBHeadline?: string | null;
+  heroVariantBSubheadline?: string | null;
+  seoKeywords?: string[] | null;
+  publicTranslations?: Record<string, unknown> | null;
+  locale?: string;
 }): Promise<ActionResult<GymSettings>> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });
@@ -204,6 +214,72 @@ export async function syncDirectoryListingsAction() {
   try {
     const auth = await requireStaffSession({ adminOnly: true });
     return { ok: true as const, data: await syncDirectoryListings(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function syncGbpHoursAction() {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    return { ok: true as const, data: await syncGbpHoursFromSchedule(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function previewGbpHoursAction() {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    return { ok: true as const, data: await previewGbpHoursFromSchedule(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function listApiKeysAction() {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    return { ok: true as const, data: await listApiKeys(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function createApiKeyAction(name: string) {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const data = await createApiKey(auth.gymId, name);
+    return { ok: true as const, data };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function revokeApiKeyAction(keyId: string) {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    await revokeApiKey(auth.gymId, keyId);
+    revalidatePath('/settings');
+    return { ok: true as const };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function suggestSeoKeywordsAction() {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const settings = await getGymSettings(auth.gymId);
+    const programs = await listPrograms(auth.gymId);
+    const keywords = suggestSeoKeywords({
+      gymName: settings.name,
+      city: settings.address_city,
+      state: settings.address_state,
+      tagline: settings.tagline,
+      programs: programs.map((p) => p.name),
+    });
+    return { ok: true as const, data: keywords };
   } catch (error) {
     return toActionError(error);
   }

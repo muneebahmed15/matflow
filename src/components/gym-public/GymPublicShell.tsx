@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import type { PublicGymProfile } from '@/lib/gym-public';
 import { formatGymAddress, gymPrimaryColor } from '@/lib/gym-public';
 import NewsletterSignup from '@/components/gym-public/NewsletterSignup';
+import PublicHeaderExtras from '@/components/gym-public/PublicHeaderExtras';
 
 const BASE_NAV = [
   { href: '', label: 'Home' },
@@ -68,19 +69,7 @@ export default function GymPublicShell({ gym, children }: Props) {
               </Link>
             ))}
           </nav>
-          <Link
-            href="/portal/login"
-            className="hidden sm:inline text-sm text-white/60 hover:text-white px-3 py-2"
-          >
-            Member Login
-          </Link>
-          <Link
-            href={`${base}/trial`}
-            className="text-sm font-semibold px-4 py-2 rounded-xl text-white shrink-0 transition hover:opacity-90"
-            style={{ backgroundColor: accent }}
-          >
-            Book Free Trial
-          </Link>
+          <PublicHeaderExtras base={base} accent={accent} />
         </div>
       </header>
 

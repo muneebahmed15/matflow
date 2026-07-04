@@ -29,6 +29,7 @@ export async function getDashboardSessionAction(): Promise<
     gymName: string;
     timezone: string;
     setupCompletedAt: string | null;
+    marketingEnabled: boolean;
   }>
 > {
   try {
@@ -42,6 +43,7 @@ export async function getDashboardSessionAction(): Promise<
         gymName: settings.name,
         timezone: settings.timezone,
         setupCompletedAt: settings.setup_completed_at ?? null,
+        marketingEnabled: settings.marketing_enabled,
       },
     };
   } catch (error) {

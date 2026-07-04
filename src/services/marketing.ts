@@ -5,6 +5,7 @@ import { unsubscribeUrl } from '@/lib/unsubscribe';
 import { getPublicEnv } from '@/lib/env';
 import { canSendMarketingEmail } from '@/lib/marketing-consent';
 import { prepareCampaignHtml } from '@/lib/campaign-tracking';
+import { reviewClickToken } from '@/lib/review-click-token';
 
 export type EmailCampaign = {
   id: string;
@@ -247,6 +248,52 @@ export async function sendDueCampaigns(): Promise<{ processed: number }> {
   return { processed };
 }
 
+export function reviewClickUrl(
+  appUrl: string,
+  gymId: string,
+  memberId: string,
+  requestId: string
+): string {
+  const params = new URLSearchParams({
+    gym: gymId,
+    member: memberId,
+    request: requestId,
+    token: reviewClickToken(gymId, memberId, requestId),
+  });
+  return `${appUrl.replace(/\/$/, '')}/api/public/review-click?${params.toString()}`;
+}
+
+export async function getReviewConversionStats(gymId: string): Promise<{
+  sent: number;
+  clicked: number;
+  completed: number;
+}> {
+  const admin = getAdminClient();
+  const { data } = await admin.from('review_requests').select('link_clicked_at, completed_at').eq('gym_id', gymId);
+
+  const rows = data ?? [];
+  return {
+    sent: rows.length,
+    clicked: rows.filter((r) => r.link_clicked_at).length,
+    completed: rows.filter((r) => r.completed_at).length,
+  };
+}
+
+export async function markReviewLinkClicked(
+  gymId: string,
+  memberId: string,
+  requestId: string
+): Promise<void> {
+  const admin = getAdminClient();
+  await admin
+    .from('review_requests')
+    .update({ link_clicked_at: new Date().toISOString() })
+    .eq('id', requestId)
+    .eq('gym_id', gymId)
+    .eq('member_id', memberId)
+    .is('link_clicked_at', null);
+}
+
 export function googleReviewUrl(placeId: string | null): string | null {
   if (!placeId) return null;
   return `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`;
@@ -276,20 +323,32 @@ export async function requestReview(
 
   const placeId = googlePlaceId ?? gym?.google_place_id ?? null;
   const reviewLink = googleReviewUrl(placeId);
-  const reviewCta = reviewLink
-    ? `<p><a href="${reviewLink}">Leave us a Google review</a></p>`
+
+  const { data: requestRow, error: insertError } = await admin
+    .from('review_requests')
+    .insert({
+      gym_id: gymId,
+      member_id: memberId,
+    })
+    .select('id')
+    .single();
+
+  if (insertError || !requestRow) throw new ServiceError(500, insertError?.message ?? 'Could not log review request');
+
+  const { NEXT_PUBLIC_APP_URL } = getPublicEnv();
+  const trackedLink = reviewLink
+    ? reviewClickUrl(NEXT_PUBLIC_APP_URL, gymId, memberId, requestRow.id)
+    : null;
+
+  const reviewCta = trackedLink
+    ? `<p><a href="${trackedLink}">Leave us a Google review</a></p>`
     : '<p>Please leave us a review on Google or your favorite platform.</p>';
 
   await sendTransactionalEmail({
     to: member.email,
     subject: `How was your experience at ${gym?.name ?? 'our gym'}?`,
     html: `<p>Hi ${member.first_name},</p><p>We'd love to hear about your training experience!</p>${reviewCta}`,
-    text: `Hi ${member.first_name}, we'd love to hear about your training experience!${reviewLink ? ` Review us: ${reviewLink}` : ''}`,
-  });
-
-  await admin.from('review_requests').insert({
-    gym_id: gymId,
-    member_id: memberId,
+    text: `Hi ${member.first_name}, we'd love to hear about your training experience!${trackedLink ? ` Review us: ${trackedLink}` : ''}`,
   });
 }
 

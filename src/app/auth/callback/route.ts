@@ -5,9 +5,23 @@ import { linkMemberAuthUserServer } from '@/lib/auth/link-member-server';
 import { resolveUserPersonasWithClient } from '@/lib/auth/resolve-persona';
 import { getPublicEnv } from '@/lib/env';
 
+async function staffNeedsSetup(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  gymId: string | null
+): Promise<boolean> {
+  if (!gymId) return true;
+  const { data: gym } = await supabase
+    .from('gyms')
+    .select('setup_completed_at')
+    .eq('id', gymId)
+    .maybeSingle();
+  return !gym?.setup_completed_at;
+}
+
 function postAuthRedirect(
   personas: Awaited<ReturnType<typeof resolveUserPersonasWithClient>>,
-  explicitNext: string | null
+  explicitNext: string | null,
+  staffSetupIncomplete: boolean
 ): NextResponse {
   const { NEXT_PUBLIC_APP_URL } = getPublicEnv();
   const base = NEXT_PUBLIC_APP_URL.replace(/\/$/, '');
@@ -24,6 +38,9 @@ function postAuthRedirect(
     return NextResponse.redirect(`${base}/portal`);
   }
   if (personas.hasStaff) {
+    if (staffSetupIncomplete) {
+      return NextResponse.redirect(`${base}/setup`);
+    }
     return NextResponse.redirect(`${base}/dashboard`);
   }
 
@@ -65,5 +82,7 @@ export async function GET(request: NextRequest) {
   }
 
   const personas = await resolveUserPersonasWithClient(supabase, user);
-  return postAuthRedirect(personas, nextParam);
+  const staffSetupIncomplete =
+    personas.hasStaff && (await staffNeedsSetup(supabase, personas.gymId));
+  return postAuthRedirect(personas, nextParam, staffSetupIncomplete);
 }
