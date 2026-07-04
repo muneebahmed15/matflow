@@ -25,7 +25,7 @@
 - [x] 11.16 Audience segments (all, active, inactive, past_due, leads)
 - [~] 11.17 Template editor (plain HTML body form)
 - [x] 11.18 Send via Resend
-- [~] 11.19 Open/click tracking (columns + UI; pixel tracking deferred)
+- [x] 11.19 Open/click tracking (pixel + click redirect APIs)
 - [x] 11.20 Unsubscribe compliance (HMAC one-click unsubscribe + opt-out filtering)
 
 ## SMS Campaigns

@@ -3,6 +3,7 @@ import { ServiceError } from '@/services/errors';
 import { sendTransactionalEmail } from '@/lib/email/resend';
 import { unsubscribeUrl } from '@/lib/unsubscribe';
 import { getPublicEnv } from '@/lib/env';
+import { prepareCampaignHtml } from '@/lib/campaign-tracking';
 
 export type EmailCampaign = {
   id: string;
@@ -13,6 +14,8 @@ export type EmailCampaign = {
   audience: string;
   status: string;
   sent_count: number;
+  open_count: number;
+  click_count: number;
   created_at: string;
 };
 
@@ -133,10 +136,17 @@ export async function sendCampaign(gymId: string, campaignId: string): Promise<{
       </p>
     `;
     try {
+      const trackedHtml = prepareCampaignHtml({
+        html: `${campaign.body_html}${footer}`,
+        appUrl,
+        gymId,
+        campaignId: campaign.id,
+        email: to,
+      });
       await sendTransactionalEmail({
         to,
         subject: campaign.subject,
-        html: `${campaign.body_html}${footer}`,
+        html: trackedHtml,
         text: `${campaign.body_html.replace(/<[^>]+>/g, '')}\n\nYou received this email from ${gymName}. Unsubscribe: ${optOutLink}`,
       });
       sent++;

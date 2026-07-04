@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { LogOut } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { usePortalMember } from '@/lib/portal-member-context';
 import { canEditProfile } from '@/lib/portal/billing-access';
@@ -15,6 +17,7 @@ type Contact = {
 };
 
 export default function PortalProfilePage() {
+  const router = useRouter();
   const { activeMember, loading: memberLoading } = usePortalMember();
   const [phone, setPhone] = useState('');
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -27,6 +30,7 @@ export default function PortalProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [signingOutAll, setSigningOutAll] = useState(false);
 
   const editAllowed = activeMember ? canEditProfile(activeMember.portal_role) : false;
 
@@ -100,6 +104,12 @@ export default function PortalProfilePage() {
       const data = await res.json();
       setPhotoUrl(data.profile_photo_url ?? null);
     }
+  };
+
+  const logoutAllDevices = async () => {
+    setSigningOutAll(true);
+    await supabase.auth.signOut({ scope: 'global' });
+    router.push('/portal/login');
   };
 
   if (memberLoading || loading || !activeMember) {
@@ -234,6 +244,22 @@ export default function PortalProfilePage() {
             </button>
           </>
         )}
+      </div>
+
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-3">
+        <h2 className="font-semibold text-white">Security</h2>
+        <p className="text-white/40 text-sm">
+          Sign out of the member portal on every device where you are currently logged in.
+        </p>
+        <button
+          type="button"
+          onClick={() => void logoutAllDevices()}
+          disabled={signingOutAll}
+          className="inline-flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 text-sm font-semibold px-4 py-2.5 rounded-xl disabled:opacity-50"
+        >
+          <LogOut size={16} />
+          {signingOutAll ? 'Signing out...' : 'Sign out all devices'}
+        </button>
       </div>
     </div>
   );

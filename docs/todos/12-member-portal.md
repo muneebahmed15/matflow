@@ -139,7 +139,7 @@
 
 - [x] 12.46 Session timeout warning
 
-- [ ] 12.47 Device management (logout all)
+- [x] 12.47 Device management (logout all via global sign-out on profile)
 
 
 
