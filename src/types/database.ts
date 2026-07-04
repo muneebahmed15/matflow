@@ -1663,6 +1663,54 @@ export type Database = {
           },
         ]
       }
+      member_automation_logs: {
+        Row: {
+          channel: string
+          created_at: string
+          gym_id: string
+          id: string
+          member_id: string
+          status: string
+          step: string
+          workflow: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          gym_id: string
+          id?: string
+          member_id: string
+          status?: string
+          step: string
+          workflow: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          gym_id?: string
+          id?: string
+          member_id?: string
+          status?: string
+          step?: string
+          workflow?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_automation_logs_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_automation_logs_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           assigned_staff_id: string | null

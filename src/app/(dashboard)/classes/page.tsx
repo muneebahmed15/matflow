@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useAsyncMount } from '@/hooks/use-async-mount';
 import { hasCapability } from '@/lib/permissions/capabilities';
 import { Dumbbell, Plus } from 'lucide-react';
@@ -19,6 +19,7 @@ import {
   updateClassAction,
 } from '@/app/(dashboard)/actions';
 import { CLASS_WEEKDAYS, formatSeriesLabel } from '@/lib/class-recurrence';
+import { detectAllInstructorConflicts } from '@/lib/class-schedule-conflicts';
 import { formatClassTime } from '@/lib/gym-public-time';
 import { useAppUi } from '@/components/ui/AppUiProvider';
 import PageLoader from '@/components/PageLoader';
@@ -141,6 +142,25 @@ export default function ClassesPage() {
   }, [showError]);
 
   useAsyncMount(loadPage, [loadPage]);
+
+  const instructorConflicts = useMemo(
+    () =>
+      detectAllInstructorConflicts(
+        classes.map((c) => ({
+          id: c.id,
+          name: c.name,
+          instructorStaffId: c.instructor_staff_id,
+          dayOfWeek: c.day_of_week,
+          startTime: c.start_time,
+          endTime: c.end_time,
+        }))
+      ),
+    [classes]
+  );
+  const conflictClassIds = useMemo(
+    () => new Set(instructorConflicts.flatMap((c) => [c.classId, c.conflictsWithId])),
+    [instructorConflicts]
+  );
 
   const resetForm = () => {
     setName('');
@@ -435,6 +455,12 @@ export default function ClassesPage() {
         </div>
       ) : (
         <div className="space-y-6">
+          {instructorConflicts.length > 0 && (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-3 text-sm text-yellow-200/90">
+              {instructorConflicts.length} instructor schedule conflict
+              {instructorConflicts.length === 1 ? '' : 's'} detected. Overlapping classes are marked below.
+            </div>
+          )}
           {DAYS.filter((d) => grouped[d]?.length > 0).map((dayName) => (
             <div key={dayName}>
               <h2 className="text-sm font-semibold text-white/40 uppercase tracking-wider mb-2">{dayName}</h2>
@@ -451,6 +477,11 @@ export default function ClassesPage() {
                           {cls.series_id && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-500/10 text-purple-300 border border-purple-500/20">
                               {formatSeriesLabel(cls.recurrence_rule)}
+                            </span>
+                          )}
+                          {conflictClassIds.has(cls.id) && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-500/10 text-yellow-300 border border-yellow-500/20">
+                              Instructor conflict
                             </span>
                           )}
                         </div>

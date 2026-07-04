@@ -34,7 +34,7 @@
 
 - [x] 3.13 Substitute instructor field
 
-- [ ] 3.14 Instructor conflict detection
+- [x] 3.14 Instructor conflict detection
 
 - [x] 3.15 Public site shows instructor bios (coaches page)
 

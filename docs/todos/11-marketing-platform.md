@@ -59,7 +59,7 @@
 ## Automations
 - [x] 11.39 Workflow: new lead → email sequence (lead automation)
 - [x] 11.40 Workflow: trial reminder (lead reminders cron)
-- [ ] 11.41 Workflow: win-back inactive 30d
+- [x] 11.41 Workflow: win-back inactive 30d
 
 ## Compliance
 - [x] 11.42 CAN-SPAM footer in emails

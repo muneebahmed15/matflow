@@ -2,9 +2,40 @@ import { getAdminClient } from '@/lib/supabase/admin';
 import type { Database } from '@/types/database';
 import { ServiceError } from '@/services/errors';
 import { buildWeeklyRecurrenceRule, sortDays } from '@/lib/class-recurrence';
+import {
+  type ClassScheduleSlot,
+  findInstructorConflictsForClass,
+  formatInstructorConflictMessage,
+} from '@/lib/class-schedule-conflicts';
 import { randomUUID } from 'crypto';
 
 type ClassRow = Database['public']['Tables']['classes']['Row'];
+
+function toScheduleSlot(row: ClassRow): ClassScheduleSlot {
+  return {
+    id: row.id,
+    name: row.name,
+    instructorStaffId: row.instructor_staff_id,
+    dayOfWeek: row.day_of_week ?? '',
+    startTime: row.start_time ?? '09:00',
+    endTime: row.end_time ?? '10:00',
+  };
+}
+
+async function assertInstructorScheduleClear(
+  gymId: string,
+  candidate: ClassScheduleSlot,
+  excludeClassId?: string
+): Promise<void> {
+  if (!candidate.instructorStaffId) return;
+
+  const classes = await listClasses(gymId);
+  const slots = classes.filter((c) => c.id !== excludeClassId).map(toScheduleSlot);
+  const conflicts = findInstructorConflictsForClass([...slots, candidate], candidate);
+  if (conflicts.length > 0) {
+    throw new ServiceError(409, formatInstructorConflictMessage(conflicts));
+  }
+}
 
 export async function listClasses(gymId: string): Promise<ClassRow[]> {
   const admin = getAdminClient();
@@ -41,6 +72,15 @@ export type CreateClassInput = {
 };
 
 export async function createClass(input: CreateClassInput): Promise<ClassRow> {
+  await assertInstructorScheduleClear(input.gymId, {
+    id: 'new',
+    name: input.name.trim(),
+    instructorStaffId: input.instructorStaffId ?? null,
+    dayOfWeek: input.dayOfWeek,
+    startTime: input.startTime,
+    endTime: input.endTime,
+  });
+
   const admin = getAdminClient();
   const { data, error } = await admin
     .from('classes')
@@ -70,6 +110,17 @@ export async function createClassSeries(
   const days = sortDays(input.daysOfWeek);
   if (days.length < 2) {
     throw new ServiceError(400, 'Select at least two days for a recurring series.');
+  }
+
+  for (const dayOfWeek of days) {
+    await assertInstructorScheduleClear(input.gymId, {
+      id: 'new',
+      name: input.name.trim(),
+      instructorStaffId: input.instructorStaffId ?? null,
+      dayOfWeek,
+      startTime: input.startTime,
+      endTime: input.endTime,
+    });
   }
 
   const admin = getAdminClient();
@@ -117,6 +168,28 @@ export async function updateClass(
   input: Partial<CreateClassInput>
 ): Promise<ClassRow> {
   const admin = getAdminClient();
+  const { data: existing, error: loadError } = await admin
+    .from('classes')
+    .select('*')
+    .eq('id', classId)
+    .eq('gym_id', gymId)
+    .maybeSingle();
+
+  if (loadError) throw new ServiceError(500, loadError.message);
+  if (!existing) throw new ServiceError(404, 'Class not found');
+
+  const merged = toScheduleSlot({
+    ...existing,
+    name: input.name?.trim() ?? existing.name,
+    instructor_staff_id:
+      input.instructorStaffId !== undefined ? input.instructorStaffId : existing.instructor_staff_id,
+    day_of_week: input.dayOfWeek ?? existing.day_of_week,
+    start_time: input.startTime ?? existing.start_time,
+    end_time: input.endTime ?? existing.end_time,
+  });
+
+  await assertInstructorScheduleClear(gymId, merged, classId);
+
   const updates: Record<string, unknown> = {};
 
   if (input.name !== undefined) updates.name = input.name.trim();
