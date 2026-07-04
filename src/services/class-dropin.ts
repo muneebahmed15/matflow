@@ -72,7 +72,7 @@ export async function bookDropIn(input: {
 
   const { data: gymClass } = await admin
     .from('classes')
-    .select('id, capacity')
+    .select('id, capacity, overbook_allowance')
     .eq('id', input.classId)
     .eq('gym_id', input.gymId)
     .maybeSingle();
@@ -109,7 +109,11 @@ export async function bookDropIn(input: {
     countActiveEnrollments(input.classId),
     countSessionBookings(session.id),
   ]);
-  assertClassHasCapacity(gymClass.capacity ?? null, enrolled + dropIns);
+  assertClassHasCapacity(
+    gymClass.capacity ?? null,
+    enrolled + dropIns,
+    gymClass.overbook_allowance ?? 0
+  );
 
   const { data, error } = await admin
     .from('class_session_bookings')

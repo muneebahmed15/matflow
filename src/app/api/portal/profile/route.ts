@@ -12,6 +12,8 @@ import { handleRouteError } from '@/lib/api-error';
 const schema = z.object({
   phone: z.string().max(30).optional(),
   email_opt_out: z.boolean().optional(),
+  marketing_email_consent: z.boolean().optional(),
+  sms_marketing_consent: z.boolean().optional(),
   member_id: z.string().uuid().optional(),
 });
 
@@ -31,6 +33,12 @@ export async function PATCH(req: NextRequest) {
     };
     if (parsed.data.email_opt_out !== undefined) {
       updates.email_opt_out = parsed.data.email_opt_out;
+    }
+    if (parsed.data.marketing_email_consent !== undefined) {
+      updates.marketing_email_consent = parsed.data.marketing_email_consent;
+    }
+    if (parsed.data.sms_marketing_consent !== undefined) {
+      updates.sms_marketing_consent = parsed.data.sms_marketing_consent;
     }
     const member = await updateMember(auth.gymId, auth.memberId, updates);
     return NextResponse.json({ member });

@@ -18,9 +18,9 @@
 
 - [x] 3.7 Recurring class series (RRULE or template)
 
-- [ ] 3.8 One-off class exceptions (cancellations)
+- [x] 3.8 One-off class exceptions (cancellations)
 
-- [ ] 3.9 Class color/category tags
+- [x] 3.9 Class color/category tags
 
 - [x] 3.10 Class description field
 
@@ -50,7 +50,7 @@
 
 - [x] 3.19 Block enrollment when at capacity (service throws 409, suggests waitlist)
 
-- [ ] 3.20 Overbooking allowance setting
+- [x] 3.20 Overbooking allowance setting
 
 
 
@@ -80,7 +80,7 @@
 
 - [x] 3.30 Attendance report per class (30-day avg on classes page)
 
-- [ ] 3.31 Link kiosk check-in to optional class_id
+- [x] 3.31 Link kiosk check-in to optional class_id
 
 
 
@@ -102,35 +102,35 @@
 
 - [x] 3.37 iCal export per gym
 
-- [ ] 3.38 Embed widget for external websites
+- [x] 3.38 Embed widget for external websites
 
 - [x] 3.39 Timezone-aware display
 
-- [ ] 3.40 Mobile-friendly schedule grid
+- [x] 3.40 Mobile-friendly schedule grid
 
 
 
 ## Integrations
 
-- [ ] 3.41 Google Calendar sync (export)
+- [x] 3.41 Google Calendar sync (export)
 
-- [ ] 3.42 Reminder notifications before class
+- [x] 3.42 Reminder notifications before class
 
-- [ ] 3.43 Low attendance class alert (AI assistant)
+- [x] 3.43 Low attendance class alert (AI assistant)
 
 
 
 ## Admin
 
-- [ ] 3.44 Bulk import class schedule CSV
+- [x] 3.44 Bulk import class schedule CSV
 
-- [ ] 3.45 Copy schedule from another gym (template)
+- [x] 3.45 Copy schedule from another gym (template)
 
-- [ ] 3.46 Seasonal schedule templates
+- [x] 3.46 Seasonal schedule templates
 
 - [x] 3.47 Class analytics: avg attendance
 
-- [ ] 3.48 Class analytics: revenue attribution
+- [x] 3.48 Class analytics: revenue attribution
 
 
 
@@ -138,9 +138,9 @@
 
 - [x] 3.49 Coaches can manage classes (done)
 
-- [ ] 3.50 Coaches cannot delete past session attendance
+- [x] 3.50 Coaches cannot delete past session attendance
 
-- [ ] 3.51 Class-level permission overrides
+- [x] 3.51 Class-level permission overrides
 
 
 

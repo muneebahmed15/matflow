@@ -11,6 +11,14 @@ export async function GET(_req: Request, { params }: Props) {
   if (!gym) notFound();
 
   const admin = getAdminClient();
+  const { data: gymRow } = await admin
+    .from('gyms')
+    .select('timezone')
+    .eq('id', gym.id)
+    .maybeSingle();
+
+  const timezone = gymRow?.timezone ?? 'America/New_York';
+
   const { data: classes } = await admin
     .from('classes')
     .select('id, name, instructor, day_of_week, start_time, end_time')
@@ -26,13 +34,15 @@ export async function GET(_req: Request, { params }: Props) {
       dayOfWeek: c.day_of_week ?? 'Monday',
       startTime: c.start_time ?? '09:00',
       endTime: c.end_time ?? '10:00',
-    }))
+    })),
+    timezone
   );
 
   return new Response(ical, {
     headers: {
       'Content-Type': 'text/calendar; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${gym.slug}-schedule.ics"`,
+      'Content-Disposition': `inline; filename="${gym.slug}-schedule.ics"`,
+      'Cache-Control': 'public, max-age=300',
     },
   });
 }

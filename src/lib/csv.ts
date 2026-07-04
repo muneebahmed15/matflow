@@ -83,6 +83,9 @@ john@example.com,EXT001,2024-03-15,Evening class`;
 export const BELT_HISTORY_IMPORT_TEMPLATE = `email,external_id,from_belt,to_belt,promoted_at,notes
 john@example.com,EXT001,white,blue,2023-06-10,Promoted by Prof. Silva`;
 
+export const CLASS_IMPORT_TEMPLATE = `name,instructor,day_of_week,start_time,end_time,capacity,category_tag,color,description
+BJJ Fundamentals,Coach John,Monday,09:00,10:00,20,BJJ,#3B82F6,All levels welcome`;
+
 function escapeCsvField(value: string): string {
   if (/[",\n\r]/.test(value)) {
     return `"${value.replace(/"/g, '""')}"`;

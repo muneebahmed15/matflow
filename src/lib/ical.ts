@@ -22,7 +22,11 @@ function formatIcalTime(time: string): string {
   return `${h?.padStart(2, '0') ?? '00'}${m?.padStart(2, '0') ?? '00'}00`;
 }
 
-export function buildWeeklyScheduleIcal(gymName: string, events: ICalEvent[]): string {
+export function buildWeeklyScheduleIcal(
+  gymName: string,
+  events: ICalEvent[],
+  timezone = 'America/New_York'
+): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -30,6 +34,7 @@ export function buildWeeklyScheduleIcal(gymName: string, events: ICalEvent[]): s
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${gymName} Schedule`,
+    `X-WR-TIMEZONE:${timezone}`,
   ];
 
   for (const ev of events) {
@@ -40,8 +45,8 @@ export function buildWeeklyScheduleIcal(gymName: string, events: ICalEvent[]): s
       `UID:${ev.uid}@matflow`,
       `SUMMARY:${ev.summary}`,
       ev.description ? `DESCRIPTION:${ev.description.replace(/\n/g, '\\n')}` : '',
-      `DTSTART;TZID=America/New_York:${formatIcalTime(ev.startTime)}`,
-      `DTEND;TZID=America/New_York:${formatIcalTime(ev.endTime)}`,
+      `DTSTART;TZID=${timezone}:${formatIcalTime(ev.startTime)}`,
+      `DTEND;TZID=${timezone}:${formatIcalTime(ev.endTime)}`,
       `RRULE:FREQ=WEEKLY;BYDAY=${byday}`,
       'END:VEVENT'
     );
@@ -49,4 +54,10 @@ export function buildWeeklyScheduleIcal(gymName: string, events: ICalEvent[]): s
 
   lines.push('END:VCALENDAR');
   return lines.filter(Boolean).join('\r\n');
+}
+
+/** Build a webcal URL and Google Calendar subscribe link for a public ICS feed. */
+export function buildGoogleCalendarSubscribeUrl(icsFeedUrl: string): string {
+  const webcalUrl = icsFeedUrl.replace(/^https?:\/\//i, 'webcal://');
+  return `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`;
 }

@@ -1,5 +1,6 @@
 import { getAdminClient } from '@/lib/supabase/admin';
 import { sendTransactionalEmail } from '@/lib/email/resend';
+import { canSendMarketingEmail } from '@/lib/marketing-consent';
 import { getPublicEnv } from '@/lib/env';
 import { logger } from '@/lib/logger';
 
@@ -39,15 +40,24 @@ export async function sendInactiveMemberWinBack(): Promise<{ processed: number }
   for (const gym of gyms ?? []) {
     const { data: members } = await admin
       .from('members')
-      .select('id, first_name, email, email_opt_out, created_at')
+      .select('id, first_name, email, email_opt_out, marketing_email_consent, created_at')
       .eq('gym_id', gym.id)
       .eq('status', 'active')
       .not('email', 'is', null)
       .eq('email_opt_out', false)
+      .eq('marketing_email_consent', true)
       .limit(200);
 
     for (const member of members ?? []) {
       if (!member.email) continue;
+      if (
+        !canSendMarketingEmail({
+          email_opt_out: member.email_opt_out,
+          marketing_email_consent: member.marketing_email_consent,
+        })
+      ) {
+        continue;
+      }
 
       const { data: lastAttendance } = await admin
         .from('attendance')

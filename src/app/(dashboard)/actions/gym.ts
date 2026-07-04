@@ -119,6 +119,7 @@ export async function updateGymSettingsAction(input: {
   beltCustomOrder?: string[] | null;
   beltColorOverrides?: Record<string, string> | null;
   bookingCancelHours?: number;
+  classReminderHours?: number;
 }): Promise<ActionResult<GymSettings>> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });

@@ -12,6 +12,12 @@ type Member = {
   phone: string | null;
 };
 
+type TodayClass = {
+  id: string;
+  name: string;
+  start_time: string | null;
+};
+
 export default function CheckInPage() {
   const [gymId, setGymId] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -19,6 +25,8 @@ export default function CheckInPage() {
   const [checkedIn, setCheckedIn] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState<string | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
+  const [todayClasses, setTodayClasses] = useState<TodayClass[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const load = useCallback(async () => {
@@ -27,6 +35,11 @@ export default function CheckInPage() {
       setMembers(result.data.members);
       setCheckedIn(new Set(result.data.checkedInMemberIds));
       setGymId(result.data.gymId);
+      const classesRes = await fetch(`/api/public/todays-classes?gym_id=${result.data.gymId}`);
+      if (classesRes.ok) {
+        const body = (await classesRes.json()) as { data?: TodayClass[] };
+        setTodayClasses(body.data ?? []);
+      }
     }
     setPageLoading(false);
   }, []);
@@ -55,7 +68,11 @@ export default function CheckInPage() {
     const res = await fetch('/api/attendance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_id: member.id, gym_id: gymId }),
+      body: JSON.stringify({
+        member_id: member.id,
+        gym_id: gymId,
+        ...(selectedClassId ? { class_id: selectedClassId } : {}),
+      }),
     });
 
     const data = (await res.json()) as { error?: string };
@@ -97,6 +114,39 @@ export default function CheckInPage() {
           }`}
         >
           {toast.message}
+        </div>
+      )}
+
+      {todayClasses.length > 0 && (
+        <div className="mb-4">
+          <p className="text-white/40 text-xs mb-2">Link check-in to class (optional)</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedClassId(null)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
+                selectedClassId === null
+                  ? 'bg-blue-600/20 border-blue-500/40 text-blue-200'
+                  : 'bg-white/5 border-white/10 text-white/50'
+              }`}
+            >
+              General
+            </button>
+            {todayClasses.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setSelectedClassId(c.id)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
+                  selectedClassId === c.id
+                    ? 'bg-blue-600/20 border-blue-500/40 text-blue-200'
+                    : 'bg-white/5 border-white/10 text-white/50'
+                }`}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

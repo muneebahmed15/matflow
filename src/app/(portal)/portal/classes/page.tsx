@@ -5,6 +5,7 @@ import { useAsyncMount } from '@/hooks/use-async-mount';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { Calendar } from 'lucide-react';
+import { nextDateForWeekday } from '@/lib/class-weekday-date';
 import { usePortalMember } from '@/lib/portal-member-context';
 import { ListSkeleton } from '@/components/LoadingSkeleton';
 
@@ -42,23 +43,13 @@ type DropIn = {
   } | null;
 };
 
-/** Next calendar date (YYYY-MM-DD) for a weekday name, today included. */
-function nextDateForDay(dayName: string | null): string | null {
-  if (!dayName) return null;
-  const target = DAYS.indexOf(dayName);
-  if (target < 0) return null;
-  const now = new Date();
-  const diff = (target - now.getDay() + 7) % 7;
-  const date = new Date(now.getTime() + diff * 86_400_000);
-  return date.toISOString().slice(0, 10);
-}
-
 export default function PortalClassesPage() {
   const { activeMember, loading: memberLoading } = usePortalMember();
   const [classes, setClasses] = useState<GymClass[]>([]);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [dropIns, setDropIns] = useState<DropIn[]>([]);
+  const [cancelledDates, setCancelledDates] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -66,7 +57,8 @@ export default function PortalClassesPage() {
   const load = async () => {
     if (!activeMember) return;
     const today = new Date().toISOString().slice(0, 10);
-    const [{ data: classData }, { data: wl }, { data: enr }, { data: di }] = await Promise.all([
+    const [{ data: classData }, { data: wl }, { data: enr }, { data: di }, { data: exceptions }] =
+      await Promise.all([
       supabase
         .from('classes')
         .select('id, name, instructor, day_of_week, start_time, end_time')
@@ -89,12 +81,24 @@ export default function PortalClassesPage() {
         .eq('member_id', activeMember.id)
         .eq('status', 'booked')
         .gte('class_sessions.session_date', today),
+      supabase
+        .from('class_schedule_exceptions')
+        .select('class_id, exception_date')
+        .eq('gym_id', activeMember.gym_id)
+        .gte('exception_date', today),
     ]);
 
     setClasses((classData as GymClass[]) ?? []);
     setWaitlist((wl as unknown as WaitlistEntry[]) ?? []);
     setEnrollments((enr as unknown as Enrollment[]) ?? []);
     setDropIns((di as unknown as DropIn[]) ?? []);
+    setCancelledDates(
+      new Set(
+        ((exceptions as { class_id: string; exception_date: string }[] | null) ?? []).map(
+          (e) => `${e.class_id}:${e.exception_date}`
+        )
+      )
+    );
     setLoading(false);
   };
 
@@ -147,8 +151,13 @@ export default function PortalClassesPage() {
     if ('sessionId' in payload) {
       body = { action: 'cancel', session_id: payload.sessionId, member_id: activeMember.id };
     } else {
-      const date = nextDateForDay(payload.dayOfWeek);
+      const date = nextDateForWeekday(payload.dayOfWeek);
       if (!date) return;
+      if (cancelledDates.has(`${payload.classId}:${date}`)) {
+        setError('This class is cancelled for that date.');
+        setBusy(null);
+        return;
+      }
       body = {
         action: 'book',
         class_id: payload.classId,
@@ -171,7 +180,16 @@ export default function PortalClassesPage() {
   };
 
   const todayName = DAYS[new Date().getDay()];
-  const upcoming = classes.filter((c) => c.day_of_week === todayName);
+  const upcoming = classes.filter((c) => {
+    if (c.day_of_week !== todayName) return false;
+    const date = nextDateForWeekday(c.day_of_week);
+    return date && !cancelledDates.has(`${c.id}:${date}`);
+  });
+
+  const isClassCancelledNext = (classId: string, dayOfWeek: string | null) => {
+    const date = nextDateForWeekday(dayOfWeek);
+    return Boolean(date && cancelledDates.has(`${classId}:${date}`));
+  };
 
   if (memberLoading || loading || !activeMember) {
     return <ListSkeleton count={5} />;
@@ -279,12 +297,16 @@ export default function PortalClassesPage() {
           classes.map((c) => {
             const onList = waitlist.some((w) => w.class_id === c.id);
             const booked = enrollments.some((e) => e.class_id === c.id);
+            const cancelledNext = isClassCancelledNext(c.id, c.day_of_week);
             return (
               <div key={c.id} className="bg-[#111] border border-white/10 rounded-xl px-4 py-3 flex justify-between items-center gap-4">
                 <div>
                   <p className="text-white font-medium">{c.name}</p>
                   <p className="text-white/40 text-xs">
                     {c.day_of_week} · {c.start_time} – {c.end_time}
+                    {cancelledNext && (
+                      <span className="text-red-400"> · cancelled {nextDateForWeekday(c.day_of_week)}</span>
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -299,7 +321,7 @@ export default function PortalClassesPage() {
                   >
                     {booked ? 'Booked ✓' : 'Book'}
                   </button>
-                  {!booked && (
+                  {!booked && !cancelledNext && (
                     <button
                       disabled={busy === c.id}
                       onClick={() => void toggleDropIn({ classId: c.id, dayOfWeek: c.day_of_week })}

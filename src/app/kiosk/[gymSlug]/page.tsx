@@ -12,6 +12,15 @@ interface Member {
   email: string
 }
 
+interface TodayClass {
+  id: string
+  name: string
+  start_time: string | null
+  end_time: string | null
+  category_tag: string | null
+  color: string | null
+}
+
 interface KioskWaiver {
   id: string
   title: string
@@ -23,6 +32,8 @@ export default function KioskCheckInPage() {
   const [gym, setGym] = useState<{ id: string; name: string; kiosk_enabled: boolean } | null>(null)
   const [search, setSearch] = useState('')
   const [members, setMembers] = useState<Member[]>([])
+  const [todayClasses, setTodayClasses] = useState<TodayClass[]>([])
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [checkedInName, setCheckedInName] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -40,8 +51,15 @@ export default function KioskCheckInPage() {
       if (!gymData) { setLoading(false); return }
       setGym(gymData)
       if (gymData.kiosk_enabled) {
-        const { data } = await supabase.from('members').select('id, first_name, last_name, email').eq('gym_id', gymData.id).eq('status', 'active').order('first_name')
+        const [{ data }, classesRes] = await Promise.all([
+          supabase.from('members').select('id, first_name, last_name, email').eq('gym_id', gymData.id).eq('status', 'active').order('first_name'),
+          fetch(`/api/public/todays-classes?gym_id=${gymData.id}`),
+        ])
         setMembers(data || [])
+        if (classesRes.ok) {
+          const body = (await classesRes.json()) as { data?: TodayClass[] }
+          setTodayClasses(body.data ?? [])
+        }
       }
       setLoading(false)
     }
@@ -58,7 +76,11 @@ export default function KioskCheckInPage() {
     const res = await fetch('/api/attendance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_id: member.id, gym_id: gym.id }),
+      body: JSON.stringify({
+        member_id: member.id,
+        gym_id: gym.id,
+        ...(selectedClassId ? { class_id: selectedClassId } : {}),
+      }),
     })
     const data = (await res.json()) as { error?: string }
     if (!res.ok) return { ok: false, error: data.error, status: res.status }
@@ -230,6 +252,40 @@ export default function KioskCheckInPage() {
       )}
 
       <div className="w-full max-w-md">
+        {todayClasses.length > 0 && (
+          <div className="mb-4">
+            <p className="text-white/40 text-xs mb-2 text-center">Which class? (optional)</p>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <button
+                type="button"
+                onClick={() => setSelectedClassId(null)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
+                  selectedClassId === null
+                    ? 'bg-white/15 border-white/30 text-white'
+                    : 'bg-white/5 border-white/10 text-white/50'
+                }`}
+              >
+                Open gym
+              </button>
+              {todayClasses.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setSelectedClassId(c.id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
+                    selectedClassId === c.id
+                      ? 'bg-red-600/20 border-red-500/40 text-red-200'
+                      : 'bg-white/5 border-white/10 text-white/50'
+                  }`}
+                >
+                  {c.name}
+                  {c.start_time ? ` · ${c.start_time}` : ''}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="relative mb-4">
           <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
           <input

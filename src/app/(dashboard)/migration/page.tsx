@@ -8,6 +8,7 @@ import {
   getImportErrorsAction,
   importAttendanceCsvAction,
   importBeltHistoryCsvAction,
+  importClassesCsvAction,
   importLeadsBatchAction,
   importLeadsCsvAction,
   importMembersBatchAction,
@@ -24,10 +25,12 @@ import {
   LEAD_IMPORT_TEMPLATE,
   ATTENDANCE_IMPORT_TEMPLATE,
   BELT_HISTORY_IMPORT_TEMPLATE,
+  CLASS_IMPORT_TEMPLATE,
 } from '@/lib/csv';
 import type { ImportJob } from '@/services/migration';
+import MigrationStepper, { type MigrationStep } from '@/components/migration/MigrationStepper';
 
-type ImportType = 'members' | 'leads' | 'attendance' | 'belt_history';
+type ImportType = 'members' | 'leads' | 'attendance' | 'belt_history' | 'classes';
 
 const COLUMN_MAPS: Record<ImportType, Record<string, string>> = {
   members: {
@@ -61,6 +64,17 @@ const COLUMN_MAPS: Record<ImportType, Record<string, string>> = {
     promoted_at: 'promoted_at',
     notes: 'notes',
   },
+  classes: {
+    name: 'name',
+    instructor: 'instructor',
+    day_of_week: 'day_of_week',
+    start_time: 'start_time',
+    end_time: 'end_time',
+    capacity: 'capacity',
+    category_tag: 'category_tag',
+    color: 'color',
+    description: 'description',
+  },
 };
 
 const TEMPLATES: Record<ImportType, string> = {
@@ -68,6 +82,7 @@ const TEMPLATES: Record<ImportType, string> = {
   leads: LEAD_IMPORT_TEMPLATE,
   attendance: ATTENDANCE_IMPORT_TEMPLATE,
   belt_history: BELT_HISTORY_IMPORT_TEMPLATE,
+  classes: CLASS_IMPORT_TEMPLATE,
 };
 
 export default function MigrationPage() {
@@ -122,7 +137,9 @@ export default function MigrationPage() {
           ? importLeadsCsvAction({ rows: objects as any, fileName: file.name, dryRun: true })
           : importType === 'attendance'
             ? importAttendanceCsvAction({ rows: objects as any, fileName: file.name, dryRun: true })
-            : importBeltHistoryCsvAction({ rows: objects as any, fileName: file.name, dryRun: true });
+            : importType === 'classes'
+              ? importClassesCsvAction({ rows: objects as any, fileName: file.name, dryRun: true })
+              : importBeltHistoryCsvAction({ rows: objects as any, fileName: file.name, dryRun: true });
     /* eslint-enable @typescript-eslint/no-explicit-any */
 
     const res = await action;
@@ -193,7 +210,9 @@ export default function MigrationPage() {
       const action =
         importType === 'attendance'
           ? importAttendanceCsvAction({ rows: parsedRows as any, fileName, dryRun: false })
-          : importBeltHistoryCsvAction({ rows: parsedRows as any, fileName, dryRun: false });
+          : importType === 'classes'
+            ? importClassesCsvAction({ rows: parsedRows as any, fileName, dryRun: false })
+            : importBeltHistoryCsvAction({ rows: parsedRows as any, fileName, dryRun: false });
       /* eslint-enable @typescript-eslint/no-explicit-any */
       setProgress(60);
       const res = await action;
@@ -258,28 +277,25 @@ export default function MigrationPage() {
   const stepIndex =
     parsedRows.length === 0 ? 0 : dryRunResult && !result ? 2 : committing || result ? 3 : 1;
 
+  const steps: MigrationStep[] = ['Choose type', 'Upload CSV', 'Preview', 'Commit'].map(
+    (label, i) => ({
+      id: String(i),
+      label,
+      status: i < stepIndex ? 'complete' : i === stepIndex ? 'current' : 'upcoming',
+    })
+  );
+
   return (
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
       <h1 className="text-3xl font-extrabold mb-2">Migration Center</h1>
       <p className="text-white/40 text-sm mb-6">
-        Import members, leads, attendance history, or belt history from CSV.
+        Import members, leads, class schedules, attendance history, or belt history from CSV.
       </p>
 
-      <ol className="flex gap-2 mb-6 text-xs">
-        {['Choose type', 'Upload CSV', 'Preview', 'Commit'].map((label, i) => (
-          <li
-            key={label}
-            className={`flex-1 rounded-lg px-2 py-2 text-center border ${
-              i <= stepIndex ? 'border-blue-500/40 bg-blue-500/10 text-white' : 'border-white/10 text-white/30'
-            }`}
-          >
-            {i + 1}. {label}
-          </li>
-        ))}
-      </ol>
+      <MigrationStepper steps={steps} />
 
       <div className="flex gap-2 mb-6 flex-wrap">
-        {(['members', 'leads', 'attendance', 'belt_history'] as ImportType[]).map((t) => (
+        {(['members', 'leads', 'classes', 'attendance', 'belt_history'] as ImportType[]).map((t) => (
           <button
             key={t}
             onClick={() => {

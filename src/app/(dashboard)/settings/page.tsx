@@ -10,6 +10,8 @@ import type { GymSettings } from '@/services/gym'
 import { resolveBeltSystem } from '@/lib/belt-systems'
 import { defaultBeltHex, getBeltBadgeStyle } from '@/lib/belt-colors'
 import LocationsPanel from '@/components/settings/LocationsPanel'
+import ScheduleEmbedSnippet from '@/components/public/ScheduleEmbedSnippet'
+import CalendarSubscribeSnippet from '@/components/public/CalendarSubscribeSnippet'
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<GymSettings | null>(null)
@@ -76,6 +78,7 @@ export default function SettingsPage() {
       beltCustomOrder: settings.belt_custom_order,
       beltColorOverrides: settings.belt_color_overrides,
       bookingCancelHours: settings.booking_cancel_hours ?? 2,
+      classReminderHours: settings.class_reminder_hours ?? 2,
     })
     setSaving(false)
     if (!result.ok) {
@@ -91,6 +94,8 @@ export default function SettingsPage() {
     'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
 
   const publicUrl = settings?.slug && origin ? `${origin}/g/${settings.slug}` : ''
+  const scheduleEmbedUrl = settings?.slug && origin ? `${origin}/embed/schedule/${settings.slug}` : ''
+  const scheduleIcsUrl = settings?.slug && origin ? `${origin}/g/${settings.slug}/schedule.ics` : ''
   const kioskUrl = settings?.slug && origin ? `${origin}/kiosk/${settings.slug}` : ''
 
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
@@ -218,6 +223,20 @@ export default function SettingsPage() {
               className={inputClass}
             />
             <p className="text-white/20 text-xs mt-1">Members must cancel drop-in bookings at least this many hours before class.</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Class reminder lead time (hours)</label>
+            <input
+              type="number"
+              min={0}
+              max={24}
+              value={settings.class_reminder_hours ?? 2}
+              onChange={(e) => update({ class_reminder_hours: parseInt(e.target.value, 10) || 0 })}
+              className={inputClass}
+            />
+            <p className="text-white/20 text-xs mt-1">
+              Email enrolled members and drop-in bookers this many hours before class. Set to 0 to disable.
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Tagline</label>
@@ -361,6 +380,21 @@ export default function SettingsPage() {
               >
                 Preview <ExternalLink size={14} />
               </Link>
+            </div>
+          )}
+          {settings.website_enabled && scheduleEmbedUrl && (
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <p className="text-sm font-medium text-gray-300 mb-1">Schedule embed widget</p>
+              <p className="text-white/30 text-xs mb-2">
+                Embed your class schedule on WordPress, Squarespace, or any external site.
+              </p>
+              <ScheduleEmbedSnippet embedUrl={scheduleEmbedUrl} />
+            </div>
+          )}
+          {settings.website_enabled && scheduleIcsUrl && (
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <p className="text-sm font-medium text-gray-300 mb-1">Google Calendar sync</p>
+              <CalendarSubscribeSnippet icsFeedUrl={scheduleIcsUrl} />
             </div>
           )}
           <div className="mt-4">

@@ -120,6 +120,9 @@ export async function updateMemberAction(
     phone: string;
     belt_rank: string;
     status: string;
+    email_opt_out: boolean;
+    marketing_email_consent: boolean;
+    sms_marketing_consent: boolean;
   }>
 ): Promise<ActionResult<MemberDetail>> {
   try {

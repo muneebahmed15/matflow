@@ -19,19 +19,20 @@ describe('dedupeAudience', () => {
   it('dedupes and drops empty emails', () => {
     expect(
       dedupeAudience([
-        { email: 'a@x.com' },
-        { email: 'a@x.com' },
+        { email: 'a@x.com', marketing_email_consent: true },
+        { email: 'a@x.com', marketing_email_consent: true },
         { email: null },
-        { email: 'b@x.com' },
+        { email: 'b@x.com', marketing_email_consent: true },
       ])
     ).toEqual(['a@x.com', 'b@x.com']);
   });
 
-  it('drops opted-out emails', () => {
+  it('drops opted-out or non-consented emails', () => {
     expect(
       dedupeAudience([
-        { email: 'a@x.com', email_opt_out: true },
-        { email: 'b@x.com', email_opt_out: false },
+        { email: 'a@x.com', email_opt_out: true, marketing_email_consent: true },
+        { email: 'b@x.com', email_opt_out: false, marketing_email_consent: true },
+        { email: 'c@x.com', email_opt_out: false, marketing_email_consent: false },
       ])
     ).toEqual(['b@x.com']);
   });

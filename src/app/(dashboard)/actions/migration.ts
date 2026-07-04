@@ -3,46 +3,20 @@
 import { revalidatePath } from 'next/cache';
 
 import { requireStaffSession } from '@/lib/auth/staff';
-
-
-
-
-
-
-
-
-
-
-
-
-
 import { checkRateLimit } from '@/lib/rate-limit';
-
-
-
-
-
-
-import { importMembersFromRows, listImportJobs, importLeadsFromRows, getImportJobErrors, rollbackImportJob, createImportJob, completeImportJob, importMembersBatch, importLeadsBatch, IMPORT_BATCH_SIZE, type ImportJob } from '@/services/migration';
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import {
+  importMembersFromRows,
+  listImportJobs,
+  importLeadsFromRows,
+  getImportJobErrors,
+  rollbackImportJob,
+  createImportJob,
+  completeImportJob,
+  importMembersBatch,
+  importLeadsBatch,
+  IMPORT_BATCH_SIZE,
+  type ImportJob,
+} from '@/services/migration';
 import { type ActionResult, toActionError } from './_shared';
 
 export async function rollbackImportJobAction(jobId: string): Promise<
@@ -58,7 +32,6 @@ export async function rollbackImportJobAction(jobId: string): Promise<
   }
 }
 
-
 export async function listImportJobsAction(): Promise<ActionResult<ImportJob[]>> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });
@@ -67,7 +40,6 @@ export async function listImportJobsAction(): Promise<ActionResult<ImportJob[]>>
     return toActionError(error);
   }
 }
-
 
 export async function importMembersCsvAction(input: {
   rows: {
@@ -101,7 +73,6 @@ export async function importMembersCsvAction(input: {
   }
 }
 
-
 export async function importLeadsCsvAction(input: {
   rows: {
     first_name: string;
@@ -133,7 +104,6 @@ export async function importLeadsCsvAction(input: {
   }
 }
 
-
 export async function importAttendanceCsvAction(input: {
   rows: {
     email?: string;
@@ -163,7 +133,6 @@ export async function importAttendanceCsvAction(input: {
     return toActionError(error);
   }
 }
-
 
 export async function importBeltHistoryCsvAction(input: {
   rows: {
@@ -197,6 +166,40 @@ export async function importBeltHistoryCsvAction(input: {
   }
 }
 
+export async function importClassesCsvAction(input: {
+  rows: {
+    name: string;
+    instructor: string;
+    day_of_week: string;
+    start_time: string;
+    end_time: string;
+    capacity: string | number;
+    category_tag?: string;
+    color?: string;
+    description?: string;
+  }[];
+  fileName?: string;
+  dryRun?: boolean;
+}) {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const limit = await checkRateLimit(`import:${auth.gymId}`, 5, 60 * 60 * 1000);
+    if (!limit.allowed) {
+      return { ok: false as const, error: 'Import rate limit exceeded. Try again in an hour.' };
+    }
+    const { importClassesFromRows } = await import('@/services/migration');
+    const result = await importClassesFromRows(auth.gymId, input.rows, {
+      fileName: input.fileName,
+      createdBy: auth.user.id,
+      dryRun: input.dryRun,
+    });
+    revalidatePath('/migration');
+    revalidatePath('/classes');
+    return { ok: true as const, data: result };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
 
 export async function getImportErrorsAction(jobId: string) {
   try {
@@ -207,9 +210,8 @@ export async function getImportErrorsAction(jobId: string) {
   }
 }
 
-
 export async function startImportJobAction(input: {
-  importType: 'members' | 'leads' | 'attendance' | 'belt_history';
+  importType: 'members' | 'leads' | 'attendance' | 'belt_history' | 'classes';
   fileName?: string;
   totalRows: number;
 }): Promise<ActionResult<{ jobId: string }>> {
@@ -224,7 +226,6 @@ export async function startImportJobAction(input: {
     return toActionError(error);
   }
 }
-
 
 export async function importMembersBatchAction(input: {
   jobId: string;
@@ -248,7 +249,6 @@ export async function importMembersBatchAction(input: {
   }
 }
 
-
 export async function importLeadsBatchAction(input: {
   jobId: string;
   rows: {
@@ -270,7 +270,6 @@ export async function importLeadsBatchAction(input: {
   }
 }
 
-
 export async function finalizeImportJobAction(input: {
   jobId: string;
   success: number;
@@ -287,4 +286,3 @@ export async function finalizeImportJobAction(input: {
 }
 
 export { IMPORT_BATCH_SIZE };
-

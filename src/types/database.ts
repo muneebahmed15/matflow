@@ -117,6 +117,7 @@ export type Database = {
         Row: {
           checked_in_at: string
           checked_in_by: string | null
+          class_id: string | null
           gym_id: string
           id: string
           import_job_id: string | null
@@ -126,6 +127,7 @@ export type Database = {
         Insert: {
           checked_in_at?: string
           checked_in_by?: string | null
+          class_id?: string | null
           gym_id: string
           id?: string
           import_job_id?: string | null
@@ -135,6 +137,7 @@ export type Database = {
         Update: {
           checked_in_at?: string
           checked_in_by?: string | null
+          class_id?: string | null
           gym_id?: string
           id?: string
           import_job_id?: string | null
@@ -142,6 +145,13 @@ export type Database = {
           notes?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "attendance_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "attendance_gym_id_fkey"
             columns: ["gym_id"]
@@ -582,6 +592,191 @@ export type Database = {
           },
         ]
       }
+      class_schedule_exceptions: {
+        Row: {
+          class_id: string
+          created_at: string
+          exception_date: string
+          gym_id: string
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          exception_date: string
+          gym_id: string
+          id?: string
+          reason?: string | null
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          exception_date?: string
+          gym_id?: string
+          id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_schedule_exceptions_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_schedule_exceptions_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      class_schedule_template_items: {
+        Row: {
+          capacity: number
+          category_tag: string | null
+          color: string | null
+          description: string | null
+          day_of_week: string
+          end_time: string
+          id: string
+          instructor: string
+          name: string
+          overbook_allowance: number
+          sort_order: number
+          start_time: string
+          template_id: string
+        }
+        Insert: {
+          capacity?: number
+          category_tag?: string | null
+          color?: string | null
+          description?: string | null
+          day_of_week: string
+          end_time: string
+          id?: string
+          instructor: string
+          name: string
+          overbook_allowance?: number
+          sort_order?: number
+          start_time: string
+          template_id: string
+        }
+        Update: {
+          capacity?: number
+          category_tag?: string | null
+          color?: string | null
+          description?: string | null
+          day_of_week?: string
+          end_time?: string
+          id?: string
+          instructor?: string
+          name?: string
+          overbook_allowance?: number
+          sort_order?: number
+          start_time?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_schedule_template_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "class_schedule_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      class_schedule_templates: {
+        Row: {
+          created_at: string
+          effective_from: string | null
+          effective_to: string | null
+          gym_id: string
+          id: string
+          name: string
+          season_label: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          effective_from?: string | null
+          effective_to?: string | null
+          gym_id: string
+          id?: string
+          name: string
+          season_label?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          effective_from?: string | null
+          effective_to?: string | null
+          gym_id?: string
+          id?: string
+          name?: string
+          season_label?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_schedule_templates_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      class_staff_permissions: {
+        Row: {
+          class_id: string
+          created_at: string
+          gym_id: string
+          id: string
+          staff_id: string
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          gym_id: string
+          id?: string
+          staff_id: string
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          gym_id?: string
+          id?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_staff_permissions_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_staff_permissions_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_staff_permissions_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       class_sessions: {
         Row: {
           class_id: string
@@ -691,51 +886,63 @@ export type Database = {
       classes: {
         Row: {
           capacity: number | null
+          category_tag: string | null
+          color: string | null
           created_at: string
           day_of_week: string | null
           description: string | null
           end_time: string | null
           gym_id: string
           id: string
+          import_job_id: string | null
           instructor: string | null
           instructor_staff_id: string | null
           is_active: boolean
           location_id: string | null
           name: string
+          overbook_allowance: number
           recurrence_rule: string | null
           series_id: string | null
           start_time: string | null
         }
         Insert: {
           capacity?: number | null
+          category_tag?: string | null
+          color?: string | null
           created_at?: string
           day_of_week?: string | null
           description?: string | null
           end_time?: string | null
           gym_id: string
           id?: string
+          import_job_id?: string | null
           instructor?: string | null
           instructor_staff_id?: string | null
           is_active?: boolean
           location_id?: string | null
           name: string
+          overbook_allowance?: number
           recurrence_rule?: string | null
           series_id?: string | null
           start_time?: string | null
         }
         Update: {
           capacity?: number | null
+          category_tag?: string | null
+          color?: string | null
           created_at?: string
           day_of_week?: string | null
           description?: string | null
           end_time?: string | null
           gym_id?: string
           id?: string
+          import_job_id?: string | null
           instructor?: string | null
           instructor_staff_id?: string | null
           is_active?: boolean
           location_id?: string | null
           name?: string
+          overbook_allowance?: number
           recurrence_rule?: string | null
           series_id?: string | null
           start_time?: string | null
@@ -746,6 +953,13 @@ export type Database = {
             columns: ["gym_id"]
             isOneToOne: false
             referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classes_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
             referencedColumns: ["id"]
           },
           {
@@ -1420,6 +1634,7 @@ export type Database = {
           belt_custom_order: Json | null
           belt_system: string
           booking_cancel_hours: number
+          class_reminder_hours: number
           contact_email: string | null
           contact_phone: string | null
           created_at: string
@@ -1460,6 +1675,7 @@ export type Database = {
           belt_custom_order?: Json | null
           belt_system?: string
           booking_cancel_hours?: number
+          class_reminder_hours?: number
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -1498,6 +1714,7 @@ export type Database = {
           belt_custom_order?: Json | null
           belt_system?: string
           booking_cancel_hours?: number
+          class_reminder_hours?: number
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -1810,6 +2027,9 @@ export type Database = {
           date_of_birth: string | null
           email: string | null
           email_opt_out: boolean
+          marketing_email_consent: boolean
+          marketing_consent_at: string | null
+          sms_marketing_consent: boolean
           external_id: string | null
           family_id: string | null
           first_name: string
@@ -1830,6 +2050,9 @@ export type Database = {
           date_of_birth?: string | null
           email?: string | null
           email_opt_out?: boolean
+          marketing_email_consent?: boolean
+          marketing_consent_at?: string | null
+          sms_marketing_consent?: boolean
           external_id?: string | null
           family_id?: string | null
           first_name: string
@@ -1850,6 +2073,9 @@ export type Database = {
           date_of_birth?: string | null
           email?: string | null
           email_opt_out?: boolean
+          marketing_email_consent?: boolean
+          marketing_consent_at?: string | null
+          sms_marketing_consent?: boolean
           external_id?: string | null
           family_id?: string | null
           first_name?: string

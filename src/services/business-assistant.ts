@@ -1,5 +1,5 @@
 import { getAdminClient } from '@/lib/supabase/admin';
-import { ServiceError } from '@/services/errors';
+import { isLowAttendanceClass, lowAttendanceDescription } from '@/lib/class-attendance-alerts';
 
 export type BusinessMetrics = {
   newLeads7d: number;
@@ -92,8 +92,20 @@ export async function computeGymMetrics(gymId: string): Promise<BusinessMetrics>
 
   const { getClassAttendanceReport } = await import('@/services/class-dropin');
   const classReport = await getClassAttendanceReport(gymId, 30);
-  const lowAttendanceClasses = classReport.filter(
-    (r) => r.sessions >= 2 && r.avgPerSession < 3
+
+  const { data: classRows } = await admin
+    .from('classes')
+    .select('id, capacity')
+    .eq('gym_id', gymId)
+    .eq('is_active', true);
+
+  const capacityByClass = new Map((classRows ?? []).map((c) => [c.id, c.capacity ?? 0]));
+  const lowAttendanceClasses = classReport.filter((r) =>
+    isLowAttendanceClass({
+      avgPerSession: r.avgPerSession,
+      capacity: capacityByClass.get(r.classId) ?? 0,
+      sessions: r.sessions,
+    })
   ).length;
 
   const { listMembersWithWaiverGaps } = await import('@/services/waivers');
@@ -169,7 +181,7 @@ export function metricsToRecommendations(metrics: BusinessMetrics): BusinessReco
     recs.push({
       priority: 'P3',
       title: `${metrics.lowAttendanceClasses} class(es) with low attendance`,
-      description: 'Average below 3 per session over the last 30 days.',
+      description: lowAttendanceDescription(),
       actionHref: '/classes',
     });
   }

@@ -8,6 +8,7 @@ export const checkInSchema = z.object({
   gym_id: uuid(),
   notes: z.string().max(2000).optional(),
   checked_in_by: uuid().optional(),
+  class_id: uuid().optional(),
 });
 
 export const attendanceLogQuerySchema = z.object({

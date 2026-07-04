@@ -31,7 +31,7 @@
 - [ ] 10.20 New members this week
 
 ## Metrics — Classes
-- [ ] 10.21 Low attendance classes (< 30% capacity avg)
+- [x] 10.21 Low attendance classes (< 30% capacity avg)
 - [ ] 10.22 Cancelled classes this week
 - [ ] 10.23 Peak hours heatmap data
 

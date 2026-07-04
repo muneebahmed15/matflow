@@ -35,6 +35,9 @@ interface Member {
   id: string; first_name: string; last_name: string
   email: string; phone: string; belt_rank: string | null; status: string
   stripe_count?: number
+  email_opt_out?: boolean
+  marketing_email_consent?: boolean
+  sms_marketing_consent?: boolean
 }
 interface Plan {
   id: string; name: string; stripe_price_id: string | null; price_cents: number | null; interval: string
@@ -121,6 +124,19 @@ export default function MemberDetailPage() {
   const handleEdit = async (field: string, value: string) => {
     if (!member) return
     const result = await updateMemberAction(member.id, { [field]: value })
+    if (result.ok && result.data) setMember(result.data as Member)
+  }
+
+  const handleMarketingPref = async (
+    field: 'marketing_email_consent' | 'sms_marketing_consent',
+    value: boolean
+  ) => {
+    if (!member) return
+    const updates: Parameters<typeof updateMemberAction>[1] = { [field]: value }
+    if (field === 'marketing_email_consent') {
+      updates.email_opt_out = !value
+    }
+    const result = await updateMemberAction(member.id, updates)
     if (result.ok && result.data) setMember(result.data as Member)
   }
 
@@ -256,6 +272,27 @@ export default function MemberDetailPage() {
               <option value="active" className="bg-gray-900">active</option>
               <option value="inactive" className="bg-gray-900">inactive</option>
             </select>
+          </div>
+          <div className="border-t border-white/10 pt-4 space-y-3">
+            <p className="text-gray-400 text-sm">Marketing preferences</p>
+            <label className="flex items-center justify-between gap-4 text-sm text-white/70">
+              <span>Promotional email</span>
+              <input
+                type="checkbox"
+                checked={Boolean(member.marketing_email_consent) && !member.email_opt_out}
+                onChange={(e) => void handleMarketingPref('marketing_email_consent', e.target.checked)}
+                className="rounded"
+              />
+            </label>
+            <label className="flex items-center justify-between gap-4 text-sm text-white/70">
+              <span>Promotional SMS</span>
+              <input
+                type="checkbox"
+                checked={Boolean(member.sms_marketing_consent)}
+                onChange={(e) => void handleMarketingPref('sms_marketing_consent', e.target.checked)}
+                className="rounded"
+              />
+            </label>
           </div>
           <div className="border-t border-white/10 pt-4">
             <button

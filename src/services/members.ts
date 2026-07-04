@@ -160,7 +160,7 @@ export async function updateMember(
   fields: Partial<
     Pick<
       MemberRow,
-      'first_name' | 'last_name' | 'email' | 'phone' | 'belt_rank' | 'status' | 'email_opt_out' | 'profile_photo_url'
+      'first_name' | 'last_name' | 'email' | 'phone' | 'belt_rank' | 'status' | 'email_opt_out' | 'marketing_email_consent' | 'sms_marketing_consent' | 'marketing_consent_at' | 'profile_photo_url'
     >
   > & {
     date_of_birth?: string | null;
@@ -187,6 +187,14 @@ export async function updateMember(
   if (nextStatus === 'active') {
     const { assertMinorHasEmergencyContact } = await import('@/services/emergency-contacts');
     await assertMinorHasEmergencyContact(gymId, memberId, nextDob);
+  }
+
+  if (
+    'marketing_email_consent' in fields ||
+    'sms_marketing_consent' in fields ||
+    'email_opt_out' in fields
+  ) {
+    fields.marketing_consent_at = new Date().toISOString();
   }
 
   const { data, error } = await admin

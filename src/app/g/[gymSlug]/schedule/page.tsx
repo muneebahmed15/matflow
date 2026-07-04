@@ -1,95 +1,121 @@
 import { notFound } from 'next/navigation';
-import { getAdminClient } from '@/lib/supabase/admin';
-import { getPublicGymBySlug } from '@/lib/gym-public';
-import { formatClassTime } from '@/lib/gym-public-time';
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+import { getAdminClient } from '@/lib/supabase/admin';
+
+import { getPublicGymBySlug } from '@/lib/gym-public';
+
+import PublicScheduleGrid from '@/components/public/PublicScheduleGrid';
+import ScheduleEmbedSnippet from '@/components/public/ScheduleEmbedSnippet';
+import CalendarSubscribeSnippet from '@/components/public/CalendarSubscribeSnippet';
+
+import { getPublicEnv } from '@/lib/env';
+
+import type { PublicScheduleClass } from '@/lib/public-schedule';
+
+
 
 type Props = { params: Promise<{ gymSlug: string }> };
 
+
+
 export default async function GymSchedulePage({ params }: Props) {
+
   const { gymSlug } = await params;
+
   const gym = await getPublicGymBySlug(gymSlug);
+
   if (!gym) notFound();
 
+
+
   const admin = getAdminClient();
+
   const { data: gymRow } = await admin
+
     .from('gyms')
+
     .select('timezone')
+
     .eq('id', gym.id)
+
     .maybeSingle();
+
   const timezone = gymRow?.timezone ?? 'America/New_York';
 
+
+
   const { data: classes } = await admin
+
     .from('classes')
-    .select('name, instructor, day_of_week, start_time, end_time, capacity')
+
+    .select('name, instructor, day_of_week, start_time, end_time, capacity, category_tag, color')
+
     .eq('gym_id', gym.id)
+
     .eq('is_active', true)
+
     .order('day_of_week')
+
     .order('start_time');
 
-  const grouped = DAYS.reduce(
-    (acc, day) => {
-      acc[day] = (classes ?? []).filter((c) => c.day_of_week === day);
-      return acc;
-    },
-    {} as Record<string, typeof classes>
-  );
+
+
+  const appUrl = getPublicEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, '');
+
+  const embedUrl = `${appUrl}/embed/schedule/${gym.slug}`;
+  const icsFeedUrl = `${appUrl}/g/${gym.slug}/schedule.ics`;
+
+
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-extrabold mb-2">Class Schedule</h1>
-      <p className="text-white/40 text-sm mb-4">
-        Weekly training schedule at {gym.name} ({timezone.replace('_', ' ')}).
-      </p>
-      <a
-        href={`/g/${gym.slug}/schedule.ics`}
-        className="inline-block text-sm text-blue-400 hover:underline mb-8"
-      >
-        Add to calendar (.ics)
-      </a>
 
-      {!classes?.length ? (
-        <p className="text-white/30 text-center py-12">Schedule coming soon.</p>
-      ) : (
-        <div className="space-y-6">
-          {DAYS.filter((d) => (grouped[d]?.length ?? 0) > 0).map((day) => (
-            <div key={day}>
-              <h2 className="text-sm font-semibold text-white/40 uppercase tracking-wider mb-2">
-                {day}
-              </h2>
-              <div className="space-y-2">
-                {grouped[day]!.map((cls, i) => (
-                  <div
-                    key={`${day}-${i}`}
-                    className="bg-[#111] border border-white/10 rounded-xl px-4 py-3 flex justify-between gap-4"
-                  >
-                    <div>
-                      <p className="font-medium text-white">{cls.name}</p>
-                      <p className="text-xs text-white/30">{cls.instructor}</p>
-                    </div>
-                    <div className="text-right text-sm text-white/50 flex items-center gap-4">
-                      <div>
-                        <p>
-                          {formatClassTime(cls.start_time, timezone)} –{' '}
-                          {formatClassTime(cls.end_time, timezone)}
-                        </p>
-                        <p className="text-xs text-white/25">{cls.capacity} spots</p>
-                      </div>
-                      <a
-                        href={`/g/${gym.slug}/trial?class=${encodeURIComponent(cls.name)}`}
-                        className="text-xs font-semibold text-blue-400 hover:text-blue-300 border border-blue-400/30 rounded-lg px-3 py-1.5 shrink-0"
-                      >
-                        Book trial
-                      </a>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="max-w-3xl mx-auto px-4 py-12">
+
+      <h1 className="text-3xl font-extrabold mb-2">Class Schedule</h1>
+
+      <p className="text-white/40 text-sm mb-4">
+
+        Weekly training schedule at {gym.name} ({timezone.replace('_', ' ')}).
+
+      </p>
+
+      <div className="flex flex-wrap gap-4 mb-8 text-sm">
+        <CalendarSubscribeSnippet icsFeedUrl={icsFeedUrl} />
+      </div>
+
+
+
+      <PublicScheduleGrid
+
+        classes={(classes ?? []) as PublicScheduleClass[]}
+
+        timezone={timezone}
+
+        gymSlug={gym.slug}
+
+        gymName={gym.name}
+
+      />
+
+
+
+      <div className="mt-12 bg-white/5 border border-white/10 rounded-2xl p-5">
+
+        <h2 className="font-semibold text-white text-sm mb-1">Embed on your website</h2>
+
+        <p className="text-white/40 text-xs mb-3">
+
+          Paste this iframe on any site to show your live class schedule.
+
+        </p>
+
+        <ScheduleEmbedSnippet embedUrl={embedUrl} />
+
+      </div>
+
     </div>
+
   );
+
 }
+

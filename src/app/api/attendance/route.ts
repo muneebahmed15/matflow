@@ -12,7 +12,7 @@ import { handleRouteError } from '@/lib/api-error';
 export async function POST(req: NextRequest) {
   const parsed = await parseJsonBody(req, checkInSchema);
   if (!parsed.success) return parsed.response;
-  const { member_id, gym_id, notes, checked_in_by } = parsed.data;
+  const { member_id, gym_id, notes, checked_in_by, class_id } = parsed.data;
 
   const staffAuth = await requireStaffAuth();
   const isStaff = !isErrorResponse(staffAuth);
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
       memberId: member_id,
       notes: notes ?? null,
       checkedInBy: isStaff ? staffAuth.user.id : checked_in_by ?? null,
+      classId: class_id ?? null,
     });
 
     return NextResponse.json({ data });

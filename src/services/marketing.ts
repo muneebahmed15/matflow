@@ -3,6 +3,7 @@ import { ServiceError } from '@/services/errors';
 import { sendTransactionalEmail } from '@/lib/email/resend';
 import { unsubscribeUrl } from '@/lib/unsubscribe';
 import { getPublicEnv } from '@/lib/env';
+import { canSendMarketingEmail } from '@/lib/marketing-consent';
 import { prepareCampaignHtml } from '@/lib/campaign-tracking';
 
 export type EmailCampaign = {
@@ -67,12 +68,23 @@ export function audienceStatusFilter(audience: string): string | null {
 
 /** Dedupe emails and drop empty/opted-out entries. Pure, for unit testing. */
 export function dedupeAudience(
-  rows: { email: string | null; email_opt_out?: boolean | null }[]
+  rows: {
+    email: string | null;
+    email_opt_out?: boolean | null;
+    marketing_email_consent?: boolean | null;
+  }[]
 ): string[] {
   return [
     ...new Set(
       rows
-        .filter((r) => r.email && !r.email_opt_out)
+        .filter(
+          (r) =>
+            r.email &&
+            canSendMarketingEmail({
+              email_opt_out: r.email_opt_out ?? false,
+              marketing_email_consent: r.marketing_email_consent ?? false,
+            })
+        )
         .map((r) => r.email as string)
     ),
   ];
@@ -90,12 +102,18 @@ export async function resolveAudienceEmails(
       .select('email, email_opt_out')
       .eq('gym_id', gymId)
       .not('email', 'is', null);
-    return dedupeAudience(leads ?? []);
+    return dedupeAudience(
+      (leads ?? []).map((l) => ({
+        email: l.email,
+        email_opt_out: l.email_opt_out,
+        marketing_email_consent: !l.email_opt_out,
+      }))
+    );
   }
 
   let query = admin
     .from('members')
-    .select('email, email_opt_out')
+    .select('email, email_opt_out, marketing_email_consent')
     .eq('gym_id', gymId)
     .not('email', 'is', null);
 

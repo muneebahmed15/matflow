@@ -6,7 +6,7 @@
 
 - [x] 8.1 Dashboard route `/migration`
 
-- [ ] 8.2 Migration wizard stepper component
+- [x] 8.2 Migration wizard stepper component
 
 - [x] 8.3 Import history list
 

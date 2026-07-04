@@ -1,6 +1,7 @@
 import { getAdminClient } from '@/lib/supabase/admin';
 import { ServiceError } from '@/services/errors';
 import { effectiveSessionInstructor } from '@/lib/class-sessions-display';
+import { isClassCancelledOnDate } from '@/services/class-schedule-exceptions';
 
 export type ClassSession = {
   id: string;
@@ -32,6 +33,11 @@ export async function getOrCreateTodaySession(
     .maybeSingle();
 
   if (existing) return existing as ClassSession;
+
+  const cancelled = await isClassCancelledOnDate(gymId, classId, today);
+  if (cancelled) {
+    throw new ServiceError(409, 'This class is cancelled for today.');
+  }
 
   const { data, error } = await admin
     .from('class_sessions')
@@ -83,9 +89,31 @@ export async function markSessionAttendance(input: {
 export async function removeSessionAttendance(
   gymId: string,
   sessionId: string,
-  memberId: string
+  memberId: string,
+  options?: { staffRole?: 'admin' | 'supervisor' | 'coach' }
 ): Promise<void> {
   const admin = getAdminClient();
+
+  const { data: session } = await admin
+    .from('class_sessions')
+    .select('session_date')
+    .eq('id', sessionId)
+    .eq('gym_id', gymId)
+    .maybeSingle();
+
+  if (!session) throw new ServiceError(404, 'Session not found');
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (session.session_date < today) {
+    const role = options?.staffRole;
+    if (role !== 'admin' && role !== 'supervisor') {
+      throw new ServiceError(
+        403,
+        'Past session attendance can only be removed by an admin or supervisor.'
+      );
+    }
+  }
+
   const { error } = await admin
     .from('class_session_attendance')
     .delete()

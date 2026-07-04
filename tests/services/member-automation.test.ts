@@ -46,6 +46,7 @@ describe('sendInactiveMemberWinBack', () => {
               first_name: 'Alex',
               email: 'alex@test.com',
               email_opt_out: false,
+              marketing_email_consent: true,
               created_at: oldDate.toISOString(),
             },
           ],

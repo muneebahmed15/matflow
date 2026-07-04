@@ -1,4 +1,5 @@
 import { getAdminClient } from '@/lib/supabase/admin';
+import { effectiveEnrollmentLimit } from '@/lib/class-capacity';
 import { ServiceError } from '@/services/errors';
 import { promoteNextFromWaitlist } from '@/services/class-waitlist';
 
@@ -17,14 +18,21 @@ export type ClassEnrollment = {
   } | null;
 };
 
-export function assertClassHasCapacity(capacity: number | null, activeCount: number): void {
-  if (capacity !== null && capacity > 0 && activeCount >= capacity) {
+export function assertClassHasCapacity(
+  capacity: number | null,
+  activeCount: number,
+  overbookAllowance = 0
+): void {
+  const limit = effectiveEnrollmentLimit(capacity, overbookAllowance);
+  if (limit !== null && activeCount >= limit) {
     throw new ServiceError(
       409,
       'This class is full. Join the waitlist to be notified when a spot opens.'
     );
   }
 }
+
+export { effectiveEnrollmentLimit } from '@/lib/class-capacity';
 
 export async function countActiveEnrollments(classId: string): Promise<number> {
   const admin = getAdminClient();
@@ -47,7 +55,7 @@ export async function enrollMemberInClass(input: {
 
   const { data: gymClass } = await admin
     .from('classes')
-    .select('id, capacity')
+    .select('id, capacity, overbook_allowance')
     .eq('id', input.classId)
     .eq('gym_id', input.gymId)
     .maybeSingle();
@@ -78,7 +86,11 @@ export async function enrollMemberInClass(input: {
   }
 
   const activeCount = await countActiveEnrollments(input.classId);
-  assertClassHasCapacity(gymClass.capacity ?? null, activeCount);
+  assertClassHasCapacity(
+    gymClass.capacity ?? null,
+    activeCount,
+    gymClass.overbook_allowance ?? 0
+  );
 
   const { data, error } = await admin
     .from('class_enrollments')

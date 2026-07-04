@@ -64,7 +64,7 @@
 ## Compliance
 - [x] 11.42 CAN-SPAM footer in emails
 - [x] 11.43 TCPA consent log (`sms_consent_log`)
-- [ ] 11.44 GDPR marketing preferences per member
+- [x] 11.44 GDPR marketing preferences per member
 
 ## Admin UI
 - [x] 11.45 Marketing nav section (admin only)

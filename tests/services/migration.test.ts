@@ -3,6 +3,7 @@ import {
   buildMemberLookup,
   resolveMemberId,
   parseImportTimestamp,
+  validateClassImportRow,
 } from '@/services/migration';
 
 describe('buildMemberLookup / resolveMemberId', () => {
@@ -53,5 +54,39 @@ describe('parseImportTimestamp', () => {
   it('rejects future dates', () => {
     const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     expect(parseImportTimestamp(future)).toBeNull();
+  });
+});
+
+describe('validateClassImportRow', () => {
+  const validRow = {
+    name: 'BJJ Fundamentals',
+    instructor: 'Coach John',
+    day_of_week: 'monday',
+    start_time: '9:00',
+    end_time: '10:00',
+    capacity: '20',
+    category_tag: 'BJJ',
+    color: '#3B82F6',
+  };
+
+  it('accepts a valid row with normalized day and times', () => {
+    const result = validateClassImportRow(validRow);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.parsed.dayOfWeek).toBe('Monday');
+      expect(result.parsed.startTime).toBe('09:00');
+      expect(result.parsed.endTime).toBe('10:00');
+      expect(result.parsed.capacity).toBe(20);
+    }
+  });
+
+  it('rejects missing required fields', () => {
+    expect(validateClassImportRow({ ...validRow, name: '' }).ok).toBe(false);
+    expect(validateClassImportRow({ ...validRow, day_of_week: 'Funday' }).ok).toBe(false);
+    expect(validateClassImportRow({ ...validRow, capacity: '0' }).ok).toBe(false);
+  });
+
+  it('rejects invalid hex colors', () => {
+    expect(validateClassImportRow({ ...validRow, color: 'blue' }).ok).toBe(false);
   });
 });

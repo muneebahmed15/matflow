@@ -35,10 +35,11 @@ export type GymSettings = Pick<GymRow, 'id' | 'name' | 'slug' | 'kiosk_enabled'>
   belt_custom_order: string[] | null;
   belt_color_overrides: Record<string, string> | null;
   booking_cancel_hours: number;
+  class_reminder_hours: number;
 };
 
 const GYM_SETTINGS_COLUMNS =
-  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, review_checkin_threshold, require_waiver_for_checkin, timezone, belt_system, belt_custom_order, belt_color_overrides, booking_cancel_hours';
+  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, review_checkin_threshold, require_waiver_for_checkin, timezone, belt_system, belt_custom_order, belt_color_overrides, booking_cancel_hours, class_reminder_hours';
 
 function parseGymSettingsRow(data: Record<string, unknown>): GymSettings {
   const customOrder = data.belt_custom_order;
@@ -103,6 +104,7 @@ export type UpdateGymSettingsInput = {
   beltCustomOrder?: string[] | null;
   beltColorOverrides?: Record<string, string> | null;
   bookingCancelHours?: number;
+  classReminderHours?: number;
 };
 
 export async function updateGymSettings(
@@ -193,6 +195,7 @@ export async function updateGymSettings(
       belt_custom_order: beltCustomOrder && beltCustomOrder.length >= 2 ? beltCustomOrder : null,
       belt_color_overrides: beltColorOverrides,
       booking_cancel_hours: Math.max(0, input.bookingCancelHours ?? 2),
+      class_reminder_hours: Math.max(0, Math.min(24, input.classReminderHours ?? 2)),
     })
     .eq('id', gymId)
     .select(GYM_SETTINGS_COLUMNS)
@@ -213,6 +216,24 @@ export async function updateGymSettings(
   }
 
   return parseGymSettingsRow(data as Record<string, unknown>);
+}
+
+export async function listSiblingGyms(
+  gymId: string
+): Promise<{ id: string; name: string; slug: string }[]> {
+  const admin = getAdminClient();
+  const { data: gym, error } = await admin.from('gyms').select('owner_id').eq('id', gymId).single();
+  if (error || !gym) throw new ServiceError(404, 'Gym not found');
+
+  const { data, error: listError } = await admin
+    .from('gyms')
+    .select('id, name, slug')
+    .eq('owner_id', gym.owner_id)
+    .neq('id', gymId)
+    .order('name');
+
+  if (listError) throw new ServiceError(500, listError.message);
+  return data ?? [];
 }
 
 export async function getGymName(gymId: string): Promise<string | null> {

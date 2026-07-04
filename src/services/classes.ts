@@ -2,6 +2,7 @@ import { getAdminClient } from '@/lib/supabase/admin';
 import type { Database } from '@/types/database';
 import { ServiceError } from '@/services/errors';
 import { buildWeeklyRecurrenceRule, sortDays } from '@/lib/class-recurrence';
+import { normalizeCategoryTag, normalizeClassColor } from '@/lib/class-tags';
 import {
   type ClassScheduleSlot,
   findInstructorConflictsForClass,
@@ -69,6 +70,9 @@ export type CreateClassInput = {
   startTime: string;
   endTime: string;
   capacity: number;
+  categoryTag?: string | null;
+  color?: string | null;
+  overbookAllowance?: number;
 };
 
 export async function createClass(input: CreateClassInput): Promise<ClassRow> {
@@ -82,6 +86,10 @@ export async function createClass(input: CreateClassInput): Promise<ClassRow> {
   });
 
   const admin = getAdminClient();
+  const categoryTag = normalizeCategoryTag(input.categoryTag);
+  const color = normalizeClassColor(input.color);
+  const overbookAllowance = Math.max(0, Math.min(50, input.overbookAllowance ?? 0));
+
   const { data, error } = await admin
     .from('classes')
     .insert({
@@ -94,6 +102,9 @@ export async function createClass(input: CreateClassInput): Promise<ClassRow> {
       start_time: input.startTime,
       end_time: input.endTime,
       capacity: input.capacity,
+      category_tag: categoryTag,
+      color,
+      overbook_allowance: overbookAllowance,
     })
     .select()
     .single();
@@ -136,6 +147,9 @@ export async function createClassSeries(
     start_time: input.startTime,
     end_time: input.endTime,
     capacity: input.capacity,
+    category_tag: normalizeCategoryTag(input.categoryTag),
+    color: normalizeClassColor(input.color),
+    overbook_allowance: Math.max(0, Math.min(50, input.overbookAllowance ?? 0)),
     series_id: seriesId,
     recurrence_rule: recurrenceRule,
   }));
@@ -202,6 +216,13 @@ export async function updateClass(
   if (input.startTime !== undefined) updates.start_time = input.startTime;
   if (input.endTime !== undefined) updates.end_time = input.endTime;
   if (input.capacity !== undefined) updates.capacity = input.capacity;
+  if (input.categoryTag !== undefined) {
+    updates.category_tag = normalizeCategoryTag(input.categoryTag);
+  }
+  if (input.color !== undefined) updates.color = normalizeClassColor(input.color);
+  if (input.overbookAllowance !== undefined) {
+    updates.overbook_allowance = Math.max(0, Math.min(50, input.overbookAllowance));
+  }
 
   const { data, error } = await admin
     .from('classes')
@@ -241,5 +262,71 @@ export async function duplicateClass(
     startTime: source.start_time ?? '09:00',
     endTime: source.end_time ?? '10:00',
     capacity: source.capacity ?? 20,
+    categoryTag: source.category_tag,
+    color: source.color,
+    overbookAllowance: source.overbook_allowance ?? 0,
   });
+}
+
+export async function copyScheduleFromGym(
+  targetGymId: string,
+  sourceGymId: string
+): Promise<{ copied: number }> {
+  if (targetGymId === sourceGymId) {
+    throw new ServiceError(400, 'Choose a different gym to copy from.');
+  }
+
+  const admin = getAdminClient();
+  const { data: gyms, error: gymsError } = await admin
+    .from('gyms')
+    .select('id, owner_id')
+    .in('id', [targetGymId, sourceGymId]);
+
+  if (gymsError) throw new ServiceError(500, gymsError.message);
+  if (!gyms || gyms.length !== 2) throw new ServiceError(404, 'Gym not found');
+
+  const ownerIds = new Set(gyms.map((g) => g.owner_id));
+  if (ownerIds.size !== 1) {
+    throw new ServiceError(403, 'You can only copy schedules between gyms you own.');
+  }
+
+  const { data: sourceClasses, error } = await admin
+    .from('classes')
+    .select('*')
+    .eq('gym_id', sourceGymId)
+    .eq('is_active', true)
+    .order('day_of_week')
+    .order('start_time');
+
+  if (error) throw new ServiceError(500, error.message);
+  if (!sourceClasses?.length) {
+    throw new ServiceError(400, 'Source gym has no active classes to copy.');
+  }
+
+  const { data: targetStaff } = await admin.from('staff_roles').select('id').eq('gym_id', targetGymId);
+  const targetStaffIds = new Set((targetStaff ?? []).map((s) => s.id));
+
+  let copied = 0;
+  for (const source of sourceClasses) {
+    await createClass({
+      gymId: targetGymId,
+      name: source.name,
+      description: source.description,
+      instructor: source.instructor ?? '',
+      instructorStaffId:
+        source.instructor_staff_id && targetStaffIds.has(source.instructor_staff_id)
+          ? source.instructor_staff_id
+          : null,
+      dayOfWeek: source.day_of_week ?? 'Monday',
+      startTime: source.start_time ?? '09:00',
+      endTime: source.end_time ?? '10:00',
+      capacity: source.capacity ?? 20,
+      categoryTag: source.category_tag,
+      color: source.color,
+      overbookAllowance: source.overbook_allowance ?? 0,
+    });
+    copied++;
+  }
+
+  return { copied };
 }

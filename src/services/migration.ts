@@ -1,6 +1,9 @@
 import { getAdminClient } from '@/lib/supabase/admin';
 import { ServiceError } from '@/services/errors';
 import { createMember } from '@/services/members';
+import { CLASS_WEEKDAYS } from '@/lib/class-recurrence';
+import { normalizeClassColor } from '@/lib/class-tags';
+import type { CreateClassInput } from '@/services/classes';
 
 export const MAX_IMPORT_ROWS = 5000;
 export const IMPORT_BATCH_SIZE = 25;
@@ -713,6 +716,158 @@ export async function importBeltHistoryFromRows(
   return { jobId: job.id, success, errors };
 }
 
+export type ClassImportRow = {
+  name: string;
+  instructor: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  capacity: string | number;
+  category_tag?: string;
+  color?: string;
+  description?: string;
+};
+
+const CLASS_IMPORT_TIME = /^([01]?\d|2[0-3]):[0-5]\d$/;
+
+function normalizeImportTime(value: string): string | null {
+  const trimmed = value.trim();
+  if (!CLASS_IMPORT_TIME.test(trimmed)) return null;
+  const [hours, minutes] = trimmed.split(':');
+  return `${hours.padStart(2, '0')}:${minutes}`;
+}
+
+function normalizeImportDay(value: string): string | null {
+  const match = CLASS_WEEKDAYS.find((day) => day.toLowerCase() === value.trim().toLowerCase());
+  return match ?? null;
+}
+
+/** Validate a CSV row for class schedule import. Exported for unit tests. */
+export function validateClassImportRow(
+  row: ClassImportRow
+): { ok: true; parsed: Omit<CreateClassInput, 'gymId'> } | { ok: false; message: string } {
+  const name = row.name?.trim();
+  if (!name) return { ok: false, message: 'name is required' };
+
+  const instructor = row.instructor?.trim();
+  if (!instructor) return { ok: false, message: 'instructor is required' };
+
+  const dayOfWeek = normalizeImportDay(row.day_of_week ?? '');
+  if (!dayOfWeek) {
+    return { ok: false, message: `Invalid day_of_week: ${row.day_of_week ?? ''}` };
+  }
+
+  const startTime = normalizeImportTime(row.start_time ?? '');
+  if (!startTime) {
+    return { ok: false, message: `Invalid start_time: ${row.start_time ?? ''}` };
+  }
+
+  const endTime = normalizeImportTime(row.end_time ?? '');
+  if (!endTime) {
+    return { ok: false, message: `Invalid end_time: ${row.end_time ?? ''}` };
+  }
+
+  const capacityRaw = String(row.capacity ?? '').trim();
+  const capacity = Number.parseInt(capacityRaw, 10);
+  if (!capacityRaw || Number.isNaN(capacity) || capacity < 1) {
+    return { ok: false, message: 'capacity must be a positive integer' };
+  }
+
+  const color = row.color?.trim();
+  if (color && !normalizeClassColor(color)) {
+    return { ok: false, message: `Invalid color: ${color}` };
+  }
+
+  return {
+    ok: true,
+    parsed: {
+      name,
+      instructor,
+      dayOfWeek,
+      startTime,
+      endTime,
+      capacity,
+      categoryTag: row.category_tag,
+      color: row.color,
+      description: row.description,
+    },
+  };
+}
+
+export async function importClassesFromRows(
+  gymId: string,
+  rows: ClassImportRow[],
+  options: { fileName?: string; createdBy?: string; dryRun?: boolean }
+): Promise<{ jobId: string; success: number; errors: { row: number; message: string }[] }> {
+  if (rows.length > MAX_IMPORT_ROWS) {
+    throw new ServiceError(400, `Import limited to ${MAX_IMPORT_ROWS} rows per job.`);
+  }
+
+  const admin = getAdminClient();
+  const { createClass } = await import('@/services/classes');
+
+  const { data: job, error: jobErr } = await admin
+    .from('import_jobs')
+    .insert({
+      gym_id: gymId,
+      import_type: 'classes',
+      status: 'processing',
+      file_name: options.fileName ?? null,
+      total_rows: rows.length,
+      created_by: options.createdBy ?? null,
+    })
+    .select('id')
+    .single();
+
+  if (jobErr || !job) throw new ServiceError(500, jobErr?.message ?? 'Failed to create import job');
+
+  const errors: { row: number; message: string }[] = [];
+  let success = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 2;
+    const validated = validateClassImportRow(row);
+
+    if (!validated.ok) {
+      errors.push({ row: rowNum, message: validated.message });
+      continue;
+    }
+
+    if (options.dryRun) {
+      success++;
+      continue;
+    }
+
+    try {
+      const created = await createClass({ gymId, ...validated.parsed });
+      await admin.from('classes').update({ import_job_id: job.id }).eq('id', created.id);
+      success++;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Import failed';
+      errors.push({ row: rowNum, message });
+      await admin.from('import_row_errors').insert({
+        job_id: job.id,
+        row_number: rowNum,
+        row_data: row,
+        error_message: message,
+      });
+    }
+  }
+
+  await admin
+    .from('import_jobs')
+    .update({
+      status: success === 0 && errors.length > 0 ? 'failed' : 'completed',
+      success_rows: success,
+      error_rows: errors.length,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', job.id);
+
+  return { jobId: job.id, success, errors };
+}
+
 export async function getImportJobErrors(jobId: string, gymId: string) {
   const admin = getAdminClient();
   const { data: job } = await admin
@@ -790,6 +945,19 @@ export async function rollbackImportJob(gymId: string, jobId: string): Promise<{
     const ids = (recs ?? []).map((r) => r.id);
     if (ids.length > 0) {
       const { error } = await admin.from(table).delete().in('id', ids);
+      if (error) throw new ServiceError(500, error.message);
+      removed = ids.length;
+    }
+  } else if (job.import_type === 'classes') {
+    const { data: classes } = await admin
+      .from('classes')
+      .select('id')
+      .eq('gym_id', gymId)
+      .eq('import_job_id', jobId);
+
+    const ids = (classes ?? []).map((c) => c.id);
+    if (ids.length > 0) {
+      const { error } = await admin.from('classes').delete().in('id', ids);
       if (error) throw new ServiceError(500, error.message);
       removed = ids.length;
     }

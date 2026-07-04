@@ -39,6 +39,11 @@ describe('assertClassHasCapacity', () => {
     expect(() => assertClassHasCapacity(10, 12)).toThrowError(/full/i);
   });
 
+  it('allows enrollment within overbook allowance', () => {
+    expect(() => assertClassHasCapacity(10, 10, 2)).not.toThrow();
+    expect(() => assertClassHasCapacity(10, 12, 2)).toThrowError(/full/i);
+  });
+
   it('allows enrollment below capacity', () => {
     expect(() => assertClassHasCapacity(10, 9)).not.toThrow();
   });
@@ -56,7 +61,7 @@ describe('enrollMemberInClass', () => {
 
   it('rejects when the class is full', async () => {
     mockFrom
-      .mockReturnValueOnce(chain({ data: { id: 'c1', capacity: 2 } })) // class
+      .mockReturnValueOnce(chain({ data: { id: 'c1', capacity: 2, overbook_allowance: 0 } })) // class
       .mockReturnValueOnce(chain({ data: { id: 'm1', status: 'active' } })) // member
       .mockReturnValueOnce(chain({ data: null })) // existing enrollment
       .mockReturnValueOnce(chain({ count: 2 })); // active count
@@ -68,7 +73,7 @@ describe('enrollMemberInClass', () => {
 
   it('rejects duplicate active bookings', async () => {
     mockFrom
-      .mockReturnValueOnce(chain({ data: { id: 'c1', capacity: 20 } }))
+      .mockReturnValueOnce(chain({ data: { id: 'c1', capacity: 20, overbook_allowance: 0 } }))
       .mockReturnValueOnce(chain({ data: { id: 'm1', status: 'active' } }))
       .mockReturnValueOnce(chain({ data: { id: 'e1', status: 'active' } }));
 
@@ -79,7 +84,7 @@ describe('enrollMemberInClass', () => {
 
   it('rejects inactive members', async () => {
     mockFrom
-      .mockReturnValueOnce(chain({ data: { id: 'c1', capacity: 20 } }))
+      .mockReturnValueOnce(chain({ data: { id: 'c1', capacity: 20, overbook_allowance: 0 } }))
       .mockReturnValueOnce(chain({ data: { id: 'm1', status: 'inactive' } }));
 
     await expect(
@@ -89,7 +94,7 @@ describe('enrollMemberInClass', () => {
 
   it('enrolls when a spot is available', async () => {
     mockFrom
-      .mockReturnValueOnce(chain({ data: { id: 'c1', capacity: 20 } }))
+      .mockReturnValueOnce(chain({ data: { id: 'c1', capacity: 20, overbook_allowance: 0 } }))
       .mockReturnValueOnce(chain({ data: { id: 'm1', status: 'active' } }))
       .mockReturnValueOnce(chain({ data: null }))
       .mockReturnValueOnce(chain({ count: 5 }))

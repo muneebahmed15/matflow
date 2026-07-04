@@ -64,6 +64,7 @@ export async function checkInMember(input: {
   memberId: string;
   checkedInBy?: string | null;
   notes?: string | null;
+  classId?: string | null;
 }): Promise<AttendanceRow> {
   const admin = getAdminClient();
   const { start, end } = todayBounds();
@@ -85,6 +86,32 @@ export async function checkInMember(input: {
   const { assertMemberWaiverCompliance } = await import('@/services/waivers');
   await assertMemberWaiverCompliance(input.gymId, input.memberId);
 
+  let classId: string | null = null;
+  if (input.classId) {
+    const { weekdayNameForDate } = await import('@/lib/todays-classes');
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: gymClass } = await admin
+      .from('classes')
+      .select('id, day_of_week, instructor, is_active')
+      .eq('id', input.classId)
+      .eq('gym_id', input.gymId)
+      .maybeSingle();
+
+    if (!gymClass?.is_active) {
+      throw new ServiceError(400, 'Invalid class for check-in.');
+    }
+    if (gymClass.day_of_week !== weekdayNameForDate()) {
+      throw new ServiceError(400, 'That class is not scheduled today.');
+    }
+
+    const { isClassCancelledOnDate } = await import('@/services/class-schedule-exceptions');
+    if (await isClassCancelledOnDate(input.gymId, input.classId, today)) {
+      throw new ServiceError(409, 'That class is cancelled today.');
+    }
+
+    classId = gymClass.id;
+  }
+
   const { data: existing } = await admin
     .from('attendance')
     .select('id')
@@ -105,11 +132,33 @@ export async function checkInMember(input: {
       gym_id: input.gymId,
       notes: input.notes ?? null,
       checked_in_by: input.checkedInBy ?? null,
+      class_id: classId,
     })
     .select()
     .single();
 
   if (error) throw new ServiceError(500, error.message);
+
+  if (classId) {
+    const { getOrCreateTodaySession, markSessionAttendance } = await import(
+      '@/services/class-sessions'
+    );
+    const { data: cls } = await admin
+      .from('classes')
+      .select('instructor')
+      .eq('id', classId)
+      .maybeSingle();
+    const session = await getOrCreateTodaySession(
+      input.gymId,
+      classId,
+      cls?.instructor ?? undefined
+    );
+    await markSessionAttendance({
+      gymId: input.gymId,
+      sessionId: session.id,
+      memberId: input.memberId,
+    });
+  }
 
   const { maybeRequestReviewAfterCheckIn } = await import('@/services/review-automation');
   void maybeRequestReviewAfterCheckIn(input.gymId, input.memberId).catch(() => undefined);

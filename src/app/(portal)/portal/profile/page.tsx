@@ -21,7 +21,8 @@ export default function PortalProfilePage() {
   const { activeMember, loading: memberLoading } = usePortalMember();
   const [phone, setPhone] = useState('');
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [emailOptOut, setEmailOptOut] = useState(false);
+  const [marketingEmailConsent, setMarketingEmailConsent] = useState(false);
+  const [smsMarketingConsent, setSmsMarketingConsent] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [ecName, setEcName] = useState('');
@@ -48,12 +49,15 @@ export default function PortalProfilePage() {
       setPhone('');
       const { data: member } = await supabase
         .from('members')
-        .select('phone, profile_photo_url, email_opt_out')
+        .select('phone, profile_photo_url, email_opt_out, marketing_email_consent, sms_marketing_consent')
         .eq('id', activeMember.id)
         .single();
       setPhone(member?.phone ?? '');
       setPhotoUrl(member?.profile_photo_url ?? null);
-      setEmailOptOut(member?.email_opt_out ?? false);
+      setMarketingEmailConsent(
+        Boolean(member?.marketing_email_consent) && !member?.email_opt_out
+      );
+      setSmsMarketingConsent(Boolean(member?.sms_marketing_consent));
       await loadContacts(activeMember.id);
       setLoading(false);
     })();
@@ -66,7 +70,13 @@ export default function PortalProfilePage() {
     const res = await fetch('/api/portal/profile', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, email_opt_out: emailOptOut, member_id: activeMember.id }),
+      body: JSON.stringify({
+        phone,
+        marketing_email_consent: marketingEmailConsent,
+        sms_marketing_consent: smsMarketingConsent,
+        email_opt_out: !marketingEmailConsent,
+        member_id: activeMember.id,
+      }),
     });
     setSaving(false);
     if (res.ok) setSaved(true);
@@ -194,16 +204,29 @@ export default function PortalProfilePage() {
       </div>
 
       <div className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-3">
-        <h2 className="font-semibold text-white">Notifications</h2>
+        <h2 className="font-semibold text-white">Marketing preferences</h2>
+        <p className="text-white/40 text-xs">
+          Choose how we may contact you about promotions and gym news (GDPR).
+        </p>
         <label className="flex items-center gap-3 text-sm text-white/70 cursor-pointer">
           <input
             type="checkbox"
-            checked={emailOptOut}
-            onChange={(e) => setEmailOptOut(e.target.checked)}
+            checked={marketingEmailConsent}
+            onChange={(e) => setMarketingEmailConsent(e.target.checked)}
             disabled={!editAllowed}
             className="rounded"
           />
-          Opt out of marketing and promotional emails (GDPR preference)
+          Email me about promotions, events, and gym news
+        </label>
+        <label className="flex items-center gap-3 text-sm text-white/70 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={smsMarketingConsent}
+            onChange={(e) => setSmsMarketingConsent(e.target.checked)}
+            disabled={!editAllowed}
+            className="rounded"
+          />
+          Text me promotional SMS messages
         </label>
         {editAllowed && (
           <button
