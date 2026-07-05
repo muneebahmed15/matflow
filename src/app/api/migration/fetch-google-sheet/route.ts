@@ -4,7 +4,9 @@ import { isErrorResponse, requireStaffAuth } from '@/lib/auth/api';
 import { parseJsonBody } from '@/lib/api-validate';
 import { handleRouteError } from '@/lib/api-error';
 import { fetchGoogleSheetCsv } from '@/lib/google-sheets-import';
+import { fetchGoogleSheetCsvAuthenticated } from '@/services/google-sheets-oauth';
 import { parseCsvSpreadsheet } from '@/lib/parse-spreadsheet';
+import { ServiceError } from '@/services/errors';
 
 const schema = z.object({
   url: z.string().url().max(2000),
@@ -18,7 +20,27 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return parsed.response;
 
   try {
-    const { csvText, spreadsheetId } = await fetchGoogleSheetCsv(parsed.data.url);
+    let csvText: string;
+    let spreadsheetId: string;
+
+    try {
+      ({ csvText, spreadsheetId } = await fetchGoogleSheetCsv(parsed.data.url));
+    } catch (publicErr) {
+      try {
+        ({ csvText, spreadsheetId } = await fetchGoogleSheetCsvAuthenticated(
+          auth.gymId,
+          parsed.data.url
+        ));
+      } catch {
+        throw publicErr instanceof ServiceError
+          ? publicErr
+          : new ServiceError(
+              400,
+              'Could not fetch sheet. Share it publicly or connect Google Sheets in Migration Center.'
+            );
+      }
+    }
+
     const { headers, rows } = parseCsvSpreadsheet(csvText);
 
     if (headers.length === 0 || rows.length < 2) {

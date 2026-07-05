@@ -2,14 +2,22 @@
 
 import { useState } from 'react';
 import { useAsyncMount } from '@/hooks/use-async-mount';
-import { getBusinessInsightsAction, refreshBusinessSnapshotAction } from '@/app/(dashboard)/actions';
+import { getBusinessInsightsAction, refreshBusinessSnapshotAction, markDigestActionDoneAction, snoozeDigestActionAction } from '@/app/(dashboard)/actions';
 import Link from 'next/link';
 import { StatsSkeleton } from '@/components/LoadingSkeleton';
 
 export default function BusinessInsightsWidget() {
   const [data, setData] = useState<{
     metrics?: Record<string, number>;
-    recommendations?: { priority: string; title: string; description: string; actionHref?: string }[];
+    recommendations?: {
+      priority: string;
+      title: string;
+      description: string;
+      actionHref?: string;
+      actionKey?: string;
+      draftEmail?: string;
+    }[];
+    marketingTip?: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -41,7 +49,8 @@ export default function BusinessInsightsWidget() {
     { label: 'Waiver gaps', value: metrics.waiverGapMembers ?? 0 },
     { label: 'Low-attendance classes', value: metrics.lowAttendanceClasses ?? 0 },
     { label: 'Open trial leads', value: metrics.trialLeadsOpen ?? 0 },
-    { label: 'Failed payments', value: metrics.failedPayments ?? 0 },
+    { label: 'Escalated chats', value: metrics.escalationQueueSize ?? 0 },
+    { label: 'Lead conv. (7d)', value: metrics.leadConversionRate7d ?? 0 },
   ];
 
   return (
@@ -78,15 +87,44 @@ export default function BusinessInsightsWidget() {
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-medium">{r.title}</p>
                 <p className="text-white/40 text-xs mt-0.5">{r.description}</p>
+                {r.draftEmail && (
+                  <p className="text-white/30 text-xs mt-1 italic truncate">Draft: {r.draftEmail}</p>
+                )}
               </div>
-              {r.actionHref && (
-                <Link href={r.actionHref} className="text-xs text-blue-400 hover:underline shrink-0">
-                  Go →
-                </Link>
-              )}
+              <div className="flex flex-col gap-1 shrink-0">
+                {r.actionHref && (
+                  <Link href={r.actionHref} className="text-xs text-blue-400 hover:underline">
+                    Go →
+                  </Link>
+                )}
+                {r.actionKey && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void markDigestActionDoneAction(r.actionKey!).then(() => load())}
+                      className="text-xs text-green-400 hover:underline"
+                    >
+                      Done
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void snoozeDigestActionAction(r.actionKey!, 3).then(() => load())}
+                      className="text-xs text-white/40 hover:underline"
+                    >
+                      Snooze
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           ))}
         </div>
+      )}
+
+      {data.marketingTip && (
+        <p className="text-white/40 text-xs mt-4 border-t border-white/10 pt-3">
+          Tip: {data.marketingTip}
+        </p>
       )}
 
       <Link href="/insights" className="inline-block mt-4 text-xs text-white/40 hover:text-white">

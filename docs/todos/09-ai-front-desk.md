@@ -9,71 +9,71 @@
 
 ## Website Chat
 - [x] 9.6 Embeddable chat widget on public site
-- [~] 9.7 WebSocket or SSE streaming responses (HTTP polling; streaming deferred)
+- [x] 9.7 SSE streaming responses (`/api/ai/chat/stream` + widget token streaming)
 - [x] 9.8 Chat history persisted per session
 - [x] 9.9 Human handoff button (contact page link)
-- [ ] 9.10 Business hours auto-message
+- [x] 9.10 Business hours auto-message
 
 ## SMS
 - [x] 9.11 Twilio integration (outbound follow-up SMS)
-- [ ] 9.12 Inbound SMS webhook
-- [~] 9.13 Outbound SMS with TCPA consent tracking (STOP in message; full consent log deferred)
-- [ ] 9.14 Opt-out handling (STOP)
-- [ ] 9.15 Phone number per gym (subaccount)
+- [x] 9.12 Inbound SMS webhook (`/api/twilio/sms`)
+- [x] 9.13 Outbound SMS with TCPA consent tracking (`sms_consent_log` on follow-up)
+- [x] 9.14 Opt-out handling (STOP/START)
+- [x] 9.15 Phone number per gym (`twilio_phone` in Settings + inbound SMS routing)
 
 ## Phone
-- [ ] 9.16 Twilio Voice integration
-- [ ] 9.17 AI answers with TTS
-- [ ] 9.18 Transfer to staff on keyword
-- [ ] 9.19 Call recording with consent prompt
-- [ ] 9.20 Voicemail transcription
+- [ ] 9.16 Twilio Voice integration (deferred — requires Twilio Voice setup)
+- [ ] 9.17 AI answers with TTS (deferred)
+- [ ] 9.18 Transfer to staff on keyword (deferred)
+- [ ] 9.19 Call recording with consent prompt (deferred)
+- [ ] 9.20 Voicemail transcription (deferred)
 
 ## Email
-- [ ] 9.21 Inbound email parsing (Resend/SendGrid)
-- [ ] 9.22 AI draft reply for staff approval
-- [ ] 9.23 Auto-reply for FAQs
+- [ ] 9.21 Inbound email parsing (deferred — Resend/SendGrid inbound)
+- [ ] 9.22 AI draft reply for staff approval (deferred)
+- [ ] 9.23 Auto-reply for FAQs (deferred)
 
 ## Social
-- [ ] 9.24 Facebook Messenger webhook
-- [ ] 9.25 Instagram DM webhook (Meta API)
-- [~] 9.26 Unified inbox UI in dashboard (`/inbox` + AI Desk conversations tab)
+- [ ] 9.24 Facebook Messenger webhook (deferred — Meta app)
+- [ ] 9.25 Instagram DM webhook (deferred — Meta API)
+- [x] 9.26 Unified inbox UI in dashboard (`/inbox` + AI Desk conversations + analytics)
 
 ## Knowledge Base
 - [x] 9.27 Admin UI: upload gym FAQ doc (topic/content on `/ai-desk`)
 - [x] 9.28 Auto-index schedule, pricing, policies (injected into LLM context)
-- [ ] 9.29 Versioning when settings change
+- [x] 9.29 Versioning when settings change (`gym_knowledge_versions`)
 - [x] 9.30 Block AI from inventing prices (system prompt + pricing page fallback)
 
 ## Actions
 - [x] 9.31 Tool: book_free_trial → create lead
 - [x] 9.32 Tool: lookup_class_schedule
 - [x] 9.33 Tool: capture_lead_contact
-- [ ] 9.34 Tool: escalate_to_human
+- [x] 9.34 Tool: escalate_to_human
 - [x] 9.35 Never cancel subscriptions via AI (no such tool exposed)
 
 ## Safety
 - [x] 9.36 Prompt injection guardrails (system prompt boundaries)
-- [ ] 9.37 PII redaction in logs
+- [x] 9.37 PII redaction in logs (`redactPii`)
 - [x] 9.38 Rate limit per IP/session
-- [ ] 9.39 Content moderation filter
-- [ ] 9.40 Medical/injury disclaimer auto-insert
+- [x] 9.39 Content moderation filter (OpenAI Moderation API when key configured)
+- [x] 9.40 Medical/injury disclaimer auto-insert
 
 ## CRM Integration
 - [x] 9.41 Every conversation → crm_notes entry (on lead capture)
 - [x] 9.42 Auto-tag lead source = ai_chat
-- [ ] 9.43 Staff notification on escalation
+- [x] 9.43 Staff notification on escalation
 
 ## Analytics
-- [ ] 9.44 Resolution rate metric
-- [ ] 9.45 Avg response time
+- [x] 9.44 Resolution rate metric (AI Desk analytics tab)
+- [x] 9.45 Avg response time (AI Desk analytics tab)
 - [x] 9.46 Leads captured via AI (via `createLead` + conversation link)
-- [ ] 9.47 CSAT thumbs up/down
+- [x] 9.47 CSAT thumbs up/down
 
 ## Config
-- [ ] 9.48 AI persona name per gym
-- [ ] 9.49 Tone setting (formal/friendly)
-- [ ] 9.50 Languages supported
+- [x] 9.48 AI persona name per gym
+- [x] 9.49 Tone setting (formal/friendly)
+- [x] 9.50 Languages supported (Settings + LLM prompt)
 
 ## Billing
-- [ ] 9.51 Usage metering (messages/minutes)
-- [ ] 9.52 Overage alerts
+- [ ] 9.51 Usage metering (deferred)
+- [ ] 9.52 Overage alerts (deferred)

@@ -66,7 +66,7 @@
 ## Communication Log
 - [x] 2.52 Notifications table (done)
 - [x] 2.53 Log outbound emails in notifications
-- [~] 2.54 Log inbound messages (AI chat → CRM note on lead capture; full inbox deferred)
+- [x] 2.54 Log inbound messages (AI chat + inbound SMS → CRM notes)
 - [x] 2.55 Unified activity feed component (member Timeline tab)
 
 ## Data Quality

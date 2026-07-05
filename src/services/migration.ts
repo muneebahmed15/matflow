@@ -196,6 +196,14 @@ export type ImportJob = {
   error_rows: number;
   created_at: string;
   completed_at: string | null;
+  payload?: unknown;
+  progress_offset?: number;
+  queue_options?: unknown;
+};
+
+export type QueuedImportPayload = {
+  rows: MemberImportRow[] | LeadImportRow[];
+  duplicateEmailStrategy?: DuplicateEmailStrategy;
 };
 
 export async function listImportJobs(gymId: string): Promise<ImportJob[]> {
@@ -1273,4 +1281,102 @@ export async function importStripeCustomerMappings(
   }
 
   return { success, errors };
+}
+
+export async function queueImportJob(input: {
+  gymId: string;
+  importType: 'members' | 'leads';
+  rows: MemberImportRow[] | LeadImportRow[];
+  fileName?: string;
+  createdBy?: string;
+  duplicateEmailStrategy?: DuplicateEmailStrategy;
+}): Promise<string> {
+  if (input.rows.length > MAX_IMPORT_ROWS) {
+    throw new ServiceError(400, `Import limited to ${MAX_IMPORT_ROWS} rows per job.`);
+  }
+
+  const admin = getAdminClient();
+  const payload: QueuedImportPayload = {
+    rows: input.rows,
+    duplicateEmailStrategy: input.duplicateEmailStrategy,
+  };
+
+  const { data: job, error } = await admin
+    .from('import_jobs')
+    .insert({
+      gym_id: input.gymId,
+      import_type: input.importType,
+      status: 'pending',
+      file_name: input.fileName ?? null,
+      total_rows: input.rows.length,
+      created_by: input.createdBy ?? null,
+      payload,
+      progress_offset: 0,
+      queue_options: { duplicateEmailStrategy: input.duplicateEmailStrategy ?? 'error' },
+    })
+    .select('id')
+    .single();
+
+  if (error || !job) throw new ServiceError(500, error?.message ?? 'Failed to queue import job');
+  return job.id;
+}
+
+export async function processImportJobQueue(maxJobs = 5): Promise<number> {
+  const admin = getAdminClient();
+  const { data: jobs } = await admin
+    .from('import_jobs')
+    .select('*')
+    .in('status', ['pending', 'processing'])
+    .not('payload', 'is', null)
+    .order('created_at', { ascending: true })
+    .limit(maxJobs);
+
+  let processed = 0;
+
+  for (const job of jobs ?? []) {
+    const payload = job.payload as QueuedImportPayload | null;
+    if (!payload?.rows?.length) {
+      await admin
+        .from('import_jobs')
+        .update({ status: 'failed', completed_at: new Date().toISOString() })
+        .eq('id', job.id);
+      continue;
+    }
+
+    await admin.from('import_jobs').update({ status: 'processing' }).eq('id', job.id);
+
+    const offset = job.progress_offset ?? 0;
+    const batch = payload.rows.slice(offset, offset + IMPORT_BATCH_SIZE);
+    const strategy = payload.duplicateEmailStrategy ?? 'error';
+
+    if (job.import_type === 'members') {
+      await importMembersBatch(job.gym_id, job.id, batch as MemberImportRow[], offset, strategy);
+    } else if (job.import_type === 'leads') {
+      await importLeadsBatch(job.gym_id, job.id, batch as LeadImportRow[], offset);
+    } else {
+      continue;
+    }
+
+    const newOffset = offset + batch.length;
+    if (newOffset >= payload.rows.length) {
+      const { data: updated } = await admin
+        .from('import_jobs')
+        .select('success_rows, error_rows, file_name, created_by')
+        .eq('id', job.id)
+        .single();
+
+      await completeImportJob(job.id, updated?.success_rows ?? 0, [], {
+        gymId: job.gym_id,
+        actorId: updated?.created_by,
+        importType: job.import_type,
+        fileName: updated?.file_name,
+      });
+    } else {
+      await admin.from('import_jobs').update({ progress_offset: newOffset }).eq('id', job.id);
+    }
+
+    processed++;
+  }
+
+  return processed;
 }

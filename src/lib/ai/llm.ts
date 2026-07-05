@@ -1,7 +1,7 @@
 import { logger } from '@/lib/logger';
 
 export type LlmToolCall = {
-  name: 'book_trial' | 'capture_lead' | 'lookup_schedule';
+  name: 'book_trial' | 'capture_lead' | 'lookup_schedule' | 'escalate_to_human';
   args: Record<string, string>;
 };
 
@@ -10,9 +10,12 @@ export type LlmReply = {
   toolCall?: LlmToolCall;
 };
 
-type GymContext = {
+export type GymContext = {
   gymName: string;
   gymSlug: string;
+  personaName?: string;
+  tone?: 'formal' | 'friendly';
+  languages?: string[];
   scheduleSummary?: string;
   pricingSummary?: string;
 };
@@ -24,13 +27,25 @@ function getOpenAiKey(): string | null {
 }
 
 function buildSystemPrompt(ctx: GymContext): string {
-  return `You are the friendly front desk assistant for ${ctx.gymName}, a martial arts gym.
+  const persona = ctx.personaName ?? 'Front Desk';
+  const toneHint =
+    ctx.tone === 'formal'
+      ? 'Use a professional, courteous tone.'
+      : 'Use a warm, friendly tone.';
+  const langHint =
+    ctx.languages && ctx.languages.length > 1
+      ? `You may reply in: ${ctx.languages.join(', ')} when the visitor writes in those languages.`
+      : '';
+
+  return `You are ${persona}, the front desk assistant for ${ctx.gymName}, a martial arts gym.
+${toneHint} ${langHint}
 Help visitors with class schedules, pricing, and booking free trials.
 When a visitor wants to book a trial or gives their contact info, use the book_trial or capture_lead tools.
 Never invent prices — refer to the pricing page if unsure.
 Schedule info: ${ctx.scheduleSummary ?? 'See the Schedule page on our website.'}
 Pricing info: ${ctx.pricingSummary ?? 'See the Pricing page on our website.'}
-Keep replies concise (2-3 sentences).`;
+Keep replies concise (2-3 sentences).
+For injuries or medical questions, remind visitors to consult a doctor — you cannot give medical advice.`;
 }
 
 const TOOLS = [
@@ -77,6 +92,19 @@ const TOOLS = [
         type: 'object',
         properties: {
           day: { type: 'string' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'escalate_to_human',
+      description: 'Escalate to staff when visitor asks for a person or issue is too complex',
+      parameters: {
+        type: 'object',
+        properties: {
+          reason: { type: 'string' },
         },
       },
     },
@@ -191,9 +219,17 @@ function generateKeywordReply(userMessage: string, ctx: GymContext): LlmReply {
     };
   }
 
-  if (lower.includes('hello') || lower.includes('hi')) {
+  if (lower.includes('human') || lower.includes('speak to') || lower.includes('real person')) {
     return {
-      message: `Hello! Welcome to ${ctx.gymName}. I can help with schedules, pricing, and booking a free trial. What would you like to know?`,
+      message: "I'll connect you with our team right away.",
+      toolCall: { name: 'escalate_to_human', args: { reason: userMessage.slice(0, 200) } },
+    };
+  }
+
+  if (lower.includes('hello') || lower.includes('hi')) {
+    const persona = ctx.personaName ?? 'assistant';
+    return {
+      message: `Hello! Welcome to ${ctx.gymName}. I'm ${persona} — I can help with schedules, pricing, and booking a free trial. What would you like to know?`,
     };
   }
 

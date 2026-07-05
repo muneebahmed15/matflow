@@ -144,6 +144,18 @@ export async function updateGymSettingsAction(input: {
   paymentProvider?: string;
   stripeOnly?: boolean;
   waiverRetentionDays?: number | null;
+  digestInactiveDays?: number;
+  digestHour?: number;
+  digestSlackWebhookUrl?: string | null;
+  digestSections?: Record<string, boolean>;
+  digestFrequency?: 'daily' | 'weekly';
+  digestSmsEnabled?: boolean;
+  digestSmsPhone?: string | null;
+  aiOffHoursMessage?: string | null;
+  aiPersonaName?: string | null;
+  aiTone?: 'formal' | 'friendly';
+  aiLanguages?: string[];
+  twilioPhone?: string | null;
 }): Promise<ActionResult<GymSettings>> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });

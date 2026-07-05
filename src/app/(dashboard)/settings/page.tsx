@@ -102,6 +102,18 @@ export default function SettingsPage() {
       paymentProvider: settings.payment_provider,
       stripeOnly: settings.stripe_only,
       waiverRetentionDays: settings.waiver_retention_days,
+      digestInactiveDays: settings.digest_inactive_days,
+      digestHour: settings.digest_hour,
+      digestSlackWebhookUrl: settings.digest_slack_webhook_url,
+      digestSections: settings.digest_sections,
+      digestFrequency: settings.digest_frequency === 'weekly' ? 'weekly' : 'daily',
+      digestSmsEnabled: settings.digest_sms_enabled,
+      digestSmsPhone: settings.digest_sms_phone,
+      aiOffHoursMessage: settings.ai_off_hours_message,
+      aiPersonaName: settings.ai_persona_name,
+      aiTone: settings.ai_tone === 'formal' ? 'formal' : 'friendly',
+      aiLanguages: settings.ai_languages,
+      twilioPhone: settings.twilio_phone,
     })
     setSaving(false)
     if (!result.ok) {
@@ -768,6 +780,191 @@ export default function SettingsPage() {
               className="h-4 w-4 rounded accent-blue-500"
             />
           </label>
+          {settings.daily_digest_enabled && (
+            <div className="py-3 border-b border-white/10 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Digest frequency</label>
+                <select
+                  value={settings.digest_frequency ?? 'daily'}
+                  onChange={(e) =>
+                    update({
+                      digest_frequency: e.target.value === 'weekly' ? 'weekly' : 'daily',
+                    })
+                  }
+                  className={inputClass}
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly (Mondays)</option>
+                </select>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={settings.digest_sms_enabled ?? false}
+                  onChange={(e) => update({ digest_sms_enabled: e.target.checked })}
+                  className="h-4 w-4 rounded accent-blue-500"
+                />
+                SMS digest (short summary)
+              </label>
+              {settings.digest_sms_enabled && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    SMS digest phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={settings.digest_sms_phone ?? settings.contact_phone ?? ''}
+                    onChange={(e) => update({ digest_sms_phone: e.target.value || null })}
+                    placeholder={settings.contact_phone ?? '+1...'}
+                    className={inputClass}
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Inactive member threshold (days)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={90}
+                  value={settings.digest_inactive_days ?? 14}
+                  onChange={(e) =>
+                    update({
+                      digest_inactive_days: Math.min(
+                        90,
+                        Math.max(1, parseInt(e.target.value || '14', 10))
+                      ),
+                    })
+                  }
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Digest delivery hour (gym timezone)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={settings.digest_hour ?? 8}
+                  onChange={(e) =>
+                    update({
+                      digest_hour: Math.min(23, Math.max(0, parseInt(e.target.value || '8', 10))),
+                    })
+                  }
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Slack webhook URL (optional)
+                </label>
+                <input
+                  type="url"
+                  value={settings.digest_slack_webhook_url ?? ''}
+                  onChange={(e) => update({ digest_slack_webhook_url: e.target.value || null })}
+                  placeholder="https://hooks.slack.com/..."
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-300 mb-2">Digest sections</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['leads', 'payments', 'retention', 'classes', 'belts', 'ai'] as const).map(
+                    (key) => (
+                      <label key={key} className="flex items-center gap-2 text-xs text-white/60">
+                        <input
+                          type="checkbox"
+                          checked={settings.digest_sections?.[key] !== false}
+                          onChange={(e) =>
+                            update({
+                              digest_sections: {
+                                ...settings.digest_sections,
+                                [key]: e.target.checked,
+                              },
+                            })
+                          }
+                          className="h-3 w-3 rounded accent-blue-500"
+                        />
+                        {key}
+                      </label>
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          {settings.ai_front_desk_enabled && (
+            <div className="py-3 border-b border-white/10 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">AI persona name</label>
+                <input
+                  type="text"
+                  value={settings.ai_persona_name ?? 'Front Desk'}
+                  onChange={(e) => update({ ai_persona_name: e.target.value || null })}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">AI tone</label>
+                <select
+                  value={settings.ai_tone ?? 'friendly'}
+                  onChange={(e) =>
+                    update({ ai_tone: e.target.value === 'formal' ? 'formal' : 'friendly' })
+                  }
+                  className={inputClass}
+                >
+                  <option value="friendly">Friendly</option>
+                  <option value="formal">Formal</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Supported languages (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={(settings.ai_languages ?? ['en']).join(', ')}
+                  onChange={(e) =>
+                    update({
+                      ai_languages: e.target.value
+                        .split(',')
+                        .map((l) => l.trim())
+                        .filter(Boolean),
+                    })
+                  }
+                  placeholder="en, es"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Twilio phone (inbound SMS)
+                </label>
+                <input
+                  type="tel"
+                  value={settings.twilio_phone ?? ''}
+                  onChange={(e) => update({ twilio_phone: e.target.value || null })}
+                  placeholder="+15551234567"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  AI off-hours message
+                </label>
+                <textarea
+                  value={settings.ai_off_hours_message ?? ''}
+                  onChange={(e) => update({ ai_off_hours_message: e.target.value || null })}
+                  rows={3}
+                  placeholder="Thanks for contacting us! We're currently closed..."
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          )}
           <label className="flex items-center justify-between gap-4 py-3 border-b border-white/10">
             <div>
               <span className="text-gray-300 text-sm">White-label mode</span>

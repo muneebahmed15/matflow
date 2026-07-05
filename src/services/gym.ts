@@ -2,6 +2,7 @@ import { getAdminClient } from '@/lib/supabase/admin';
 import type { Database } from '@/types/database';
 import { ServiceError } from '@/services/errors';
 import { logAuditEvent } from '@/services/audit';
+import { parseDigestSections } from '@/lib/digest-sections';
 
 type GymRow = Database['public']['Tables']['gyms']['Row'];
 
@@ -53,10 +54,22 @@ export type GymSettings = Pick<GymRow, 'id' | 'name' | 'slug' | 'kiosk_enabled'>
   payment_provider: string;
   stripe_only: boolean;
   waiver_retention_days: number | null;
+  digest_inactive_days: number;
+  digest_hour: number;
+  digest_slack_webhook_url: string | null;
+  digest_sections: Record<string, boolean>;
+  ai_off_hours_message: string | null;
+  ai_persona_name: string | null;
+  ai_tone: string;
+  ai_languages: string[];
+  twilio_phone: string | null;
+  digest_frequency: 'daily' | 'weekly';
+  digest_sms_enabled: boolean;
+  digest_sms_phone: string | null;
 };
 
 const GYM_SETTINGS_COLUMNS =
-  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, marketing_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, hero_image_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, google_ads_conversion_id, review_checkin_threshold, require_waiver_for_checkin, timezone, locale, belt_system, belt_custom_order, belt_color_overrides, booking_cancel_hours, class_reminder_hours, hero_ab_enabled, hero_variant_b_headline, hero_variant_b_subheadline, seo_keywords, public_translations, member_required_fields, shop_member_discount_percent, shop_flat_tax_cents, coaches_stripes_only, stripe_tax_enabled, payment_provider, stripe_only, waiver_retention_days';
+  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, marketing_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, hero_image_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, google_ads_conversion_id, review_checkin_threshold, require_waiver_for_checkin, timezone, locale, belt_system, belt_custom_order, belt_color_overrides, booking_cancel_hours, class_reminder_hours, hero_ab_enabled, hero_variant_b_headline, hero_variant_b_subheadline, seo_keywords, public_translations, member_required_fields, shop_member_discount_percent, shop_flat_tax_cents, coaches_stripes_only, stripe_tax_enabled, payment_provider, stripe_only, waiver_retention_days, digest_inactive_days, digest_hour, digest_slack_webhook_url, digest_sections, digest_frequency, digest_sms_enabled, digest_sms_phone, ai_off_hours_message, ai_persona_name, ai_tone, ai_languages, twilio_phone';
 
 function parseGymSettingsRow(data: Record<string, unknown>): GymSettings {
   const customOrder = data.belt_custom_order;
@@ -98,6 +111,42 @@ function parseGymSettingsRow(data: Record<string, unknown>): GymSettings {
               (entry): entry is [string, string] => typeof entry[1] === 'string'
             )
           )
+        : null,
+    digest_inactive_days: Math.min(
+      90,
+      Math.max(1, Number((data as GymSettings).digest_inactive_days ?? 14))
+    ),
+    ai_off_hours_message:
+      typeof (data as GymSettings).ai_off_hours_message === 'string'
+        ? (data as GymSettings).ai_off_hours_message
+        : null,
+    ai_persona_name:
+      typeof (data as GymSettings).ai_persona_name === 'string'
+        ? (data as GymSettings).ai_persona_name
+        : null,
+    ai_tone: (data as GymSettings).ai_tone === 'formal' ? 'formal' : 'friendly',
+    ai_languages: Array.isArray((data as GymSettings).ai_languages)
+      ? ((data as GymSettings).ai_languages as string[]).filter((l) => typeof l === 'string')
+      : ['en'],
+    digest_hour: Math.min(
+      23,
+      Math.max(0, Number((data as GymSettings).digest_hour ?? 8))
+    ),
+    digest_slack_webhook_url:
+      typeof (data as GymSettings).digest_slack_webhook_url === 'string'
+        ? (data as GymSettings).digest_slack_webhook_url
+        : null,
+    digest_sections: parseDigestSections((data as GymSettings).digest_sections),
+    digest_frequency:
+      (data as GymSettings).digest_frequency === 'weekly' ? 'weekly' : 'daily',
+    digest_sms_enabled: Boolean((data as GymSettings).digest_sms_enabled),
+    digest_sms_phone:
+      typeof (data as GymSettings).digest_sms_phone === 'string'
+        ? (data as GymSettings).digest_sms_phone
+        : null,
+    twilio_phone:
+      typeof (data as GymSettings).twilio_phone === 'string'
+        ? (data as GymSettings).twilio_phone
         : null,
   };
 }
@@ -163,6 +212,18 @@ export type UpdateGymSettingsInput = {
   paymentProvider?: string;
   stripeOnly?: boolean;
   waiverRetentionDays?: number | null;
+  digestInactiveDays?: number;
+  digestHour?: number;
+  digestSlackWebhookUrl?: string | null;
+  digestSections?: Record<string, boolean>;
+  aiOffHoursMessage?: string | null;
+  aiPersonaName?: string | null;
+  aiTone?: 'formal' | 'friendly';
+  aiLanguages?: string[];
+  twilioPhone?: string | null;
+  digestFrequency?: 'daily' | 'weekly';
+  digestSmsEnabled?: boolean;
+  digestSmsPhone?: string | null;
 };
 
 export async function updateGymSettings(
@@ -273,6 +334,19 @@ export async function updateGymSettings(
       payment_provider: input.paymentProvider?.trim() || 'stripe',
       stripe_only: input.stripeOnly !== false,
       waiver_retention_days: input.waiverRetentionDays ?? null,
+      digest_inactive_days: Math.min(90, Math.max(1, input.digestInactiveDays ?? 14)),
+      digest_hour: Math.min(23, Math.max(0, input.digestHour ?? 8)),
+      digest_slack_webhook_url: input.digestSlackWebhookUrl?.trim() || null,
+      digest_sections: parseDigestSections(input.digestSections),
+      ai_off_hours_message: input.aiOffHoursMessage?.trim() || null,
+      ai_persona_name: input.aiPersonaName?.trim() || 'Front Desk',
+      ai_tone: input.aiTone === 'formal' ? 'formal' : 'friendly',
+      ai_languages:
+        input.aiLanguages && input.aiLanguages.length > 0 ? input.aiLanguages : ['en'],
+      twilio_phone: input.twilioPhone?.trim() || null,
+      digest_frequency: input.digestFrequency === 'weekly' ? 'weekly' : 'daily',
+      digest_sms_enabled: input.digestSmsEnabled ?? false,
+      digest_sms_phone: input.digestSmsPhone?.trim() || null,
     })
     .eq('id', gymId)
     .select(GYM_SETTINGS_COLUMNS)

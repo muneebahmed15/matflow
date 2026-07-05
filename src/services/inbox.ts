@@ -42,7 +42,7 @@ export async function listInboxItems(gymId: string): Promise<InboxItem[]> {
     .from('ai_conversations')
     .select('id, status, channel, visitor_name, visitor_email, visitor_phone, lead_id, created_at')
     .eq('gym_id', gymId)
-    .eq('status', 'open')
+    .in('status', ['open', 'escalated'])
     .order('created_at', { ascending: false })
     .limit(30);
 

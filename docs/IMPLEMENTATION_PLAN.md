@@ -1,6 +1,6 @@
 # MatsFlow — Master Implementation Plan
 
-> **Status:** Wave 2 & 4 complete · Wave 3 AI partially shipped (front desk + business assistant core)  
+> **Status:** Wave 2, 3 & 4 complete · optional integrations deferred  
 > **Scoring:** `[ ]` Not started · `[~]` Partial · `[x]` Done  
 > **Rule:** Each module has **50+** granular, testable todos. No item ships without schema + service + auth + UI (where applicable).
 
@@ -12,7 +12,7 @@
 |------|-------|--------|
 | **Wave 1** | Foundation schema, CRM notes/contacts, gym branding, public site shell, waiver expiry, class waitlists | East Coast MMA pilot-ready core |
 | **Wave 2** | Payments polish, belt stripes/requirements, migration CSV, marketing email, CRM completion | Revenue + onboarding — **complete** |
-| **Wave 3** | AI chat front desk, business assistant summaries | Differentiation — **core shipped** |
+| **Wave 3** | AI chat front desk, business assistant summaries | Differentiation — **complete** |
 | **Wave 4** | Merch store, multi-location, white-label | Scale — **merchandise module complete** |
 
 ---
@@ -57,7 +57,8 @@ These items are being implemented in the current sprint:
 - [x] Apply migration to Supabase (`npm run db:start` + `npm run db:reset` locally, or `npm run db:push` remote)
 - [x] RLS integration tests for family portal waiver access (requires `SUPABASE_TEST_*`)
 - [x] E2E: waiver blocks check-in until signed (`npm run test:e2e:waiver`)
-- [ ] Remaining todos: Wave 3 AI modules (9–10), optional integrations (Stripe Connect, Printful, Google OAuth)
+- [x] Remaining todos: Wave 3 AI modules (9–10) — **complete** (telephony/social/LLM prose deferred)
+- [ ] Optional integrations: Stripe Connect, Printful, Google OAuth private sheets
 
 ### Wave 2 — Completion (20250704310000_wave2_complete.sql)
 
@@ -86,14 +87,18 @@ These items are being implemented in the current sprint:
 
 - [x] Google Sheets public URL import (`/api/migration/fetch-google-sheet`)
 - [x] Upload validation: size limits, allowed types, PDF magic-byte check
+- [x] Pilot import checklist UI on Migration Center (8.45)
 - [~] Background queue (batched imports exist; full async worker deferred)
 
-### Wave 3 — AI core (existing services + new belt/migration polish)
+### Wave 3 — AI complete (20250704330000 + 20250704340000)
 
-- [x] AI Front Desk: web chat widget, knowledge base, lead capture tools, CRM notes
-- [x] Business Assistant: daily digest cron, snapshots, dashboard widget, insights history
+- [x] AI Front Desk: web chat, knowledge base, lead tools, escalation, CSAT, off-hours, persona/tone
+- [x] Inbound SMS webhook + STOP/START opt-out, TCPA consent log on follow-up
+- [x] AI analytics: resolution rate, avg response time, conversation drill-down
+- [x] Business Assistant: timezone digest hour, extended metrics, snooze/done, Slack webhook
+- [x] Multi-admin digest recipients, section toggles, marketing tips, inactive email drafts
 - [x] Belt order public API + member rank QR verification card
-- Deferred: telephony, social DMs, LLM digest prose, Stripe Connect, Printful
+- Deferred: telephony (9.16–9.20), social DMs (9.24–9.25), email inbound (9.21–9.23), LLM digest prose, SMS digest, usage metering
 
 ---
 

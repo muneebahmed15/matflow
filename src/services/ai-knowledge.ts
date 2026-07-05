@@ -39,6 +39,21 @@ export async function upsertKnowledge(input: {
     .maybeSingle();
 
   if (existing) {
+    const { data: prior } = await admin
+      .from('gym_knowledge')
+      .select('topic, content')
+      .eq('id', existing.id)
+      .single();
+
+    if (prior && prior.content !== content) {
+      await admin.from('gym_knowledge_versions').insert({
+        gym_id: input.gymId,
+        knowledge_id: existing.id,
+        topic: prior.topic,
+        content: prior.content,
+      });
+    }
+
     const { data, error } = await admin
       .from('gym_knowledge')
       .update({ content, updated_at: new Date().toISOString() })

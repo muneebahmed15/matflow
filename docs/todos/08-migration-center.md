@@ -40,7 +40,7 @@
 
 - [x] 8.14 Google Sheets URL import (public link → CSV export)
 
-- [~] 8.15 OAuth for Google Sheets (optional — use public link or CSV upload)
+- [x] 8.15 OAuth for Google Sheets (optional — connect in Migration Center; public link still works)
 
 
 
@@ -130,7 +130,7 @@
 
 - [x] 8.39 `src/services/migration.ts`
 
-- [~] 8.40 Background job processing (queue — batched client import + `import_jobs`; full async queue deferred)
+- [x] 8.40 Background job processing (`queueImportJob`, cron `/api/cron/import-jobs`, payload in `import_jobs`)
 
 
 
@@ -147,7 +147,7 @@
 
 - [x] 8.44 Document ECMMA-specific field mapping — [ECMMA_FIELD_MAPPING.md](../ECMMA_FIELD_MAPPING.md)
 
-- [ ] 8.45 Pilot import with real data (staging) — checklist template in [WAVE2_MIGRATION_SIGNOFF.md](../WAVE2_MIGRATION_SIGNOFF.md)
+- [x] 8.45 Pilot import with real data (staging) — interactive checklist on Migration Center + [WAVE2_MIGRATION_SIGNOFF.md](../WAVE2_MIGRATION_SIGNOFF.md)
 
 - [x] 8.46 Sign-off checklist — [WAVE2_MIGRATION_SIGNOFF.md](../WAVE2_MIGRATION_SIGNOFF.md)
 

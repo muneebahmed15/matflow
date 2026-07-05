@@ -19,6 +19,8 @@ export type Database = {
           channel: string
           closed_at: string | null
           created_at: string
+          csat_rating: number | null
+          escalated_at: string | null
           gym_id: string
           id: string
           lead_id: string | null
@@ -33,6 +35,8 @@ export type Database = {
           channel?: string
           closed_at?: string | null
           created_at?: string
+          csat_rating?: number | null
+          escalated_at?: string | null
           gym_id: string
           id?: string
           lead_id?: string | null
@@ -47,6 +51,8 @@ export type Database = {
           channel?: string
           closed_at?: string | null
           created_at?: string
+          csat_rating?: number | null
+          escalated_at?: string | null
           gym_id?: string
           id?: string
           lead_id?: string | null
@@ -505,6 +511,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "business_snapshots_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      digest_action_states: {
+        Row: {
+          action_key: string
+          gym_id: string
+          id: string
+          snooze_until: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          action_key: string
+          gym_id: string
+          id?: string
+          snooze_until?: string | null
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          action_key?: string
+          gym_id?: string
+          id?: string
+          snooze_until?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_action_states_gym_id_fkey"
             columns: ["gym_id"]
             isOneToOne: false
             referencedRelation: "gyms"
@@ -1537,6 +1578,41 @@ export type Database = {
           },
         ]
       }
+      google_sheets_connections: {
+        Row: {
+          access_token: string | null
+          connected_at: string
+          gym_id: string
+          refresh_token: string | null
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          connected_at?: string
+          gym_id: string
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          connected_at?: string
+          gym_id?: string
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_sheets_connections_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: true
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gym_coaches: {
         Row: {
           belt_rank: string | null
@@ -1707,6 +1783,48 @@ export type Database = {
             columns: ["gym_id"]
             isOneToOne: false
             referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gym_knowledge_versions: {
+        Row: {
+          content: string
+          created_at: string
+          gym_id: string
+          id: string
+          knowledge_id: string
+          topic: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          gym_id: string
+          id?: string
+          knowledge_id: string
+          topic: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          gym_id?: string
+          id?: string
+          knowledge_id?: string
+          topic?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gym_knowledge_versions_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gym_knowledge_versions_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "gym_knowledge"
             referencedColumns: ["id"]
           },
         ]
@@ -1883,7 +2001,10 @@ export type Database = {
           address_state: string | null
           address_zip: string | null
           ai_front_desk_enabled: boolean
+          ai_languages: string[]
+          ai_off_hours_message: string | null
           ai_persona_name: string | null
+          ai_tone: string
           belt_custom_order: Json | null
           belt_system: string
           booking_cancel_hours: number
@@ -1893,6 +2014,13 @@ export type Database = {
           created_at: string
           custom_domain: string | null
           daily_digest_enabled: boolean
+          digest_hour: number
+          digest_inactive_days: number
+          digest_sections: Json
+          digest_slack_webhook_url: string | null
+          digest_frequency: string
+          digest_sms_enabled: boolean
+          digest_sms_phone: string | null
           ga4_measurement_id: string | null
           google_place_id: string | null
           google_ads_conversion_id: string | null
@@ -1940,7 +2068,10 @@ export type Database = {
           address_state?: string | null
           address_zip?: string | null
           ai_front_desk_enabled?: boolean
+          ai_languages?: string[]
+          ai_off_hours_message?: string | null
           ai_persona_name?: string | null
+          ai_tone?: string
           belt_custom_order?: Json | null
           belt_system?: string
           booking_cancel_hours?: number
@@ -1950,6 +2081,13 @@ export type Database = {
           created_at?: string
           custom_domain?: string | null
           daily_digest_enabled?: boolean
+          digest_hour?: number
+          digest_inactive_days?: number
+          digest_sections?: Json
+          digest_slack_webhook_url?: string | null
+          digest_frequency?: string
+          digest_sms_enabled?: boolean
+          digest_sms_phone?: string | null
           ga4_measurement_id?: string | null
           google_place_id?: string | null
           id?: string
@@ -1987,7 +2125,10 @@ export type Database = {
           address_state?: string | null
           address_zip?: string | null
           ai_front_desk_enabled?: boolean
+          ai_languages?: string[]
+          ai_off_hours_message?: string | null
           ai_persona_name?: string | null
+          ai_tone?: string
           belt_custom_order?: Json | null
           belt_system?: string
           booking_cancel_hours?: number
@@ -1997,6 +2138,13 @@ export type Database = {
           created_at?: string
           custom_domain?: string | null
           daily_digest_enabled?: boolean
+          digest_hour?: number
+          digest_inactive_days?: number
+          digest_sections?: Json
+          digest_slack_webhook_url?: string | null
+          digest_frequency?: string
+          digest_sms_enabled?: boolean
+          digest_sms_phone?: string | null
           ga4_measurement_id?: string | null
           google_place_id?: string | null
           id?: string
@@ -2039,6 +2187,9 @@ export type Database = {
           gym_id: string
           id: string
           import_type: string
+          payload: Json | null
+          progress_offset: number
+          queue_options: Json | null
           rolled_back_at: string | null
           status: string
           success_rows: number
@@ -2053,6 +2204,9 @@ export type Database = {
           gym_id: string
           id?: string
           import_type: string
+          payload?: Json | null
+          progress_offset?: number
+          queue_options?: Json | null
           rolled_back_at?: string | null
           status?: string
           success_rows?: number
@@ -2067,6 +2221,9 @@ export type Database = {
           gym_id?: string
           id?: string
           import_type?: string
+          payload?: Json | null
+          progress_offset?: number
+          queue_options?: Json | null
           rolled_back_at?: string | null
           status?: string
           success_rows?: number
@@ -2879,6 +3036,32 @@ export type Database = {
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_opt_outs: {
+        Row: {
+          gym_id: string
+          opted_out_at: string
+          phone: string
+        }
+        Insert: {
+          gym_id: string
+          opted_out_at?: string
+          phone: string
+        }
+        Update: {
+          gym_id?: string
+          opted_out_at?: string
+          phone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_opt_outs_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
             referencedColumns: ["id"]
           },
         ]

@@ -24,11 +24,62 @@ import {
   importMembersBatch,
   importLeadsBatch,
   importStripeCustomerMappings,
+  queueImportJob,
   IMPORT_BATCH_SIZE,
   type ImportJob,
   type DuplicateEmailStrategy,
 } from '@/services/migration';
 import { type ActionResult, toActionError } from './_shared';
+import { getGoogleSheetsConnectionStatus } from '@/services/google-sheets-oauth';
+
+export async function getGoogleSheetsStatusAction(): Promise<
+  ActionResult<{ connected: boolean; oauthUrl: string | null }>
+> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    return { ok: true, data: await getGoogleSheetsConnectionStatus(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function queueImportJobAction(input: {
+  importType: 'members' | 'leads';
+  rows: Record<string, string>[];
+  fileName?: string;
+  duplicateEmailStrategy?: DuplicateEmailStrategy;
+}): Promise<ActionResult<{ jobId: string }>> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const limit = await checkRateLimit(`import:${auth.gymId}`, 5, 60 * 60 * 1000);
+    if (!limit.allowed) {
+      return { ok: false, error: 'Import rate limit exceeded. Try again in an hour.' };
+    }
+
+    const schema = input.importType === 'members' ? memberImportRowSchema : leadImportRowSchema;
+    const { rows: validatedRows, errors: schemaErrors } = validateImportRows(schema, input.rows);
+    if (schemaErrors.length > 0 && validatedRows.length === 0) {
+      return { ok: false, error: schemaErrors[0]?.message ?? 'Validation failed' };
+    }
+
+    const jobId = await queueImportJob({
+      gymId: auth.gymId,
+      importType: input.importType,
+      rows: validatedRows,
+      fileName: input.fileName,
+      createdBy: auth.user.id,
+      duplicateEmailStrategy: input.duplicateEmailStrategy,
+    });
+
+    revalidatePath('/migration');
+    if (input.importType === 'members') revalidatePath('/members');
+    if (input.importType === 'leads') revalidatePath('/leads');
+
+    return { ok: true, data: { jobId } };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
 
 export async function rollbackImportJobAction(jobId: string): Promise<
   ActionResult<{ removed: number }>

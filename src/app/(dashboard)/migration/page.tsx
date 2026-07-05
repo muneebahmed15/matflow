@@ -5,6 +5,7 @@ import { useAsyncMount } from '@/hooks/use-async-mount';
 import { Upload, Download, FileWarning } from 'lucide-react';
 import {
   finalizeImportJobAction,
+  getGoogleSheetsStatusAction,
   getImportErrorsAction,
   importAttendanceCsvAction,
   importBeltHistoryCsvAction,
@@ -16,6 +17,7 @@ import {
   importSubscriptionsCsvAction,
   IMPORT_BATCH_SIZE,
   listImportJobsAction,
+  queueImportJobAction,
   rollbackImportJobAction,
   startImportJobAction,
   type DuplicateEmailStrategy,
@@ -40,6 +42,7 @@ import { listWaiversAction } from '@/app/(dashboard)/actions';
 import type { Waiver } from '@/services/waivers';
 import MigrationStepper, { type MigrationStep } from '@/components/migration/MigrationStepper';
 import CsvColumnMapper from '@/components/migration/CsvColumnMapper';
+import PilotChecklist from '@/components/migration/PilotChecklist';
 
 const TEMPLATES: Record<ImportType, string> = {
   members: MEMBER_IMPORT_TEMPLATE,
@@ -75,10 +78,16 @@ export default function MigrationPage() {
   const [bulkUploading, setBulkUploading] = useState(false);
   const [googleSheetUrl, setGoogleSheetUrl] = useState('');
   const [fetchingSheet, setFetchingSheet] = useState(false);
+  const [sheetsStatus, setSheetsStatus] = useState<{ connected: boolean; oauthUrl: string | null } | null>(
+    null
+  );
+  const [queueing, setQueueing] = useState(false);
 
   const load = async () => {
     const res = await listImportJobsAction();
     if (res.ok && res.data) setJobs(res.data);
+    const sheetsRes = await getGoogleSheetsStatusAction();
+    if (sheetsRes.ok && sheetsRes.data) setSheetsStatus(sheetsRes.data);
     const waiverRes = await listWaiversAction();
     if (waiverRes.ok && waiverRes.data) {
       setWaivers(waiverRes.data.filter((w) => w.is_active));
@@ -330,6 +339,30 @@ export default function MigrationPage() {
     void load();
   };
 
+  const handleBackgroundCommit = async () => {
+    if (parsedRows.length === 0 || (importType !== 'members' && importType !== 'leads')) return;
+    setQueueing(true);
+    setResult(null);
+
+    const res = await queueImportJobAction({
+      importType,
+      rows: parsedRows,
+      fileName,
+      duplicateEmailStrategy: importType === 'members' ? duplicateStrategy : undefined,
+    });
+
+    setQueueing(false);
+    if (!res.ok) {
+      setResult(`Error: ${res.error}`);
+      return;
+    }
+    setResult(
+      `Queued background import (job ${res.data?.jobId?.slice(0, 8)}…). Processing runs every few minutes — check Import History for progress.`
+    );
+    resetUpload();
+    void load();
+  };
+
   const downloadTemplate = () => {
     const tpl = TEMPLATES[importType];
     const blob = new Blob([tpl], { type: 'text/csv' });
@@ -461,7 +494,19 @@ export default function MigrationPage() {
         </label>
 
         <div className="border-t border-white/10 pt-4 space-y-3">
-          <p className="text-white/50 text-sm">Or import from Google Sheets (public link)</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-white/50 text-sm">Or import from Google Sheets</p>
+            {sheetsStatus?.connected ? (
+              <span className="text-xs text-green-400">Private sheets connected</span>
+            ) : sheetsStatus?.oauthUrl ? (
+              <a
+                href={sheetsStatus.oauthUrl}
+                className="text-xs text-blue-400 hover:underline"
+              >
+                Connect Google account
+              </a>
+            ) : null}
+          </div>
           <input
             type="url"
             value={googleSheetUrl}
@@ -479,7 +524,7 @@ export default function MigrationPage() {
             {fetchingSheet ? 'Fetching sheet…' : 'Import from Google Sheets'}
           </button>
           <p className="text-white/30 text-xs">
-            Sheet must be shared as “Anyone with the link can view”. OAuth for private sheets is not required for public links.
+            Public sheets work with link sharing. Connect Google above for private sheets, or upload CSV.
           </p>
         </div>
 
@@ -515,13 +560,25 @@ export default function MigrationPage() {
           </div>
         )}
         {parsedRows.length > 0 && mappingConfirmed && !committing && (
-          <button
-            onClick={() => void handleCommit()}
-            disabled={Boolean(dryRunResult?.startsWith('Error'))}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition"
-          >
-            Commit import ({parsedRows.length} rows)
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={() => void handleCommit()}
+              disabled={Boolean(dryRunResult?.startsWith('Error')) || queueing}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition"
+            >
+              Commit import ({parsedRows.length} rows)
+            </button>
+            {(importType === 'members' || importType === 'leads') && parsedRows.length > 100 && (
+              <button
+                type="button"
+                onClick={() => void handleBackgroundCommit()}
+                disabled={Boolean(dryRunResult?.startsWith('Error')) || queueing}
+                className="w-full bg-white/10 hover:bg-white/15 disabled:opacity-50 text-white font-medium py-2.5 rounded-xl text-sm transition"
+              >
+                {queueing ? 'Queueing…' : `Run in background (${parsedRows.length} rows)`}
+              </button>
+            )}
+          </div>
         )}
         {result && <p className="text-sm text-green-400/80">{result}</p>}
       </div>
@@ -620,6 +677,9 @@ export default function MigrationPage() {
                 <p className="text-white/30 text-xs">
                   {new Date(j.created_at).toLocaleString()} · {j.success_rows}/{j.total_rows} ok
                   {j.error_rows > 0 && ` · ${j.error_rows} errors`}
+                  {(j.status === 'pending' || j.status === 'processing') &&
+                    j.total_rows > 0 &&
+                    ` · queued ${j.progress_offset ?? 0}/${j.total_rows}`}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -646,6 +706,9 @@ export default function MigrationPage() {
           ))}
         </div>
       )}
+      <div className="mt-8">
+        <PilotChecklist />
+      </div>
     </div>
   );
 }
