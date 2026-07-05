@@ -835,10 +835,10 @@ export async function sendVoiceBriefing(gymId: string): Promise<boolean> {
       ? `Good morning from ${gym.name}. Today's priorities: ${lines.join('. ')}.`
       : `Good morning from ${gym.name}. No urgent actions today.`;
 
-  const { sendSms } = await import('@/lib/sms/twilio');
-  await sendSms({
+  const { sendGymTextMessage } = await import('@/lib/messaging/gym-message');
+  await sendGymTextMessage({
+    gymId,
     to: gym.voice_briefing_phone,
-    from: gym.twilio_phone ?? undefined,
     body: `[Voice briefing] ${script}`,
   });
 

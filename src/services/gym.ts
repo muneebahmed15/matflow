@@ -89,10 +89,14 @@ export type GymSettings = Pick<GymRow, 'id' | 'name' | 'slug' | 'kiosk_enabled'>
   printful_store_id: string | null;
   voice_briefing_enabled: boolean;
   voice_briefing_phone: string | null;
+  whatsapp_enabled: boolean;
+  whatsapp_phone_number_id: string | null;
+  whatsapp_business_account_id: string | null;
+  whatsapp_display_phone: string | null;
 };
 
 const GYM_SETTINGS_COLUMNS =
-  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, marketing_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, hero_image_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, google_ads_conversion_id, review_checkin_threshold, require_waiver_for_checkin, timezone, locale, belt_system, belt_custom_order, belt_color_overrides, booking_cancel_hours, class_reminder_hours, hero_ab_enabled, hero_variant_b_headline, hero_variant_b_subheadline, seo_keywords, public_translations, member_required_fields, shop_member_discount_percent, shop_flat_tax_cents, coaches_stripes_only, stripe_tax_enabled, payment_provider, stripe_only, waiver_retention_days, digest_inactive_days, digest_hour, digest_slack_webhook_url, digest_sections, digest_frequency, digest_sms_enabled, digest_sms_phone, ai_off_hours_message, ai_persona_name, ai_tone, ai_languages, twilio_phone, ai_monthly_message_limit, ai_voice_enabled, ai_voice_transfer_keyword, ai_voice_record_calls, staff_transfer_phone, meta_page_id, meta_page_access_token, meta_verify_token, meta_instagram_id, inbound_email_address, ai_email_auto_reply, belt_graduation_preset, nfc_display_enabled, docusign_export_enabled, docusign_webhook_url, buffer_access_token, buffer_profile_ids, stripe_connect_account_id, stripe_connect_onboarded, printful_api_key, printful_store_id, voice_briefing_enabled, voice_briefing_phone';
+  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, marketing_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, hero_image_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, google_ads_conversion_id, review_checkin_threshold, require_waiver_for_checkin, timezone, locale, belt_system, belt_custom_order, belt_color_overrides, booking_cancel_hours, class_reminder_hours, hero_ab_enabled, hero_variant_b_headline, hero_variant_b_subheadline, seo_keywords, public_translations, member_required_fields, shop_member_discount_percent, shop_flat_tax_cents, coaches_stripes_only, stripe_tax_enabled, payment_provider, stripe_only, waiver_retention_days, digest_inactive_days, digest_hour, digest_slack_webhook_url, digest_sections, digest_frequency, digest_sms_enabled, digest_sms_phone, ai_off_hours_message, ai_persona_name, ai_tone, ai_languages, twilio_phone, ai_monthly_message_limit, ai_voice_enabled, ai_voice_transfer_keyword, ai_voice_record_calls, staff_transfer_phone, meta_page_id, meta_page_access_token, meta_verify_token, meta_instagram_id, inbound_email_address, ai_email_auto_reply, belt_graduation_preset, nfc_display_enabled, docusign_export_enabled, docusign_webhook_url, buffer_access_token, buffer_profile_ids, stripe_connect_account_id, stripe_connect_onboarded, printful_api_key, printful_store_id, voice_briefing_enabled, voice_briefing_phone, whatsapp_enabled, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_display_phone';
 
 function parseGymSettingsRow(data: Record<string, unknown>): GymSettings {
   const customOrder = data.belt_custom_order;
@@ -239,6 +243,19 @@ function parseGymSettingsRow(data: Record<string, unknown>): GymSettings {
       typeof (data as GymSettings).voice_briefing_phone === 'string'
         ? (data as GymSettings).voice_briefing_phone
         : null,
+    whatsapp_enabled: Boolean((data as GymSettings).whatsapp_enabled),
+    whatsapp_phone_number_id:
+      typeof (data as GymSettings).whatsapp_phone_number_id === 'string'
+        ? (data as GymSettings).whatsapp_phone_number_id
+        : null,
+    whatsapp_business_account_id:
+      typeof (data as GymSettings).whatsapp_business_account_id === 'string'
+        ? (data as GymSettings).whatsapp_business_account_id
+        : null,
+    whatsapp_display_phone:
+      typeof (data as GymSettings).whatsapp_display_phone === 'string'
+        ? (data as GymSettings).whatsapp_display_phone
+        : null,
   };
 }
 
@@ -336,6 +353,10 @@ export type UpdateGymSettingsInput = {
   printfulStoreId?: string | null;
   voiceBriefingEnabled?: boolean;
   voiceBriefingPhone?: string | null;
+  whatsappEnabled?: boolean;
+  whatsappPhoneNumberId?: string | null;
+  whatsappBusinessAccountId?: string | null;
+  whatsappDisplayPhone?: string | null;
 };
 
 export async function updateGymSettings(
@@ -480,6 +501,10 @@ export async function updateGymSettings(
       printful_store_id: input.printfulStoreId?.trim() || null,
       voice_briefing_enabled: input.voiceBriefingEnabled ?? false,
       voice_briefing_phone: input.voiceBriefingPhone?.trim() || null,
+      whatsapp_enabled: input.whatsappEnabled ?? false,
+      whatsapp_phone_number_id: input.whatsappPhoneNumberId?.trim() || null,
+      whatsapp_business_account_id: input.whatsappBusinessAccountId?.trim() || null,
+      whatsapp_display_phone: input.whatsappDisplayPhone?.trim() || null,
     })
     .eq('id', gymId)
     .select(GYM_SETTINGS_COLUMNS)

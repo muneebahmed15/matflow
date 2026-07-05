@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
-import { handleInboundMetaMessage } from '@/services/ai-front-desk';
+import {
+  handleInboundMetaMessage,
+  handleInboundWhatsApp,
+} from '@/services/ai-front-desk';
+import { parseWhatsAppWebhook, sendWhatsAppText } from '@/lib/whatsapp/meta';
 import { logger } from '@/lib/logger';
 
 export async function GET(req: NextRequest) {
@@ -26,8 +30,66 @@ export async function GET(req: NextRequest) {
   return new NextResponse(challenge, { status: 200 });
 }
 
+type GymMetaRow = {
+  id: string;
+  meta_page_id: string | null;
+  meta_page_access_token: string | null;
+  whatsapp_enabled: boolean;
+  whatsapp_phone_number_id: string | null;
+  meta_instagram_id: string | null;
+};
+
+async function findGymForWhatsApp(phoneNumberId: string): Promise<GymMetaRow | null> {
+  const admin = getAdminClient();
+  const { data } = await admin
+    .from('gyms')
+    .select(
+      'id, meta_page_id, meta_page_access_token, whatsapp_enabled, whatsapp_phone_number_id, meta_instagram_id'
+    )
+    .eq('whatsapp_phone_number_id', phoneNumberId)
+    .eq('whatsapp_enabled', true)
+    .not('meta_page_access_token', 'is', null)
+    .maybeSingle();
+
+  return data as GymMetaRow | null;
+}
+
 export async function POST(req: NextRequest) {
-  const body = (await req.json()) as {
+  const body = await req.json();
+
+  if (body.object === 'whatsapp_business_account') {
+    const admin = getAdminClient();
+
+    for (const message of parseWhatsAppWebhook(body)) {
+      const gym = await findGymForWhatsApp(message.phoneNumberId);
+      if (!gym?.meta_page_access_token) continue;
+
+      try {
+        const { reply } = await handleInboundWhatsApp({
+          gymId: gym.id,
+          from: message.from,
+          body: message.text,
+        });
+
+        if (reply) {
+          await sendWhatsAppText({
+            config: {
+              phoneNumberId: message.phoneNumberId,
+              accessToken: gym.meta_page_access_token,
+            },
+            to: message.from,
+            body: reply,
+          });
+        }
+      } catch (err) {
+        logger.warn({ err, gymId: gym.id }, 'WhatsApp webhook handler failed');
+      }
+    }
+
+    return NextResponse.json({ ok: true });
+  }
+
+  const payload = body as {
     object?: string;
     entry?: Array<{
       messaging?: Array<{
@@ -37,13 +99,13 @@ export async function POST(req: NextRequest) {
     }>;
   };
 
-  if (body.object !== 'page') {
+  if (payload.object !== 'page') {
     return NextResponse.json({ ok: true });
   }
 
   const admin = getAdminClient();
 
-  for (const entry of body.entry ?? []) {
+  for (const entry of payload.entry ?? []) {
     for (const event of entry.messaging ?? []) {
       const senderId = event.sender?.id;
       const text = event.message?.text;
@@ -51,7 +113,7 @@ export async function POST(req: NextRequest) {
 
       const { data: gyms } = await admin
         .from('gyms')
-        .select('id, meta_page_id')
+        .select('id, meta_page_id, meta_page_access_token')
         .not('meta_page_access_token', 'is', null);
 
       const gym = gyms?.find((g) => g.meta_page_id);

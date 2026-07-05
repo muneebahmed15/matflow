@@ -14,12 +14,12 @@
 - [x] 9.9 Human handoff button (contact page link)
 - [x] 9.10 Business hours auto-message
 
-## SMS
-- [x] 9.11 Twilio integration (outbound follow-up SMS)
-- [x] 9.12 Inbound SMS webhook (`/api/twilio/sms`)
-- [x] 9.13 Outbound SMS with TCPA consent tracking (`sms_consent_log` on follow-up)
-- [x] 9.14 Opt-out handling (STOP/START)
-- [x] 9.15 Phone number per gym (`twilio_phone` in Settings + inbound SMS routing)
+## SMS / WhatsApp
+- [x] 9.11 WhatsApp Business integration (outbound follow-up via Cloud API)
+- [x] 9.12 Inbound WhatsApp webhook (`/api/meta/webhook`, object `whatsapp_business_account`)
+- [x] 9.13 Outbound messages with TCPA consent tracking (`sms_consent_log` on follow-up)
+- [x] 9.14 Opt-out handling (STOP/START on WhatsApp)
+- [x] 9.15 WhatsApp phone number per gym (`whatsapp_phone_number_id` in Settings)
 
 ## Phone
 - [x] 9.16 Twilio Voice integration (`/api/twilio/voice` + TwiML gather/transfer)

@@ -6,7 +6,7 @@ import { streamLlmReply } from '@/lib/ai/llm-stream';
 import { moderateUserInput, MODERATION_BLOCK_MESSAGE } from '@/lib/ai/moderation';
 import { assertAiUsageWithinLimit, recordAiUsage } from '@/lib/ai/usage-metering';
 import { createLead } from '@/services/leads';
-import { sendSms } from '@/lib/sms/twilio';
+import { sendGymTextMessage } from '@/lib/messaging/gym-message';
 import { sendTransactionalEmail } from '@/lib/email/resend';
 import { getPublicEnv } from '@/lib/env';
 import { defaultOffHoursMessage, isGymLikelyOpen } from '@/lib/ai-business-hours';
@@ -445,9 +445,9 @@ export async function sendChatSmsFollowUp(conversationId: string): Promise<void>
     .single();
   const trialUrl = `${getPublicEnv().NEXT_PUBLIC_APP_URL}/g/${gym?.slug}/trial`;
 
-  await sendSms({
+  await sendGymTextMessage({
+    gymId: conv.gym_id,
     to: conv.visitor_phone,
-    from: gym?.twilio_phone ?? undefined,
     body: `Thanks for chatting with ${gym?.name}! Book your free trial anytime: ${trialUrl} Reply STOP to opt out.`,
   });
 
@@ -638,6 +638,105 @@ export async function handleInboundSms(input: {
     // best-effort CRM logging
   }
 
+  return { reply };
+}
+
+export async function handleInboundWhatsApp(input: {
+  gymId: string;
+  from: string;
+  body: string;
+}): Promise<{ reply?: string }> {
+  const admin = getAdminClient();
+  const phone = input.from.replace(/\D/g, '');
+  const body = input.body.trim();
+  const upper = body.toUpperCase();
+
+  if (upper === 'STOP' || upper === 'UNSUBSCRIBE') {
+    await admin.from('sms_opt_outs').upsert(
+      { gym_id: input.gymId, phone, opted_out_at: new Date().toISOString() },
+      { onConflict: 'gym_id,phone' }
+    );
+    await admin.from('sms_consent_log').insert({
+      gym_id: input.gymId,
+      phone,
+      consented: false,
+      source: 'whatsapp_stop',
+    });
+    return { reply: 'You have been unsubscribed. Reply START to opt back in.' };
+  }
+
+  if (upper === 'START') {
+    await admin.from('sms_opt_outs').delete().eq('gym_id', input.gymId).eq('phone', phone);
+    return { reply: 'You are opted back in to messages from us.' };
+  }
+
+  const { data: gym } = await admin
+    .from('gyms')
+    .select('ai_front_desk_enabled')
+    .eq('id', input.gymId)
+    .maybeSingle();
+
+  if (!gym?.ai_front_desk_enabled) {
+    return { reply: 'Thanks for your message. A team member will follow up soon.' };
+  }
+
+  const { data: conv } = await admin
+    .from('ai_conversations')
+    .insert({
+      gym_id: input.gymId,
+      channel: 'whatsapp',
+      status: 'open',
+      visitor_phone: phone,
+    })
+    .select('id')
+    .single();
+
+  if (!conv) return {};
+
+  const { reply } = await sendWebChatMessage(conv.id, body);
+
+  try {
+    const { createCrmNote } = await import('@/services/crm-notes');
+    const { data: existingLead } = await admin
+      .from('leads')
+      .select('id')
+      .eq('gym_id', input.gymId)
+      .eq('phone', phone)
+      .maybeSingle();
+
+    const leadId =
+      existingLead?.id ??
+      (
+        await (async () => {
+          const { createLead } = await import('@/services/leads');
+          const lead = await createLead({
+            gymId: input.gymId,
+            firstName: 'WhatsApp',
+            lastName: 'Visitor',
+            phone,
+            source: 'whatsapp',
+            skipAutomation: true,
+            smsConsent: true,
+          });
+          await admin
+            .from('ai_conversations')
+            .update({ lead_id: lead.id, visitor_phone: phone })
+            .eq('id', conv.id);
+          return lead.id;
+        })()
+      );
+
+    await createCrmNote({
+      gymId: input.gymId,
+      leadId,
+      noteType: 'system',
+      body: `Inbound WhatsApp: ${body.slice(0, 500)}`,
+    });
+  } catch {
+    // best-effort CRM logging
+  }
+
+  await recordAiUsage({ gymId: input.gymId, channel: 'whatsapp' });
   return { reply };
 }
 

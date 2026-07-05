@@ -16,7 +16,7 @@ import { parseDigestSections } from '@/lib/digest-sections';
 import { shouldSendDigest } from '@/lib/digest-schedule';
 import { summarizeDigestWithLlm } from '@/lib/digest-llm-summary';
 import { sendTransactionalEmail } from '@/lib/email/resend';
-import { sendSms } from '@/lib/sms/twilio';
+import { sendGymTextMessage } from '@/lib/messaging/gym-message';
 import { logger } from '@/lib/logger';
 
 async function postSlackDigest(webhookUrl: string, gymName: string, lines: string[]): Promise<void> {
@@ -90,7 +90,8 @@ export async function GET(req: NextRequest) {
       const smsPhone = await getDigestSmsPhone(gym.id);
       if (smsPhone) {
         try {
-          await sendSms({
+          await sendGymTextMessage({
+            gymId: gym.id,
             to: smsPhone,
             body: buildDigestSmsBody(gym.name, recommendations),
           });

@@ -1,6 +1,6 @@
 import { getAdminClient } from '@/lib/supabase/admin';
 import { sendTransactionalEmail } from '@/lib/email/resend';
-import { sendSms } from '@/lib/sms/twilio';
+import { sendGymTextMessage } from '@/lib/messaging/gym-message';
 import { getPublicEnv } from '@/lib/env';
 import { logger } from '@/lib/logger';
 
@@ -145,7 +145,8 @@ async function sendLeadWelcomeSms(gym: GymRow, lead: LeadRow): Promise<void> {
   }
 
   try {
-    await sendSms({
+    await sendGymTextMessage({
+      gymId: gym.id,
       to: lead.phone,
       body: `Hi ${lead.first_name}! Thanks for reaching out to ${gym.name}. We'll text you shortly to confirm your free trial. Reply STOP to opt out.`,
     });
@@ -249,7 +250,8 @@ export async function sendTrialReminders(): Promise<{ processed: number }> {
 
     if (lead.phone && lead.sms_consent) {
       try {
-        await sendSms({
+        await sendGymTextMessage({
+          gymId: lead.gym_id,
           to: lead.phone,
           body: `Reminder from ${gym?.name}: your free trial is tomorrow! See you on the mats. Reply STOP to opt out.`,
         });

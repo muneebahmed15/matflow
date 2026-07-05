@@ -1,6 +1,6 @@
 import { getAdminClient } from '@/lib/supabase/admin';
 import { ServiceError } from '@/services/errors';
-import { sendSms } from '@/lib/sms/twilio';
+import { sendGymTextMessage } from '@/lib/messaging/gym-message';
 import { dedupeAudience, audienceStatusFilter } from '@/services/marketing';
 import { canSendMarketingSms } from '@/lib/marketing-consent';
 
@@ -100,7 +100,7 @@ export async function sendSmsCampaign(gymId: string, campaignId: string): Promis
 
   for (const phone of phones) {
     try {
-      await sendSms({ to: phone, body: campaign.body });
+      await sendGymTextMessage({ gymId, to: phone, body: campaign.body });
       sent += 1;
     } catch {
       // Continue sending to remaining recipients.

@@ -135,6 +135,10 @@ export default function SettingsPage() {
       printfulStoreId: settings.printful_store_id,
       voiceBriefingEnabled: settings.voice_briefing_enabled,
       voiceBriefingPhone: settings.voice_briefing_phone,
+      whatsappEnabled: settings.whatsapp_enabled,
+      whatsappPhoneNumberId: settings.whatsapp_phone_number_id,
+      whatsappBusinessAccountId: settings.whatsapp_business_account_id,
+      whatsappDisplayPhone: settings.whatsapp_display_phone,
     })
     setSaving(false)
     if (!result.ok) {
@@ -1001,17 +1005,51 @@ export default function SettingsPage() {
                   className={inputClass}
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Twilio phone (inbound SMS)
+              <div className="pt-2 border-t border-white/10 space-y-3">
+                <label className="flex items-center justify-between gap-4 py-2">
+                  <div>
+                    <span className="text-gray-300 text-sm">WhatsApp Business</span>
+                    <p className="text-white/30 text-xs">Primary channel for AI chat follow-ups, campaigns, and digests</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={settings.whatsapp_enabled}
+                    onChange={(e) => update({ whatsapp_enabled: e.target.checked })}
+                    className="h-4 w-4 rounded accent-blue-500"
+                  />
                 </label>
-                <input
-                  type="tel"
-                  value={settings.twilio_phone ?? ''}
-                  onChange={(e) => update({ twilio_phone: e.target.value || null })}
-                  placeholder="+15551234567"
-                  className={inputClass}
-                />
+                {settings.whatsapp_enabled && (
+                  <>
+                    <input
+                      value={settings.whatsapp_phone_number_id ?? ''}
+                      onChange={(e) => update({ whatsapp_phone_number_id: e.target.value || null })}
+                      placeholder="WhatsApp Phone Number ID (Meta dashboard)"
+                      className={inputClass}
+                    />
+                    <input
+                      value={settings.whatsapp_business_account_id ?? ''}
+                      onChange={(e) =>
+                        update({ whatsapp_business_account_id: e.target.value || null })
+                      }
+                      placeholder="WhatsApp Business Account ID"
+                      className={inputClass}
+                    />
+                    <input
+                      value={settings.whatsapp_display_phone ?? ''}
+                      onChange={(e) => update({ whatsapp_display_phone: e.target.value || null })}
+                      placeholder="Display phone (+15551234567)"
+                      className={inputClass}
+                    />
+                    {origin && (
+                      <p className="text-white/30 text-xs">
+                        Webhook URL: {origin}/api/meta/webhook — use the Meta verify token below.
+                      </p>
+                    )}
+                    <p className="text-white/30 text-xs">
+                      Uses your Meta access token below. Subscribe to the WhatsApp Business Account in Meta App Dashboard.
+                    </p>
+                  </>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
@@ -1050,6 +1088,13 @@ export default function SettingsPage() {
               </label>
               {settings.ai_voice_enabled && (
                 <>
+                  <input
+                    type="tel"
+                    value={settings.twilio_phone ?? ''}
+                    onChange={(e) => update({ twilio_phone: e.target.value || null })}
+                    placeholder="Twilio voice number (+15551234567)"
+                    className={inputClass}
+                  />
                   <input
                     value={settings.staff_transfer_phone ?? ''}
                     onChange={(e) => update({ staff_transfer_phone: e.target.value || null })}

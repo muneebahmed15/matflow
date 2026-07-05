@@ -177,6 +177,10 @@ export async function updateGymSettingsAction(input: {
   printfulStoreId?: string | null;
   voiceBriefingEnabled?: boolean;
   voiceBriefingPhone?: string | null;
+  whatsappEnabled?: boolean;
+  whatsappPhoneNumberId?: string | null;
+  whatsappBusinessAccountId?: string | null;
+  whatsappDisplayPhone?: string | null;
 }): Promise<ActionResult<GymSettings>> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });

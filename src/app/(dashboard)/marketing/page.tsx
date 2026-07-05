@@ -534,7 +534,7 @@ export default function MarketingPage() {
                   }}
                   className="text-blue-400 text-xs hover:text-blue-300"
                 >
-                  Send via Twilio
+                  Send via WhatsApp
                 </button>
               ) : (
                 <span className="text-white/40 text-xs">{c.sent_count} sent</span>
