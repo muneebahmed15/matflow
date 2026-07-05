@@ -8,6 +8,7 @@ import {
   backfillDigestSnapshotsAction,
   exportDigestPdfAction,
   listDigestHistoryAction,
+  compareGymToBenchmarksAction,
 } from '@/app/(dashboard)/actions';
 import type { BusinessMetrics, BusinessRecommendation } from '@/services/business-assistant';
 
@@ -38,6 +39,9 @@ export default function InsightsPage() {
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
+  const [benchmarks, setBenchmarks] = useState<
+    { metricKey: string; gymValue: number; platformMedian: number; percentile: string }[]
+  >([]);
 
   const loadHistory = async () => {
     setHistoryLoading(true);
@@ -48,6 +52,9 @@ export default function InsightsPage() {
 
   useAsyncMount(() => {
     if (tab === 'history') void loadHistory();
+    void compareGymToBenchmarksAction().then((res) => {
+      if (res.ok && res.data) setBenchmarks(res.data);
+    });
   }, [tab]);
 
   const downloadPdf = async () => {
@@ -109,7 +116,37 @@ export default function InsightsPage() {
       </div>
 
       {tab === 'today' ? (
-        <BusinessInsightsWidget />
+        <>
+          {benchmarks.length > 0 && (
+            <div className="bg-[#111] border border-white/10 rounded-2xl p-5 mb-6">
+              <p className="text-white font-medium text-sm mb-3">Platform benchmarks</p>
+              <div className="space-y-2">
+                {benchmarks.map((b) => (
+                  <div key={b.metricKey} className="flex justify-between text-sm">
+                    <span className="text-white/60 capitalize">
+                      {b.metricKey.replace(/_/g, ' ')}
+                    </span>
+                    <span className="text-white">
+                      {b.gymValue}% vs median {b.platformMedian}% ·{' '}
+                      <span
+                        className={
+                          b.percentile === 'above'
+                            ? 'text-green-400'
+                            : b.percentile === 'below'
+                              ? 'text-red-400'
+                              : 'text-yellow-400'
+                        }
+                      >
+                        {b.percentile}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <BusinessInsightsWidget />
+        </>
       ) : historyLoading ? (
         <StatsSkeleton />
       ) : history.length === 0 ? (

@@ -10,7 +10,7 @@
 - [x] 6.7 Waiver expires_at field (Wave 1)
 - [x] 6.8 Require re-sign on template update (compliance checks signed version)
 - [x] 6.9 Waiver templates library (General, BJJ, MMA presets)
-- [ ] 6.10 Multi-language waiver support (deferred Wave 3+)
+- [x] 6.10 Multi-language waiver support (`waiver_translations` table)
 
 ## Signing
 - [x] 6.11 waiver_signatures table (done)
@@ -65,10 +65,10 @@
 - [x] 6.44 RLS: member can only sign own waivers (family portal read test)
 
 ## Integrations
-- [ ] 6.45 DocuSign export path (enterprise) (deferred Wave 3+)
+- [x] 6.45 DocuSign export path (`exportSignatureForDocuSign` + webhook)
 - [x] 6.46 Import signed waivers from PDF upload (Migration Center bulk import)
 - [x] 6.47 Waiver merge fields (member name, date)
 - [x] 6.48 Minor age verification field (`members.date_of_birth`)
 - [x] 6.49 Witness signature field
-- [ ] 6.50 State-specific waiver templates (deferred Wave 3+)
+- [x] 6.50 State-specific waiver templates (`STATE_WAIVER_TEMPLATES` library)
 - [x] 6.51 Audit log on waiver template edits

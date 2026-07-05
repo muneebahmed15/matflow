@@ -42,7 +42,7 @@
 - [x] 11.28 AI generate Instagram caption (`generateInstagramCaptionAction`)
 - [x] 11.29 Promotion announcement template (campaign template)
 - [x] 11.30 Export image with gym branding (`SocialPromoExporter` canvas PNG)
-- [ ] 11.31 Schedule posts (deferred Wave 3+ — Buffer integration; email campaigns use `scheduled_at` + cron)
+- [x] 11.31 Schedule posts (Buffer API + `social_posts` + cron)
 
 ## Ads — Future
 - [x] 11.32 Google Ads conversion pixel hook (`google_ads_conversion_id` + MarketingPixels)

@@ -156,6 +156,27 @@ export async function updateGymSettingsAction(input: {
   aiTone?: 'formal' | 'friendly';
   aiLanguages?: string[];
   twilioPhone?: string | null;
+  aiMonthlyMessageLimit?: number;
+  aiVoiceEnabled?: boolean;
+  aiVoiceTransferKeyword?: string;
+  aiVoiceRecordCalls?: boolean;
+  staffTransferPhone?: string | null;
+  metaPageId?: string | null;
+  metaPageAccessToken?: string | null;
+  metaVerifyToken?: string | null;
+  metaInstagramId?: string | null;
+  inboundEmailAddress?: string | null;
+  aiEmailAutoReply?: boolean;
+  beltGraduationPreset?: 'custom' | 'ibjjf';
+  nfcDisplayEnabled?: boolean;
+  docusignExportEnabled?: boolean;
+  docusignWebhookUrl?: string | null;
+  bufferAccessToken?: string | null;
+  bufferProfileIds?: string[];
+  printfulApiKey?: string | null;
+  printfulStoreId?: string | null;
+  voiceBriefingEnabled?: boolean;
+  voiceBriefingPhone?: string | null;
 }): Promise<ActionResult<GymSettings>> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });
@@ -306,6 +327,57 @@ export async function suggestSeoKeywordsAction() {
       programs: programs.map((p) => p.name),
     });
     return { ok: true as const, data: keywords };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function startStripeConnectOnboardingAction(): Promise<
+  ActionResult<{ onboardingUrl: string }>
+> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const settings = await getGymSettings(auth.gymId);
+    const { createConnectAccountLink } = await import('@/lib/stripe-connect');
+    const { accountId, onboardingUrl } = await createConnectAccountLink({
+      gymId: auth.gymId,
+      email: auth.user.email ?? settings.contact_email ?? '',
+      existingAccountId: settings.stripe_connect_account_id,
+    });
+
+    const admin = (await import('@/lib/supabase/admin')).getAdminClient();
+    await admin
+      .from('gyms')
+      .update({ stripe_connect_account_id: accountId })
+      .eq('id', auth.gymId);
+
+    return { ok: true, data: { onboardingUrl } };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function refreshStripeConnectStatusAction(): Promise<
+  ActionResult<{ onboarded: boolean }>
+> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const settings = await getGymSettings(auth.gymId);
+    if (!settings.stripe_connect_account_id) {
+      return { ok: true, data: { onboarded: false } };
+    }
+
+    const { refreshConnectAccountStatus } = await import('@/lib/stripe-connect');
+    const onboarded = await refreshConnectAccountStatus(settings.stripe_connect_account_id);
+
+    const admin = (await import('@/lib/supabase/admin')).getAdminClient();
+    await admin
+      .from('gyms')
+      .update({ stripe_connect_onboarded: onboarded })
+      .eq('id', auth.gymId);
+
+    revalidatePath('/settings');
+    return { ok: true, data: { onboarded } };
   } catch (error) {
     return toActionError(error);
   }

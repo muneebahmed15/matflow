@@ -894,3 +894,86 @@ export async function applyWaiverRetentionPolicy(gymId: string): Promise<number>
   }
   return removed;
 }
+
+export async function upsertWaiverTranslation(input: {
+  waiverId: string;
+  gymId: string;
+  locale: string;
+  title: string;
+  body: string;
+}): Promise<void> {
+  const admin = getAdminClient();
+  await getWaiver(input.gymId, input.waiverId);
+  const { error } = await admin.from('waiver_translations').upsert(
+    {
+      waiver_id: input.waiverId,
+      locale: input.locale,
+      title: input.title,
+      body: input.body,
+    },
+    { onConflict: 'waiver_id,locale' }
+  );
+  if (error) throw new ServiceError(500, error.message);
+}
+
+export async function listWaiverTranslations(
+  gymId: string,
+  waiverId: string
+): Promise<Array<{ locale: string; title: string; body: string }>> {
+  await getWaiver(gymId, waiverId);
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('waiver_translations')
+    .select('locale, title, body')
+    .eq('waiver_id', waiverId);
+  if (error) throw new ServiceError(500, error.message);
+  return data ?? [];
+}
+
+export async function exportSignatureForDocuSign(
+  gymId: string,
+  signatureId: string
+): Promise<{ envelope: Record<string, unknown>; webhookUrl: string | null }> {
+  const admin = getAdminClient();
+  const { data: gym } = await admin
+    .from('gyms')
+    .select('docusign_export_enabled, docusign_webhook_url, name')
+    .eq('id', gymId)
+    .maybeSingle();
+
+  if (!gym?.docusign_export_enabled) {
+    throw new ServiceError(403, 'DocuSign export is not enabled for this gym.');
+  }
+
+  const { data: sig } = await admin
+    .from('waiver_signatures')
+    .select('*, members(first_name, last_name, email), waivers(title)')
+    .eq('id', signatureId)
+    .eq('gym_id', gymId)
+    .maybeSingle();
+
+  if (!sig) throw new ServiceError(404, 'Signature not found');
+
+  const envelope = {
+    emailSubject: `Signed waiver — ${gym.name}`,
+    signers: [
+      {
+        name: `${(sig.members as { first_name?: string })?.first_name ?? ''} ${(sig.members as { last_name?: string })?.last_name ?? ''}`.trim(),
+        email: (sig.members as { email?: string })?.email,
+        waiverTitle: (sig.waivers as { title?: string })?.title,
+        signedAt: sig.signed_at,
+        pdfPath: sig.pdf_storage_path,
+      },
+    ],
+  };
+
+  if (gym.docusign_webhook_url) {
+    await fetch(gym.docusign_webhook_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: 'waiver.export', envelope }),
+    }).catch(() => undefined);
+  }
+
+  return { envelope, webhookUrl: gym.docusign_webhook_url };
+}

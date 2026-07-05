@@ -271,3 +271,16 @@ export async function getWhoIsReadyAction(): Promise<
   }
 }
 
+export async function applyIbjjfPresetAction(): Promise<ActionResult<{ upserted: number }>> {
+  try {
+    const auth = await requireStaffSession({ capability: 'settings.write' });
+    const { applyIbjjfPreset } = await import('@/lib/belt-presets-ibjjf');
+    const upserted = await applyIbjjfPreset(auth.gymId);
+    revalidatePath('/settings');
+    revalidatePath('/belts');
+    return { ok: true, data: { upserted } };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+

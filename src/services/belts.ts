@@ -307,7 +307,7 @@ export async function listBeltRequirements(gymId: string): Promise<BeltRequireme
   const admin = getAdminClient();
   const { data, error } = await admin
     .from('belt_requirements')
-    .select('id, belt, min_attendance, min_days_at_rank, techniques_checklist')
+    .select('id, belt, min_attendance, min_days_at_rank, min_competition_wins, competition_bonus_attendance, techniques_checklist')
     .eq('gym_id', gymId);
 
   if (error) throw new ServiceError(500, error.message);
@@ -368,7 +368,7 @@ export type MemberReadiness = {
 export async function getPromotionReadiness(gymId: string): Promise<MemberReadiness[]> {
   const admin = getAdminClient();
 
-  const [{ data: members, error: mErr }, { data: promos, error: pErr }, requirements] =
+  const [{ data: members, error: mErr }, { data: promos, error: pErr }, requirements, { data: competitions }] =
     await Promise.all([
       admin
         .from('members')
@@ -381,6 +381,7 @@ export async function getPromotionReadiness(gymId: string): Promise<MemberReadin
         .eq('gym_id', gymId)
         .order('promoted_at', { ascending: false }),
       listBeltRequirements(gymId),
+      admin.from('competitions').select('member_id, result, event_date').eq('gym_id', gymId),
     ]);
 
   if (mErr) throw new ServiceError(500, mErr.message);
@@ -394,9 +395,27 @@ export async function getPromotionReadiness(gymId: string): Promise<MemberReadin
   const requirementByBelt = new Map<string, BeltRequirement>(
     requirements.map((r) => [
       r.belt,
-      { belt: r.belt, minAttendance: r.min_attendance, minDaysAtRank: r.min_days_at_rank },
+      {
+        belt: r.belt,
+        minAttendance: r.min_attendance,
+        minDaysAtRank: r.min_days_at_rank,
+        minCompetitionWins: (r as { min_competition_wins?: number }).min_competition_wins ?? 0,
+        competitionBonusAttendance:
+          (r as { competition_bonus_attendance?: number }).competition_bonus_attendance ?? 0,
+      },
     ])
   );
+
+  const competitionWinsByMember = new Map<string, number>();
+  for (const comp of competitions ?? []) {
+    if (!comp.member_id || !comp.result) continue;
+    const rankSince = lastPromotion.get(comp.member_id);
+    if (rankSince && comp.event_date && comp.event_date < rankSince.slice(0, 10)) continue;
+    competitionWinsByMember.set(
+      comp.member_id,
+      (competitionWinsByMember.get(comp.member_id) ?? 0) + 1
+    );
+  }
 
   const now = Date.now();
   const results: MemberReadiness[] = [];
@@ -418,6 +437,7 @@ export async function getPromotionReadiness(gymId: string): Promise<MemberReadin
       belt,
       daysAtRank,
       attendanceSinceRank: count ?? 0,
+      competitionWins: competitionWinsByMember.get(member.id) ?? 0,
       requirement,
     });
 
@@ -616,4 +636,39 @@ export async function getPromotionForecast(gymId: string): Promise<PromotionFore
 export async function getWhoIsReady(gymId: string): Promise<MemberReadiness[]> {
   const readiness = await getPromotionReadiness(gymId);
   return readiness.filter((r) => r.ready);
+}
+
+export async function listDisciplineStripes(
+  gymId: string,
+  memberId: string
+): Promise<Array<{ discipline: string; stripeCount: number }>> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('belt_discipline_stripes')
+    .select('discipline, stripe_count')
+    .eq('gym_id', gymId)
+    .eq('member_id', memberId);
+
+  if (error) throw new ServiceError(500, error.message);
+  return (data ?? []).map((r) => ({ discipline: r.discipline, stripeCount: r.stripe_count }));
+}
+
+export async function setDisciplineStripes(input: {
+  gymId: string;
+  memberId: string;
+  discipline: string;
+  stripeCount: number;
+}): Promise<void> {
+  const admin = getAdminClient();
+  const { error } = await admin.from('belt_discipline_stripes').upsert(
+    {
+      gym_id: input.gymId,
+      member_id: input.memberId,
+      discipline: input.discipline,
+      stripe_count: Math.min(4, Math.max(0, input.stripeCount)),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'gym_id,member_id,discipline' }
+  );
+  if (error) throw new ServiceError(500, error.message);
 }

@@ -47,8 +47,8 @@
 - [x] 13.32 Bundle deals (gi + belt)
 
 ## Integrations
-- [ ] 13.33 Stripe Connect for gym payouts (future)
-- [ ] 13.34 Printful dropship integration (future)
+- [x] 13.33 Stripe Connect for gym payouts (`stripe-connect.ts` + onboarding link)
+- [x] 13.34 Printful dropship integration (`printful.ts` + webhook + `fulfillment_source`)
 - [x] 13.35 QuickBooks export (CSV)
 
 ## Reporting

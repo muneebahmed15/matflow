@@ -822,7 +822,7 @@ export async function completeShopOrder(gymId: string, orderId: string): Promise
 
   const { data: order } = await admin
     .from('orders')
-    .select('id, status, customer_email, total_cents')
+    .select('id, status, customer_email, total_cents, fulfillment_type, shipping_address, printful_order_id')
     .eq('id', orderId)
     .eq('gym_id', gymId)
     .maybeSingle();
@@ -838,9 +838,11 @@ export async function completeShopOrder(gymId: string, orderId: string): Promise
   for (const item of items ?? []) {
     const { data: p } = await admin
       .from('products')
-      .select('inventory_count')
+      .select('inventory_count, fulfillment_source')
       .eq('id', item.product_id)
       .single();
+
+    if (p?.fulfillment_source === 'printful') continue;
 
     const next = (p?.inventory_count ?? 0) - item.quantity;
     if (next < 0) throw new ServiceError(400, 'Inventory conflict on payment');
@@ -856,6 +858,69 @@ export async function completeShopOrder(gymId: string, orderId: string): Promise
     .update({ status: 'paid' })
     .eq('id', orderId)
     .eq('gym_id', gymId);
+
+  if (!order.printful_order_id) {
+    const printfulItems: Array<{ variant_id: string; quantity: number }> = [];
+    for (const item of items ?? []) {
+      const { data: p } = await admin
+        .from('products')
+        .select('fulfillment_source, printful_variant_id')
+        .eq('id', item.product_id)
+        .single();
+      if (p?.fulfillment_source === 'printful' && p.printful_variant_id) {
+        printfulItems.push({ variant_id: p.printful_variant_id, quantity: item.quantity });
+      }
+    }
+
+    if (printfulItems.length > 0) {
+      const { data: gym } = await admin
+        .from('gyms')
+        .select('printful_api_key, printful_store_id, name')
+        .eq('id', gymId)
+        .maybeSingle();
+
+      const shipping = order.shipping_address as {
+        name?: string;
+        line1?: string;
+        city?: string;
+        state?: string;
+        postal_code?: string;
+        country?: string;
+      } | null;
+
+      if (
+        gym?.printful_api_key &&
+        gym.printful_store_id &&
+        shipping?.line1 &&
+        shipping.city &&
+        shipping.state &&
+        shipping.postal_code
+      ) {
+        try {
+          const { submitPrintfulOrder } = await import('@/lib/printful');
+          const { printfulOrderId } = await submitPrintfulOrder({
+            apiKey: gym.printful_api_key,
+            storeId: gym.printful_store_id,
+            recipient: {
+              name: shipping.name?.trim() || gym.name,
+              address1: shipping.line1,
+              city: shipping.city,
+              state_code: shipping.state,
+              country_code: shipping.country?.trim() || 'US',
+              zip: shipping.postal_code,
+            },
+            items: printfulItems,
+          });
+          await admin
+            .from('orders')
+            .update({ printful_order_id: printfulOrderId })
+            .eq('id', orderId);
+        } catch {
+          // Printful submission is best-effort; order remains paid
+        }
+      }
+    }
+  }
 
   if (order.customer_email) {
     try {
@@ -874,14 +939,16 @@ export async function completeShopOrder(gymId: string, orderId: string): Promise
 export async function fulfillOrder(
   gymId: string,
   orderId: string,
-  trackingNumber?: string
+  tracking?: string | { trackingNumber?: string; carrier?: string }
 ): Promise<void> {
   const admin = getAdminClient();
+  const trackingNumber =
+    typeof tracking === 'string' ? tracking : tracking?.trackingNumber?.trim() || null;
   const { error } = await admin
     .from('orders')
     .update({
       status: 'fulfilled',
-      tracking_number: trackingNumber?.trim() || null,
+      tracking_number: trackingNumber,
       fulfilled_at: new Date().toISOString(),
     })
     .eq('id', orderId)

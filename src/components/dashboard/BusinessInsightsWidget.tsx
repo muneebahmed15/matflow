@@ -51,6 +51,7 @@ export default function BusinessInsightsWidget() {
     { label: 'Open trial leads', value: metrics.trialLeadsOpen ?? 0 },
     { label: 'Escalated chats', value: metrics.escalationQueueSize ?? 0 },
     { label: 'Lead conv. (7d)', value: metrics.leadConversionRate7d ?? 0 },
+    { label: 'Missed calls (7d)', value: metrics.missedCalls7d ?? 0 },
   ];
 
   return (

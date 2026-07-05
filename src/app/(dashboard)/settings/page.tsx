@@ -5,7 +5,7 @@ import { useAsyncMount, useClientMount } from '@/hooks/use-async-mount'
 import { redirectTo } from '@/lib/navigation'
 import Link from 'next/link'
 import { ExternalLink, Globe, Monitor } from 'lucide-react'
-import { getGymSettingsAction, updateGymSettingsAction, getGbpStatusAction, syncDirectoryListingsAction, syncGbpHoursAction, updateMemberRequiredFieldsAction } from '@/app/(dashboard)/actions'
+import { getGymSettingsAction, updateGymSettingsAction, getGbpStatusAction, syncDirectoryListingsAction, syncGbpHoursAction, updateMemberRequiredFieldsAction, startStripeConnectOnboardingAction, refreshStripeConnectStatusAction, applyIbjjfPresetAction } from '@/app/(dashboard)/actions'
 import { parseMemberRequiredFields, type MemberRequiredFields } from '@/lib/member-required-fields'
 import type { GymSettings } from '@/services/gym'
 import { resolveBeltSystem } from '@/lib/belt-systems'
@@ -114,6 +114,27 @@ export default function SettingsPage() {
       aiTone: settings.ai_tone === 'formal' ? 'formal' : 'friendly',
       aiLanguages: settings.ai_languages,
       twilioPhone: settings.twilio_phone,
+      aiMonthlyMessageLimit: settings.ai_monthly_message_limit,
+      aiVoiceEnabled: settings.ai_voice_enabled,
+      aiVoiceTransferKeyword: settings.ai_voice_transfer_keyword,
+      aiVoiceRecordCalls: settings.ai_voice_record_calls,
+      staffTransferPhone: settings.staff_transfer_phone,
+      metaPageId: settings.meta_page_id,
+      metaPageAccessToken: settings.meta_page_access_token,
+      metaVerifyToken: settings.meta_verify_token,
+      metaInstagramId: settings.meta_instagram_id,
+      inboundEmailAddress: settings.inbound_email_address,
+      aiEmailAutoReply: settings.ai_email_auto_reply,
+      beltGraduationPreset: settings.belt_graduation_preset,
+      nfcDisplayEnabled: settings.nfc_display_enabled,
+      docusignExportEnabled: settings.docusign_export_enabled,
+      docusignWebhookUrl: settings.docusign_webhook_url,
+      bufferAccessToken: settings.buffer_access_token,
+      bufferProfileIds: settings.buffer_profile_ids,
+      printfulApiKey: settings.printful_api_key,
+      printfulStoreId: settings.printful_store_id,
+      voiceBriefingEnabled: settings.voice_briefing_enabled,
+      voiceBriefingPhone: settings.voice_briefing_phone,
     })
     setSaving(false)
     if (!result.ok) {
@@ -132,6 +153,7 @@ export default function SettingsPage() {
   const scheduleEmbedUrl = settings?.slug && origin ? `${origin}/embed/schedule/${settings.slug}` : ''
   const scheduleIcsUrl = settings?.slug && origin ? `${origin}/g/${settings.slug}/schedule.ics` : ''
   const kioskUrl = settings?.slug && origin ? `${origin}/kiosk/${settings.slug}` : ''
+  const nfcDisplayUrl = settings?.slug && origin ? `${origin}/g/${settings.slug}/display` : ''
 
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
   if (!settings) return <div className="p-8 text-gray-400">Unable to load settings.</div>
@@ -248,6 +270,46 @@ export default function SettingsPage() {
             </div>
             <p className="text-white/20 text-xs mt-1">Overrides badge colors on member lists and the portal.</p>
           </div>
+          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-white/10">
+            <span className="text-gray-300 text-sm">
+              Graduation preset: {settings.belt_graduation_preset === 'ibjjf' ? 'IBJJF' : 'Custom'}
+            </span>
+            <button
+              type="button"
+              onClick={async () => {
+                const res = await applyIbjjfPresetAction()
+                if (res.ok && res.data) {
+                  update({ belt_graduation_preset: 'ibjjf' })
+                  alert(`Applied IBJJF preset (${res.data.upserted} belt rules updated).`)
+                }
+              }}
+              className="text-sm text-blue-400 hover:text-blue-300"
+            >
+              Apply IBJJF preset
+            </button>
+          </div>
+          <label className="flex items-center justify-between gap-4 py-3 border-t border-white/10">
+            <div>
+              <span className="text-gray-300 text-sm">NFC belt display</span>
+              <p className="text-white/30 text-xs">Public rank board at gym entrance</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.nfc_display_enabled}
+              onChange={(e) => update({ nfc_display_enabled: e.target.checked })}
+              className="h-4 w-4 rounded accent-blue-500"
+            />
+          </label>
+          {settings.nfc_display_enabled && nfcDisplayUrl && (
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs text-green-300 bg-black/40 border border-white/10 rounded-lg px-3 py-2 truncate">
+                {nfcDisplayUrl}
+              </code>
+              <Link href={`/g/${settings.slug}/display`} target="_blank" className="text-sm text-blue-400">
+                Open
+              </Link>
+            </div>
+          )}
           <label className="flex items-center justify-between gap-4 py-3 border-b border-white/10">
             <div>
               <span className="text-gray-300 text-sm">Coaches: stripes only</span>
@@ -963,6 +1025,100 @@ export default function SettingsPage() {
                   className={inputClass}
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Monthly AI message limit
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={settings.ai_monthly_message_limit ?? 1000}
+                  onChange={(e) =>
+                    update({ ai_monthly_message_limit: parseInt(e.target.value, 10) || 0 })
+                  }
+                  className={inputClass}
+                />
+              </div>
+              <label className="flex items-center justify-between gap-4 py-2">
+                <span className="text-gray-300 text-sm">AI voice (Twilio)</span>
+                <input
+                  type="checkbox"
+                  checked={settings.ai_voice_enabled}
+                  onChange={(e) => update({ ai_voice_enabled: e.target.checked })}
+                  className="h-4 w-4 rounded accent-blue-500"
+                />
+              </label>
+              {settings.ai_voice_enabled && (
+                <>
+                  <input
+                    value={settings.staff_transfer_phone ?? ''}
+                    onChange={(e) => update({ staff_transfer_phone: e.target.value || null })}
+                    placeholder="Staff transfer phone (+15551234567)"
+                    className={inputClass}
+                  />
+                  <input
+                    value={settings.ai_voice_transfer_keyword ?? 'staff'}
+                    onChange={(e) => update({ ai_voice_transfer_keyword: e.target.value || 'staff' })}
+                    placeholder="Transfer keyword (caller says this to reach staff)"
+                    className={inputClass}
+                  />
+                  <label className="flex items-center gap-2 text-sm text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={settings.ai_voice_record_calls}
+                      onChange={(e) => update({ ai_voice_record_calls: e.target.checked })}
+                      className="h-4 w-4 rounded accent-blue-500"
+                    />
+                    Record calls
+                  </label>
+                </>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Inbound email address</label>
+                <input
+                  value={settings.inbound_email_address ?? ''}
+                  onChange={(e) => update({ inbound_email_address: e.target.value || null })}
+                  placeholder="frontdesk@yourgym.com"
+                  className={inputClass}
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={settings.ai_email_auto_reply}
+                  onChange={(e) => update({ ai_email_auto_reply: e.target.checked })}
+                  className="h-4 w-4 rounded accent-blue-500"
+                />
+                Auto-send FAQ email replies (otherwise staff approves drafts)
+              </label>
+              <div className="pt-2 border-t border-white/10 space-y-2">
+                <p className="text-sm font-medium text-gray-300">Meta Messenger / Instagram</p>
+                <input
+                  value={settings.meta_page_id ?? ''}
+                  onChange={(e) => update({ meta_page_id: e.target.value || null })}
+                  placeholder="Meta Page ID"
+                  className={inputClass}
+                />
+                <input
+                  type="password"
+                  value={settings.meta_page_access_token ?? ''}
+                  onChange={(e) => update({ meta_page_access_token: e.target.value || null })}
+                  placeholder="Page access token"
+                  className={inputClass}
+                />
+                <input
+                  value={settings.meta_verify_token ?? ''}
+                  onChange={(e) => update({ meta_verify_token: e.target.value || null })}
+                  placeholder="Webhook verify token"
+                  className={inputClass}
+                />
+                <input
+                  value={settings.meta_instagram_id ?? ''}
+                  onChange={(e) => update({ meta_instagram_id: e.target.value || null })}
+                  placeholder="Instagram business account ID"
+                  className={inputClass}
+                />
+              </div>
             </div>
           )}
           <label className="flex items-center justify-between gap-4 py-3 border-b border-white/10">
@@ -986,6 +1142,119 @@ export default function SettingsPage() {
               placeholder="Returns accepted within 14 days..."
               className={inputClass}
             />
+          </div>
+        </div>
+
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-4">
+          <h2 className="font-semibold text-white">Integrations</h2>
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-gray-300">Stripe Connect (shop payouts)</p>
+            {settings.stripe_connect_onboarded ? (
+              <p className="text-green-400 text-sm">Connected · {settings.stripe_connect_account_id}</p>
+            ) : (
+              <p className="text-white/40 text-sm">Not connected — connect to receive shop payouts directly.</p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await startStripeConnectOnboardingAction()
+                  if (res.ok && res.data) window.location.href = res.data.onboardingUrl
+                }}
+                className="text-sm bg-white text-black font-semibold px-4 py-2 rounded-xl"
+              >
+                {settings.stripe_connect_account_id ? 'Continue onboarding' : 'Connect Stripe'}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await refreshStripeConnectStatusAction()
+                  if (res.ok && res.data) {
+                    update({ stripe_connect_onboarded: res.data.onboarded })
+                  }
+                }}
+                className="text-sm text-blue-400 hover:text-blue-300"
+              >
+                Refresh status
+              </button>
+            </div>
+          </div>
+          <div className="space-y-2 pt-3 border-t border-white/10">
+            <p className="text-sm font-medium text-gray-300">Buffer (social scheduling)</p>
+            <input
+              type="password"
+              value={settings.buffer_access_token ?? ''}
+              onChange={(e) => update({ buffer_access_token: e.target.value || null })}
+              placeholder="Buffer access token"
+              className={inputClass}
+            />
+            <input
+              value={(settings.buffer_profile_ids ?? []).join(', ')}
+              onChange={(e) =>
+                update({
+                  buffer_profile_ids: e.target.value
+                    .split(',')
+                    .map((id) => id.trim())
+                    .filter(Boolean),
+                })
+              }
+              placeholder="Profile IDs (comma-separated)"
+              className={inputClass}
+            />
+          </div>
+          <div className="space-y-2 pt-3 border-t border-white/10">
+            <p className="text-sm font-medium text-gray-300">Printful (dropship)</p>
+            <input
+              type="password"
+              value={settings.printful_api_key ?? ''}
+              onChange={(e) => update({ printful_api_key: e.target.value || null })}
+              placeholder="Printful API key"
+              className={inputClass}
+            />
+            <input
+              value={settings.printful_store_id ?? ''}
+              onChange={(e) => update({ printful_store_id: e.target.value || null })}
+              placeholder="Printful store ID"
+              className={inputClass}
+            />
+          </div>
+          <div className="space-y-2 pt-3 border-t border-white/10">
+            <p className="text-sm font-medium text-gray-300">DocuSign export</p>
+            <label className="flex items-center gap-2 text-sm text-gray-300">
+              <input
+                type="checkbox"
+                checked={settings.docusign_export_enabled}
+                onChange={(e) => update({ docusign_export_enabled: e.target.checked })}
+                className="h-4 w-4 rounded accent-blue-500"
+              />
+              Enable waiver signature export
+            </label>
+            <input
+              value={settings.docusign_webhook_url ?? ''}
+              onChange={(e) => update({ docusign_webhook_url: e.target.value || null })}
+              placeholder="DocuSign webhook URL (optional)"
+              className={inputClass}
+            />
+          </div>
+          <div className="space-y-2 pt-3 border-t border-white/10">
+            <p className="text-sm font-medium text-gray-300">Voice briefing (daily SMS summary)</p>
+            <label className="flex items-center gap-2 text-sm text-gray-300">
+              <input
+                type="checkbox"
+                checked={settings.voice_briefing_enabled}
+                onChange={(e) => update({ voice_briefing_enabled: e.target.checked })}
+                className="h-4 w-4 rounded accent-blue-500"
+              />
+              Enable morning voice briefing
+            </label>
+            {settings.voice_briefing_enabled && (
+              <input
+                value={settings.voice_briefing_phone ?? ''}
+                onChange={(e) => update({ voice_briefing_phone: e.target.value || null })}
+                placeholder="Phone for briefing (+15551234567)"
+                className={inputClass}
+              />
+            )}
           </div>
         </div>
 

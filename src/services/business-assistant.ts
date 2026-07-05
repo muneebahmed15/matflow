@@ -34,6 +34,7 @@ export type BusinessMetrics = {
   atRiskChurnCount: number;
   peakHours: number[];
   beltCeremonyCandidates: number;
+  missedCalls7d: number;
 };
 
 export type BusinessRecommendation = {
@@ -300,6 +301,9 @@ export async function computeGymMetrics(gymId: string): Promise<BusinessMetrics>
     peakHours[hour] = (peakHours[hour] ?? 0) + 1;
   }
 
+  const { countMissedCalls } = await import('@/services/ai-voice');
+  const missedCalls7d = await countMissedCalls(gymId, sevenDaysAgo);
+
   return {
     newLeads7d: newLeads7d ?? 0,
     newLeads24h: newLeads24h ?? 0,
@@ -326,6 +330,7 @@ export async function computeGymMetrics(gymId: string): Promise<BusinessMetrics>
     atRiskChurnCount,
     peakHours,
     beltCeremonyCandidates: readyForPromotion,
+    missedCalls7d,
   };
 }
 
@@ -376,6 +381,15 @@ export function metricsToRecommendations(metrics: BusinessMetrics): BusinessReco
       priority: 'P1',
       title: `${metrics.escalationQueueSize} escalated AI chat(s)`,
       description: 'Visitors requested staff follow-up via AI chat.',
+      actionHref: '/ai-desk',
+    });
+  }
+
+  if (metrics.missedCalls7d > 0) {
+    push({
+      priority: 'P2',
+      title: `${metrics.missedCalls7d} missed call(s) this week`,
+      description: 'Review voicemails and return calls from AI phone line.',
       actionHref: '/ai-desk',
     });
   }
@@ -768,4 +782,65 @@ export async function listDigestHistory(
     metrics: row.metrics as BusinessMetrics,
     recommendations: (row.recommendations ?? []) as BusinessRecommendation[],
   }));
+}
+
+export type BenchmarkComparison = {
+  metricKey: string;
+  gymValue: number;
+  platformMedian: number;
+  percentile: 'below' | 'at' | 'above';
+};
+
+export async function compareGymToBenchmarks(gymId: string): Promise<BenchmarkComparison[]> {
+  const admin = getAdminClient();
+  const metrics = await computeGymMetrics(gymId);
+  const { data: benchmarks } = await admin.from('platform_benchmarks').select('*');
+
+  const comparisons: BenchmarkComparison[] = [];
+
+  for (const b of benchmarks ?? []) {
+    if (b.metric_key === 'lead_conversion_rate_7d') {
+      const median = Number(b.p50 ?? 15);
+      comparisons.push({
+        metricKey: b.metric_key,
+        gymValue: metrics.leadConversionRate7d,
+        platformMedian: median,
+        percentile:
+          metrics.leadConversionRate7d >= Number(b.p75 ?? 25)
+            ? 'above'
+            : metrics.leadConversionRate7d <= Number(b.p25 ?? 8)
+              ? 'below'
+              : 'at',
+      });
+    }
+  }
+
+  return comparisons;
+}
+
+export async function sendVoiceBriefing(gymId: string): Promise<boolean> {
+  const admin = getAdminClient();
+  const { data: gym } = await admin
+    .from('gyms')
+    .select('name, voice_briefing_enabled, voice_briefing_phone, twilio_phone')
+    .eq('id', gymId)
+    .maybeSingle();
+
+  if (!gym?.voice_briefing_enabled || !gym.voice_briefing_phone) return false;
+
+  const metrics = await computeGymMetrics(gymId);
+  const lines = metricsToRecommendations(metrics).slice(0, 3).map((r) => r.title);
+  const script =
+    lines.length > 0
+      ? `Good morning from ${gym.name}. Today's priorities: ${lines.join('. ')}.`
+      : `Good morning from ${gym.name}. No urgent actions today.`;
+
+  const { sendSms } = await import('@/lib/sms/twilio');
+  await sendSms({
+    to: gym.voice_briefing_phone,
+    from: gym.twilio_phone ?? undefined,
+    body: `[Voice briefing] ${script}`,
+  });
+
+  return true;
 }

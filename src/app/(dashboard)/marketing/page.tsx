@@ -18,6 +18,8 @@ import {
   sendSmsCampaignAction,
   getGymSettingsAction,
   generateInstagramCaptionAction,
+  listSocialPostsAction,
+  scheduleSocialPostAction,
 } from '@/app/(dashboard)/actions';
 import GbpMarketingPanel from '@/components/marketing/GbpMarketingPanel';
 import SocialPromoExporter from '@/components/marketing/SocialPromoExporter';
@@ -70,6 +72,11 @@ export default function MarketingPage() {
   const [instagramTopic, setInstagramTopic] = useState('');
   const [instagramCaption, setInstagramCaption] = useState('');
   const [promoHeadline, setPromoHeadline] = useState('New student special this month!');
+  const [socialPosts, setSocialPosts] = useState<
+    { id: string; caption: string; scheduled_at: string | null; status: string }[]
+  >([]);
+  const [socialCaption, setSocialCaption] = useState('');
+  const [socialScheduleAt, setSocialScheduleAt] = useState('');
 
   const smsPreview = smsSegmentInfo(smsBody);
 
@@ -89,18 +96,20 @@ export default function MarketingPage() {
       }
     }
 
-    const [campaignRes, funnelRes, sourceRes, reviewRes, smsRes] = await Promise.all([
+    const [campaignRes, funnelRes, sourceRes, reviewRes, smsRes, socialRes] = await Promise.all([
       listCampaignsAction(),
       getMarketingFunnelAction(),
       getLeadSourceStatsAction(),
       getReviewConversionStatsAction(),
       listSmsCampaignsAction(),
+      listSocialPostsAction(),
     ]);
     if (campaignRes.ok && campaignRes.data) setCampaigns(campaignRes.data);
     if (funnelRes.ok && funnelRes.data) setFunnel(funnelRes.data);
     if (sourceRes.ok && sourceRes.data) setSources(sourceRes.data);
     if (reviewRes.ok && reviewRes.data) setReviewStats(reviewRes.data);
     if (smsRes.ok && smsRes.data) setSmsCampaigns(smsRes.data);
+    if (socialRes.ok && socialRes.data) setSocialPosts(socialRes.data);
     setLoading(false);
   };
 
@@ -418,6 +427,52 @@ export default function MarketingPage() {
         {instagramCaption && (
           <textarea value={instagramCaption} readOnly rows={4} className={inputClass} />
         )}
+        <div className="pt-4 border-t border-white/10 space-y-3">
+          <p className="text-sm font-medium text-white/70">Schedule via Buffer</p>
+          <textarea
+            value={socialCaption}
+            onChange={(e) => setSocialCaption(e.target.value)}
+            placeholder="Post caption (or paste generated caption above)"
+            rows={3}
+            className={inputClass}
+          />
+          <input
+            type="datetime-local"
+            value={socialScheduleAt}
+            onChange={(e) => setSocialScheduleAt(e.target.value)}
+            className={inputClass}
+          />
+          <button
+            type="button"
+            onClick={async () => {
+              if (!socialCaption.trim() || !socialScheduleAt) return;
+              const res = await scheduleSocialPostAction({
+                caption: socialCaption,
+                scheduledAt: new Date(socialScheduleAt).toISOString(),
+              });
+              if (res.ok) {
+                setSocialCaption('');
+                setSocialScheduleAt('');
+                void load();
+              }
+            }}
+            className="bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-xl"
+          >
+            Schedule post
+          </button>
+          {socialPosts.length > 0 && (
+            <div className="space-y-2 pt-2">
+              {socialPosts.slice(0, 5).map((p) => (
+                <div key={p.id} className="bg-white/5 rounded-xl px-4 py-2 text-xs text-white/60">
+                  <span className="capitalize text-white/40">{p.status}</span> ·{' '}
+                  {p.scheduled_at ? new Date(p.scheduled_at).toLocaleString() : 'Draft'} ·{' '}
+                  {p.caption.slice(0, 80)}
+                  {p.caption.length > 80 ? '…' : ''}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         {gymBranding && (
           <>
             <input

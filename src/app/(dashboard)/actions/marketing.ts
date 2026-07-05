@@ -255,3 +255,34 @@ export async function generateInstagramCaptionAction(input: { topic?: string }) 
   }
 }
 
+export async function listSocialPostsAction() {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { listSocialPosts } = await import('@/services/social-posts');
+    return { ok: true as const, data: await listSocialPosts(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function scheduleSocialPostAction(input: {
+  caption: string;
+  imageUrl?: string;
+  scheduledAt: string;
+}): Promise<ActionResult<{ id: string }>> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { scheduleSocialPost } = await import('@/services/social-posts');
+    const id = await scheduleSocialPost({
+      gymId: auth.gymId,
+      caption: input.caption,
+      imageUrl: input.imageUrl,
+      scheduledAt: new Date(input.scheduledAt),
+    });
+    revalidatePath('/marketing');
+    return { ok: true, data: { id } };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+

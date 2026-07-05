@@ -58,7 +58,15 @@ These items are being implemented in the current sprint:
 - [x] RLS integration tests for family portal waiver access (requires `SUPABASE_TEST_*`)
 - [x] E2E: waiver blocks check-in until signed (`npm run test:e2e:waiver`)
 - [x] Remaining todos: Wave 3 AI modules (9–10) — **complete** (telephony/social/LLM prose deferred)
-- [ ] Optional integrations: Stripe Connect, Printful, Google OAuth private sheets
+- [x] Optional integrations: Stripe Connect, Printful, Buffer, Meta webhooks, Twilio Voice
+
+### Deferred features complete (20250704370000)
+
+- [x] AI telephony, email inbound, Meta DMs, usage metering
+- [x] Belt competition factor, IBJJF preset, discipline stripes, NFC display
+- [x] Waiver i18n, state templates, DocuSign export
+- [x] Buffer social scheduling, Stripe Connect, Printful dropship
+- [x] Benchmarks comparison, voice briefing, missed calls metric
 
 ### Wave 2 — Completion (20250704310000_wave2_complete.sql)
 
@@ -88,7 +96,7 @@ These items are being implemented in the current sprint:
 - [x] Google Sheets public URL import (`/api/migration/fetch-google-sheet`)
 - [x] Upload validation: size limits, allowed types, PDF magic-byte check
 - [x] Pilot import checklist UI on Migration Center (8.45)
-- [~] Background queue (batched imports exist; full async worker deferred)
+- [x] Background queue (`queueImportJob`, cron `/api/cron/import-jobs`)
 
 ### Wave 3 — AI complete (20250704330000 + 20250704340000)
 

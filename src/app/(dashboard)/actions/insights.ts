@@ -165,3 +165,13 @@ export async function listAuditEventsAction() {
   }
 }
 
+export async function compareGymToBenchmarksAction() {
+  try {
+    const auth = await requireStaffSession({ capability: 'reports.read' });
+    const { compareGymToBenchmarks } = await import('@/services/business-assistant');
+    return { ok: true as const, data: await compareGymToBenchmarks(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+

@@ -62,12 +62,13 @@
 - [x] 4.41 Unit test eligibility calculator
 
 ## Future
-- [ ] 4.42 Competition results factor into promotion (deferred)
+- [x] 4.42 Competition results factor into promotion (`min_competition_wins` on requirements)
 - [x] 4.43 Kids vs adult belt tracks (`bjj_kids` / `bjj_adult` presets in settings)
-- [ ] 4.44 Stripes as separate entity for multi-discipline gyms (deferred)
-- [ ] 4.45 Integration with IBJJF graduation rules preset (deferred)
+- [x] 4.44 Stripes as separate entity for multi-discipline gyms (`belt_discipline_stripes`)
+- [x] 4.45 Integration with IBJJF graduation rules preset (`applyIbjjfPreset`)
 - [x] 4.46 Belt order API for third-party displays (`GET /api/public/belt-order`)
-- [ ] 4.47 NFC belt display at gym entrance (deferred)
+- [x] 4.47 NFC belt display at gym entrance (`/g/[slug]/display` + `nfc_display_enabled`)
 - [x] 4.48 QR code on membership card showing rank (portal belt page + `/g/[slug]/rank`)
 - [x] 4.49 Historical import from spreadsheet (Migration Center belt history CSV)
+- [x] 4.50 Who-is-ready panel (readiness data on belts page)
 - [x] 4.50 Who-is-ready panel (readiness data on belts page)

@@ -14,7 +14,7 @@
 - [x] 10.9 Conversion rate trend (`leadConversionRate7d`)
 
 ## Metrics — Calls / AI
-- [ ] 10.10 Missed calls count (deferred — requires telephony)
+- [x] 10.10 Missed calls count (`ai_voice_calls` + digest metric)
 - [x] 10.11 AI conversations needing follow-up
 - [x] 10.12 Escalation queue size
 
@@ -77,5 +77,5 @@
 
 ## Future
 - [x] 10.48 Weekly vs daily digest modes
-- [ ] 10.49 Compare gym to anonymized benchmarks (deferred)
-- [ ] 10.50 Voice briefing (deferred)
+- [x] 10.49 Compare gym to anonymized benchmarks (`platform_benchmarks` + insights)
+- [x] 10.50 Voice briefing (cron `/api/cron/voice-briefing` + SMS digest script)

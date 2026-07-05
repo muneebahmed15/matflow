@@ -66,10 +66,33 @@ export type GymSettings = Pick<GymRow, 'id' | 'name' | 'slug' | 'kiosk_enabled'>
   digest_frequency: 'daily' | 'weekly';
   digest_sms_enabled: boolean;
   digest_sms_phone: string | null;
+  ai_monthly_message_limit: number;
+  ai_voice_enabled: boolean;
+  ai_voice_transfer_keyword: string;
+  ai_voice_record_calls: boolean;
+  staff_transfer_phone: string | null;
+  meta_page_id: string | null;
+  meta_page_access_token: string | null;
+  meta_verify_token: string | null;
+  meta_instagram_id: string | null;
+  inbound_email_address: string | null;
+  ai_email_auto_reply: boolean;
+  belt_graduation_preset: 'custom' | 'ibjjf';
+  nfc_display_enabled: boolean;
+  docusign_export_enabled: boolean;
+  docusign_webhook_url: string | null;
+  buffer_access_token: string | null;
+  buffer_profile_ids: string[];
+  stripe_connect_account_id: string | null;
+  stripe_connect_onboarded: boolean;
+  printful_api_key: string | null;
+  printful_store_id: string | null;
+  voice_briefing_enabled: boolean;
+  voice_briefing_phone: string | null;
 };
 
 const GYM_SETTINGS_COLUMNS =
-  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, marketing_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, hero_image_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, google_ads_conversion_id, review_checkin_threshold, require_waiver_for_checkin, timezone, locale, belt_system, belt_custom_order, belt_color_overrides, booking_cancel_hours, class_reminder_hours, hero_ab_enabled, hero_variant_b_headline, hero_variant_b_subheadline, seo_keywords, public_translations, member_required_fields, shop_member_discount_percent, shop_flat_tax_cents, coaches_stripes_only, stripe_tax_enabled, payment_provider, stripe_only, waiver_retention_days, digest_inactive_days, digest_hour, digest_slack_webhook_url, digest_sections, digest_frequency, digest_sms_enabled, digest_sms_phone, ai_off_hours_message, ai_persona_name, ai_tone, ai_languages, twilio_phone';
+  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, marketing_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, hero_image_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, google_ads_conversion_id, review_checkin_threshold, require_waiver_for_checkin, timezone, locale, belt_system, belt_custom_order, belt_color_overrides, booking_cancel_hours, class_reminder_hours, hero_ab_enabled, hero_variant_b_headline, hero_variant_b_subheadline, seo_keywords, public_translations, member_required_fields, shop_member_discount_percent, shop_flat_tax_cents, coaches_stripes_only, stripe_tax_enabled, payment_provider, stripe_only, waiver_retention_days, digest_inactive_days, digest_hour, digest_slack_webhook_url, digest_sections, digest_frequency, digest_sms_enabled, digest_sms_phone, ai_off_hours_message, ai_persona_name, ai_tone, ai_languages, twilio_phone, ai_monthly_message_limit, ai_voice_enabled, ai_voice_transfer_keyword, ai_voice_record_calls, staff_transfer_phone, meta_page_id, meta_page_access_token, meta_verify_token, meta_instagram_id, inbound_email_address, ai_email_auto_reply, belt_graduation_preset, nfc_display_enabled, docusign_export_enabled, docusign_webhook_url, buffer_access_token, buffer_profile_ids, stripe_connect_account_id, stripe_connect_onboarded, printful_api_key, printful_store_id, voice_briefing_enabled, voice_briefing_phone';
 
 function parseGymSettingsRow(data: Record<string, unknown>): GymSettings {
   const customOrder = data.belt_custom_order;
@@ -148,6 +171,74 @@ function parseGymSettingsRow(data: Record<string, unknown>): GymSettings {
       typeof (data as GymSettings).twilio_phone === 'string'
         ? (data as GymSettings).twilio_phone
         : null,
+    ai_monthly_message_limit: Math.max(
+      0,
+      Number((data as GymSettings).ai_monthly_message_limit ?? 1000)
+    ),
+    ai_voice_enabled: Boolean((data as GymSettings).ai_voice_enabled),
+    ai_voice_transfer_keyword:
+      typeof (data as GymSettings).ai_voice_transfer_keyword === 'string'
+        ? (data as GymSettings).ai_voice_transfer_keyword
+        : 'staff',
+    ai_voice_record_calls: (data as GymSettings).ai_voice_record_calls !== false,
+    staff_transfer_phone:
+      typeof (data as GymSettings).staff_transfer_phone === 'string'
+        ? (data as GymSettings).staff_transfer_phone
+        : null,
+    meta_page_id:
+      typeof (data as GymSettings).meta_page_id === 'string'
+        ? (data as GymSettings).meta_page_id
+        : null,
+    meta_page_access_token:
+      typeof (data as GymSettings).meta_page_access_token === 'string'
+        ? (data as GymSettings).meta_page_access_token
+        : null,
+    meta_verify_token:
+      typeof (data as GymSettings).meta_verify_token === 'string'
+        ? (data as GymSettings).meta_verify_token
+        : null,
+    meta_instagram_id:
+      typeof (data as GymSettings).meta_instagram_id === 'string'
+        ? (data as GymSettings).meta_instagram_id
+        : null,
+    inbound_email_address:
+      typeof (data as GymSettings).inbound_email_address === 'string'
+        ? (data as GymSettings).inbound_email_address
+        : null,
+    ai_email_auto_reply: (data as GymSettings).ai_email_auto_reply !== false,
+    belt_graduation_preset:
+      (data as GymSettings).belt_graduation_preset === 'ibjjf' ? 'ibjjf' : 'custom',
+    nfc_display_enabled: Boolean((data as GymSettings).nfc_display_enabled),
+    docusign_export_enabled: Boolean((data as GymSettings).docusign_export_enabled),
+    docusign_webhook_url:
+      typeof (data as GymSettings).docusign_webhook_url === 'string'
+        ? (data as GymSettings).docusign_webhook_url
+        : null,
+    buffer_access_token:
+      typeof (data as GymSettings).buffer_access_token === 'string'
+        ? (data as GymSettings).buffer_access_token
+        : null,
+    buffer_profile_ids: Array.isArray((data as GymSettings).buffer_profile_ids)
+      ? ((data as GymSettings).buffer_profile_ids as string[]).filter((id) => typeof id === 'string')
+      : [],
+    stripe_connect_account_id:
+      typeof (data as GymSettings).stripe_connect_account_id === 'string'
+        ? (data as GymSettings).stripe_connect_account_id
+        : null,
+    stripe_connect_onboarded: Boolean((data as GymSettings).stripe_connect_onboarded),
+    printful_api_key:
+      typeof (data as GymSettings).printful_api_key === 'string'
+        ? (data as GymSettings).printful_api_key
+        : null,
+    printful_store_id:
+      typeof (data as GymSettings).printful_store_id === 'string'
+        ? (data as GymSettings).printful_store_id
+        : null,
+    voice_briefing_enabled: Boolean((data as GymSettings).voice_briefing_enabled),
+    voice_briefing_phone:
+      typeof (data as GymSettings).voice_briefing_phone === 'string'
+        ? (data as GymSettings).voice_briefing_phone
+        : null,
   };
 }
 
@@ -224,6 +315,27 @@ export type UpdateGymSettingsInput = {
   digestFrequency?: 'daily' | 'weekly';
   digestSmsEnabled?: boolean;
   digestSmsPhone?: string | null;
+  aiMonthlyMessageLimit?: number;
+  aiVoiceEnabled?: boolean;
+  aiVoiceTransferKeyword?: string;
+  aiVoiceRecordCalls?: boolean;
+  staffTransferPhone?: string | null;
+  metaPageId?: string | null;
+  metaPageAccessToken?: string | null;
+  metaVerifyToken?: string | null;
+  metaInstagramId?: string | null;
+  inboundEmailAddress?: string | null;
+  aiEmailAutoReply?: boolean;
+  beltGraduationPreset?: 'custom' | 'ibjjf';
+  nfcDisplayEnabled?: boolean;
+  docusignExportEnabled?: boolean;
+  docusignWebhookUrl?: string | null;
+  bufferAccessToken?: string | null;
+  bufferProfileIds?: string[];
+  printfulApiKey?: string | null;
+  printfulStoreId?: string | null;
+  voiceBriefingEnabled?: boolean;
+  voiceBriefingPhone?: string | null;
 };
 
 export async function updateGymSettings(
@@ -347,6 +459,27 @@ export async function updateGymSettings(
       digest_frequency: input.digestFrequency === 'weekly' ? 'weekly' : 'daily',
       digest_sms_enabled: input.digestSmsEnabled ?? false,
       digest_sms_phone: input.digestSmsPhone?.trim() || null,
+      ai_monthly_message_limit: Math.max(0, input.aiMonthlyMessageLimit ?? 1000),
+      ai_voice_enabled: input.aiVoiceEnabled ?? false,
+      ai_voice_transfer_keyword: input.aiVoiceTransferKeyword?.trim() || 'staff',
+      ai_voice_record_calls: input.aiVoiceRecordCalls !== false,
+      staff_transfer_phone: input.staffTransferPhone?.trim() || null,
+      meta_page_id: input.metaPageId?.trim() || null,
+      meta_page_access_token: input.metaPageAccessToken?.trim() || null,
+      meta_verify_token: input.metaVerifyToken?.trim() || null,
+      meta_instagram_id: input.metaInstagramId?.trim() || null,
+      inbound_email_address: input.inboundEmailAddress?.trim() || null,
+      ai_email_auto_reply: input.aiEmailAutoReply !== false,
+      belt_graduation_preset: input.beltGraduationPreset === 'ibjjf' ? 'ibjjf' : 'custom',
+      nfc_display_enabled: input.nfcDisplayEnabled ?? false,
+      docusign_export_enabled: input.docusignExportEnabled ?? false,
+      docusign_webhook_url: input.docusignWebhookUrl?.trim() || null,
+      buffer_access_token: input.bufferAccessToken?.trim() || null,
+      buffer_profile_ids: input.bufferProfileIds ?? [],
+      printful_api_key: input.printfulApiKey?.trim() || null,
+      printful_store_id: input.printfulStoreId?.trim() || null,
+      voice_briefing_enabled: input.voiceBriefingEnabled ?? false,
+      voice_briefing_phone: input.voiceBriefingPhone?.trim() || null,
     })
     .eq('id', gymId)
     .select(GYM_SETTINGS_COLUMNS)

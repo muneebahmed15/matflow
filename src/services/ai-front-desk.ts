@@ -4,6 +4,7 @@ import { findKnowledgeReply } from '@/services/ai-knowledge';
 import { generateLlmReply } from '@/lib/ai/llm';
 import { streamLlmReply } from '@/lib/ai/llm-stream';
 import { moderateUserInput, MODERATION_BLOCK_MESSAGE } from '@/lib/ai/moderation';
+import { assertAiUsageWithinLimit, recordAiUsage } from '@/lib/ai/usage-metering';
 import { createLead } from '@/services/leads';
 import { sendSms } from '@/lib/sms/twilio';
 import { sendTransactionalEmail } from '@/lib/email/resend';
@@ -198,6 +199,8 @@ export async function sendWebChatMessage(
   if (!conv) throw new ServiceError(404, 'Conversation not found');
   if (conv.status === 'closed') throw new ServiceError(400, 'Conversation is closed');
 
+  await assertAiUsageWithinLimit(conv.gym_id);
+
   const moderation = await moderateUserInput(userMessage);
   if (moderation.flagged) {
     await admin.from('ai_messages').insert({
@@ -261,6 +264,8 @@ export async function sendWebChatMessage(
     role: 'assistant',
     content: reply,
   });
+
+  await recordAiUsage({ gymId: conv.gym_id, channel: 'web_chat' });
 
   return { reply, leadCaptured };
 }
@@ -633,5 +638,205 @@ export async function handleInboundSms(input: {
     // best-effort CRM logging
   }
 
+  return { reply };
+}
+
+export async function handleInboundEmail(input: {
+  gymId: string;
+  fromEmail: string;
+  subject: string;
+  body: string;
+}): Promise<void> {
+  const admin = getAdminClient();
+  const { data: gym } = await admin
+    .from('gyms')
+    .select('ai_front_desk_enabled, ai_email_auto_reply, name')
+    .eq('id', input.gymId)
+    .maybeSingle();
+
+  if (!gym?.ai_front_desk_enabled) return;
+
+  const { data: conv } = await admin
+    .from('ai_conversations')
+    .insert({
+      gym_id: input.gymId,
+      channel: 'email',
+      status: 'open',
+      visitor_email: input.fromEmail,
+    })
+    .select('id')
+    .single();
+
+  if (!conv) return;
+
+  const userText = `${input.subject}\n\n${input.body}`.trim();
+  await admin.from('ai_messages').insert({
+    conversation_id: conv.id,
+    role: 'user',
+    content: userText.slice(0, 8000),
+  });
+
+  const knowledgeReply = await findKnowledgeReply(input.gymId, userText);
+  const ctx = await getGymChatContext(input.gymId);
+  const reply = knowledgeReply ?? (await generateLlmReply(userText, [], ctx)).message;
+
+  const autoSend = gym.ai_email_auto_reply && Boolean(knowledgeReply);
+
+  await admin.from('ai_messages').insert({
+    conversation_id: conv.id,
+    role: 'assistant',
+    content: reply,
+    approval_status: autoSend ? 'sent' : 'pending',
+  });
+
+  if (autoSend && input.fromEmail) {
+    await sendTransactionalEmail({
+      to: input.fromEmail,
+      subject: `Re: ${input.subject || gym.name}`,
+      html: `<p>${reply.replace(/\n/g, '<br/>')}</p>`,
+      text: reply,
+    }).catch(() => undefined);
+  }
+
+  await recordAiUsage({ gymId: input.gymId, channel: 'email' });
+}
+
+export async function approveEmailDraft(input: {
+  gymId: string;
+  messageId: string;
+  actorId: string;
+}): Promise<void> {
+  const admin = getAdminClient();
+  const { data: message } = await admin
+    .from('ai_messages')
+    .select('id, content, conversation_id, approval_status')
+    .eq('id', input.messageId)
+    .maybeSingle();
+
+  if (!message || message.approval_status !== 'pending') {
+    throw new ServiceError(400, 'Draft not pending approval');
+  }
+
+  const { data: conv } = await admin
+    .from('ai_conversations')
+    .select('visitor_email, gym_id')
+    .eq('id', message.conversation_id)
+    .maybeSingle();
+
+  if (!conv || conv.gym_id !== input.gymId || !conv.visitor_email) {
+    throw new ServiceError(400, 'Conversation missing visitor email');
+  }
+
+  await sendTransactionalEmail({
+    to: conv.visitor_email,
+    subject: 'Reply from our team',
+    html: `<p>${message.content.replace(/\n/g, '<br/>')}</p>`,
+    text: message.content,
+  });
+
+  await admin
+    .from('ai_messages')
+    .update({
+      approval_status: 'sent',
+      approved_by: input.actorId,
+      approved_at: new Date().toISOString(),
+    })
+    .eq('id', input.messageId);
+}
+
+export type PendingEmailDraft = {
+  id: string;
+  content: string;
+  created_at: string;
+  visitor_email: string | null;
+  subject_context: string | null;
+};
+
+export async function listPendingEmailDrafts(gymId: string): Promise<PendingEmailDraft[]> {
+  const admin = getAdminClient();
+  const { data: convs } = await admin
+    .from('ai_conversations')
+    .select('id, visitor_email')
+    .eq('gym_id', gymId)
+    .eq('channel', 'email');
+
+  const convIds = (convs ?? []).map((c) => c.id);
+  if (convIds.length === 0) return [];
+
+  const emailByConv = new Map((convs ?? []).map((c) => [c.id, c.visitor_email as string | null]));
+
+  const { data: messages } = await admin
+    .from('ai_messages')
+    .select('id, content, created_at, conversation_id')
+    .in('conversation_id', convIds)
+    .eq('approval_status', 'pending')
+    .order('created_at', { ascending: false });
+
+  return (messages ?? []).map((m) => ({
+    id: m.id,
+    content: m.content,
+    created_at: m.created_at,
+    visitor_email: emailByConv.get(m.conversation_id) ?? null,
+    subject_context: null,
+  }));
+}
+
+export async function rejectEmailDraft(input: {
+  gymId: string;
+  messageId: string;
+  actorId: string;
+}): Promise<void> {
+  const admin = getAdminClient();
+  const { data: message } = await admin
+    .from('ai_messages')
+    .select('id, conversation_id, approval_status')
+    .eq('id', input.messageId)
+    .maybeSingle();
+
+  if (!message || message.approval_status !== 'pending') {
+    throw new ServiceError(400, 'Draft not pending approval');
+  }
+
+  const { data: conv } = await admin
+    .from('ai_conversations')
+    .select('gym_id')
+    .eq('id', message.conversation_id)
+    .maybeSingle();
+
+  if (!conv || conv.gym_id !== input.gymId) {
+    throw new ServiceError(400, 'Conversation not found');
+  }
+
+  await admin
+    .from('ai_messages')
+    .update({
+      approval_status: 'rejected',
+      approved_by: input.actorId,
+      approved_at: new Date().toISOString(),
+    })
+    .eq('id', input.messageId);
+}
+
+export async function handleInboundMetaMessage(input: {
+  gymId: string;
+  channel: 'messenger' | 'instagram';
+  senderId: string;
+  text: string;
+}): Promise<{ reply?: string }> {
+  const admin = getAdminClient();
+  const { data: conv } = await admin
+    .from('ai_conversations')
+    .insert({
+      gym_id: input.gymId,
+      channel: input.channel,
+      status: 'open',
+      visitor_name: input.senderId,
+    })
+    .select('id')
+    .single();
+
+  if (!conv) return {};
+  const { reply } = await sendWebChatMessage(conv.id, input.text);
+  await recordAiUsage({ gymId: input.gymId, channel: input.channel });
   return { reply };
 }

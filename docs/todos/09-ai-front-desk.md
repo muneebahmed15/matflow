@@ -22,20 +22,20 @@
 - [x] 9.15 Phone number per gym (`twilio_phone` in Settings + inbound SMS routing)
 
 ## Phone
-- [ ] 9.16 Twilio Voice integration (deferred — requires Twilio Voice setup)
-- [ ] 9.17 AI answers with TTS (deferred)
-- [ ] 9.18 Transfer to staff on keyword (deferred)
-- [ ] 9.19 Call recording with consent prompt (deferred)
-- [ ] 9.20 Voicemail transcription (deferred)
+- [x] 9.16 Twilio Voice integration (`/api/twilio/voice` + TwiML gather/transfer)
+- [x] 9.17 AI answers with TTS (Twilio `<Say>` + LLM)
+- [x] 9.18 Transfer to staff on keyword (`ai_voice_transfer_keyword`)
+- [x] 9.19 Call recording with consent prompt (`ai_voice_record_calls`)
+- [x] 9.20 Voicemail transcription (Twilio Record + transcription webhook)
 
 ## Email
-- [ ] 9.21 Inbound email parsing (deferred — Resend/SendGrid inbound)
-- [ ] 9.22 AI draft reply for staff approval (deferred)
-- [ ] 9.23 Auto-reply for FAQs (deferred)
+- [x] 9.21 Inbound email parsing (`/api/resend/inbound`)
+- [x] 9.22 AI draft reply for staff approval (`approval_status` on messages)
+- [x] 9.23 Auto-reply for FAQs (`ai_email_auto_reply` + knowledge match)
 
 ## Social
-- [ ] 9.24 Facebook Messenger webhook (deferred — Meta app)
-- [ ] 9.25 Instagram DM webhook (deferred — Meta API)
+- [x] 9.24 Facebook Messenger webhook (`/api/meta/webhook`)
+- [x] 9.25 Instagram DM webhook (Meta webhook, shared handler)
 - [x] 9.26 Unified inbox UI in dashboard (`/inbox` + AI Desk conversations + analytics)
 
 ## Knowledge Base
@@ -75,5 +75,5 @@
 - [x] 9.50 Languages supported (Settings + LLM prompt)
 
 ## Billing
-- [ ] 9.51 Usage metering (deferred)
-- [ ] 9.52 Overage alerts (deferred)
+- [x] 9.51 Usage metering (`ai_usage_events` + monthly limit)
+- [x] 9.52 Overage alerts (cron `/api/cron/ai-usage`)

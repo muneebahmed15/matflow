@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useAsyncMount } from '@/hooks/use-async-mount';
-import { Bot, BookOpen, MessageSquare, BarChart3 } from 'lucide-react';
+import { Bot, BookOpen, MessageSquare, BarChart3, Mail } from 'lucide-react';
 import {
   deleteAiKnowledgeAction,
   getAiAnalyticsAction,
@@ -10,6 +10,10 @@ import {
   listAiConversationsAction,
   listAiKnowledgeAction,
   upsertAiKnowledgeAction,
+  listPendingEmailDraftsAction,
+  approveEmailDraftAction,
+  rejectEmailDraftAction,
+  getAiUsageSummaryAction,
 } from '@/app/(dashboard)/actions';
 
 type Conversation = {
@@ -34,17 +38,25 @@ export default function AiDeskPage() {
   const [messages, setMessages] = useState<{ role: string; content: string; created_at: string }[]>([]);
   const [topic, setTopic] = useState('');
   const [content, setContent] = useState('');
-  const [tab, setTab] = useState<'knowledge' | 'inbox' | 'analytics'>('knowledge');
+  const [tab, setTab] = useState<'knowledge' | 'inbox' | 'analytics' | 'email'>('knowledge');
+  const [emailDrafts, setEmailDrafts] = useState<
+    { id: string; content: string; created_at: string; visitor_email: string | null }[]
+  >([]);
+  const [aiUsage, setAiUsage] = useState<{ used: number; limit: number } | null>(null);
 
   const load = async () => {
-    const [kRes, cRes, aRes] = await Promise.all([
+    const [kRes, cRes, aRes, dRes, uRes] = await Promise.all([
       listAiKnowledgeAction(),
       listAiConversationsAction(),
       getAiAnalyticsAction(),
+      listPendingEmailDraftsAction(),
+      getAiUsageSummaryAction(),
     ]);
     if (kRes.ok && kRes.data) setKnowledge(kRes.data);
     if (cRes.ok && cRes.data) setConversations(cRes.data as Conversation[]);
     if (aRes.ok && aRes.data) setAnalytics(aRes.data);
+    if (dRes.ok && dRes.data) setEmailDrafts(dRes.data);
+    if (uRes.ok && uRes.data) setAiUsage(uRes.data);
   };
 
   useAsyncMount(load, []);
@@ -63,11 +75,18 @@ export default function AiDeskPage() {
       <h1 className="text-3xl font-extrabold mb-2">AI Front Desk</h1>
       <p className="text-white/40 text-sm mb-6">Knowledge base powers web chat replies. Enable chat in Settings.</p>
 
+      {aiUsage && (
+        <p className="text-white/40 text-xs mb-4">
+          AI usage this month: {aiUsage.used} / {aiUsage.limit} messages
+        </p>
+      )}
+
       <div className="flex gap-2 mb-6 flex-wrap">
         {(
           [
             ['knowledge', BookOpen, 'Knowledge'],
             ['inbox', MessageSquare, 'Conversations'],
+            ['email', Mail, 'Email drafts'],
             ['analytics', BarChart3, 'Analytics'],
           ] as const
         ).map(([key, Icon, label]) => (
@@ -119,6 +138,44 @@ export default function AiDeskPage() {
               </li>
             ))}
           </ul>
+        </div>
+      ) : tab === 'email' ? (
+        <div className="space-y-3">
+          {emailDrafts.length === 0 ? (
+            <p className="text-white/30 text-sm">No pending email drafts.</p>
+          ) : (
+            emailDrafts.map((draft) => (
+              <div key={draft.id} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+                <div className="flex justify-between items-start gap-3 mb-2">
+                  <span className="text-white/50 text-xs">
+                    {draft.visitor_email ?? 'Unknown recipient'} ·{' '}
+                    {new Date(draft.created_at).toLocaleString()}
+                  </span>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void approveEmailDraftAction(draft.id).then(() => load())
+                      }
+                      className="text-green-400 text-xs hover:underline"
+                    >
+                      Approve & send
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void rejectEmailDraftAction(draft.id).then(() => load())
+                      }
+                      className="text-red-400 text-xs hover:underline"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+                <p className="text-white/80 text-sm whitespace-pre-wrap">{draft.content}</p>
+              </div>
+            ))
+          )}
         </div>
       ) : tab === 'analytics' ? (
         <div className="grid grid-cols-2 gap-3">

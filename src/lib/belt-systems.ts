@@ -85,12 +85,15 @@ export type BeltRequirement = {
   belt: string;
   minAttendance: number;
   minDaysAtRank: number;
+  minCompetitionWins?: number;
+  competitionBonusAttendance?: number;
 };
 
 export type ReadinessInput = {
   belt: string;
   daysAtRank: number;
   attendanceSinceRank: number;
+  competitionWins?: number;
   requirement: BeltRequirement | null;
 };
 
@@ -98,6 +101,7 @@ export type ReadinessResult = {
   ready: boolean;
   missingAttendance: number;
   missingDays: number;
+  missingCompetitionWins: number;
 };
 
 /**
@@ -106,18 +110,27 @@ export type ReadinessResult = {
  */
 export function evaluateReadiness(input: ReadinessInput): ReadinessResult {
   if (!input.requirement) {
-    return { ready: false, missingAttendance: 0, missingDays: 0 };
+    return { ready: false, missingAttendance: 0, missingDays: 0, missingCompetitionWins: 0 };
   }
+
+  const bonus =
+    (input.requirement.competitionBonusAttendance ?? 0) * (input.competitionWins ?? 0);
+  const effectiveAttendance = input.attendanceSinceRank + bonus;
 
   const missingAttendance = Math.max(
     0,
-    input.requirement.minAttendance - input.attendanceSinceRank
+    input.requirement.minAttendance - effectiveAttendance
   );
   const missingDays = Math.max(0, input.requirement.minDaysAtRank - input.daysAtRank);
+  const missingCompetitionWins = Math.max(
+    0,
+    (input.requirement.minCompetitionWins ?? 0) - (input.competitionWins ?? 0)
+  );
 
   return {
-    ready: missingAttendance === 0 && missingDays === 0,
+    ready: missingAttendance === 0 && missingDays === 0 && missingCompetitionWins === 0,
     missingAttendance,
     missingDays,
+    missingCompetitionWins,
   };
 }

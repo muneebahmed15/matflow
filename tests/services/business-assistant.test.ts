@@ -31,6 +31,7 @@ const baseMetrics = (): BusinessMetrics => ({
   atRiskChurnCount: 0,
   peakHours: new Array(24).fill(0),
   beltCeremonyCandidates: 0,
+  missedCalls7d: 0,
 });
 
 describe('metricsToRecommendations', () => {
