@@ -57,7 +57,7 @@ These items are being implemented in the current sprint:
 - [x] Apply migration to Supabase (`npm run db:start` + `npm run db:reset` locally, or `npm run db:push` remote)
 - [x] RLS integration tests for family portal waiver access (requires `SUPABASE_TEST_*`)
 - [x] E2E: waiver blocks check-in until signed (`npm run test:e2e:waiver`)
-- [ ] Remaining todos across Waves 3–4 (multi-location polish, AI modules)
+- [ ] Remaining todos: Wave 3 AI modules (9–10), optional integrations (Stripe Connect, Printful, Google OAuth)
 
 ### Wave 2 — Completion (20250704310000_wave2_complete.sql)
 
@@ -81,6 +81,12 @@ These items are being implemented in the current sprint:
 - [x] Coach read-only shop inventory view (`shop.read`)
 - [x] E2E: public cart → checkout (`npm run test:e2e:shop`)
 - Deferred: Stripe Connect (13.33), Printful dropship (13.34) → future integrations
+
+### Migration Center — post-Wave 4
+
+- [x] Google Sheets public URL import (`/api/migration/fetch-google-sheet`)
+- [x] Upload validation: size limits, allowed types, PDF magic-byte check
+- [~] Background queue (batched imports exist; full async worker deferred)
 
 ---
 

@@ -73,6 +73,8 @@ export default function MigrationPage() {
   const [waiverImportResult, setWaiverImportResult] = useState<string | null>(null);
   const [photoImportResult, setPhotoImportResult] = useState<string | null>(null);
   const [bulkUploading, setBulkUploading] = useState(false);
+  const [googleSheetUrl, setGoogleSheetUrl] = useState('');
+  const [fetchingSheet, setFetchingSheet] = useState(false);
 
   const load = async () => {
     const res = await listImportJobsAction();
@@ -98,6 +100,50 @@ export default function MigrationPage() {
     setColumnMapping({});
     setMappingConfirmed(false);
     setRawCsvText('');
+    setGoogleSheetUrl('');
+  };
+
+  const ingestSpreadsheet = (input: {
+    csvText: string;
+    headers: string[];
+    name: string;
+  }) => {
+    setResult(null);
+    setDryRunResult(null);
+    setProgress(0);
+    setMappingConfirmed(false);
+    setRawCsvText(input.csvText);
+    setCsvHeaders(input.headers);
+    setColumnMapping(guessColumnMap(input.headers, IMPORT_TARGET_FIELDS[importType]));
+    setFileName(input.name);
+    setPreview([]);
+    setParsedRows([]);
+  };
+
+  const handleGoogleSheetImport = async () => {
+    if (!googleSheetUrl.trim()) return;
+    setFetchingSheet(true);
+    setDryRunResult(null);
+    try {
+      const res = await fetch('/api/migration/fetch-google-sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: googleSheetUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDryRunResult(`Error: ${data.error ?? 'Failed to fetch Google Sheet'}`);
+        return;
+      }
+      ingestSpreadsheet({
+        csvText: data.csvText as string,
+        headers: data.headers as string[],
+        name: data.fileName as string,
+      });
+      setDryRunResult(`Loaded ${data.rowCount as number} rows from Google Sheets. Map columns and validate.`);
+    } finally {
+      setFetchingSheet(false);
+    }
   };
 
   const applyMapping = (rows: string[][], mapping: Record<string, string>) => {
@@ -146,7 +192,6 @@ export default function MigrationPage() {
     setMappingConfirmed(false);
 
     const isXlsx = file.name.toLowerCase().endsWith('.xlsx');
-    let text: string;
 
     if (isXlsx) {
       const form = new FormData();
@@ -157,17 +202,15 @@ export default function MigrationPage() {
         setDryRunResult(`Error: ${data.error ?? 'Failed to parse spreadsheet'}`);
         return;
       }
-      text = data.csvText as string;
-      setCsvHeaders(data.headers as string[]);
-      setColumnMapping(guessColumnMap(data.headers as string[], IMPORT_TARGET_FIELDS[importType]));
-      setFileName(file.name);
-      setRawCsvText(text);
-      setPreview([]);
-      setParsedRows([]);
+      ingestSpreadsheet({
+        csvText: data.csvText as string,
+        headers: data.headers as string[],
+        name: file.name,
+      });
       return;
     }
 
-    text = await file.text();
+    const text = await file.text();
     setRawCsvText(text);
     const rows = parseCsv(text);
     if (rows.length < 2) {
@@ -347,7 +390,7 @@ export default function MigrationPage() {
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
       <h1 className="text-3xl font-extrabold mb-2">Migration Center</h1>
       <p className="text-white/40 text-sm mb-6">
-        Import members, leads, class schedules, attendance history, or belt history from CSV or Excel (.xlsx).
+        Import members, leads, class schedules, attendance history, or belt history from CSV, Excel (.xlsx), or a public Google Sheet.
       </p>
 
       <MigrationStepper steps={steps} />
@@ -412,10 +455,33 @@ export default function MigrationPage() {
             type="file"
             accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="hidden"
-            disabled={importing || committing}
+            disabled={importing || committing || fetchingSheet}
             onChange={(e) => e.target.files?.[0] && void handleFile(e.target.files[0])}
           />
         </label>
+
+        <div className="border-t border-white/10 pt-4 space-y-3">
+          <p className="text-white/50 text-sm">Or import from Google Sheets (public link)</p>
+          <input
+            type="url"
+            value={googleSheetUrl}
+            onChange={(e) => setGoogleSheetUrl(e.target.value)}
+            placeholder="https://docs.google.com/spreadsheets/d/..."
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={importing || committing || fetchingSheet}
+          />
+          <button
+            type="button"
+            onClick={() => void handleGoogleSheetImport()}
+            disabled={!googleSheetUrl.trim() || importing || committing || fetchingSheet}
+            className="w-full bg-white/10 hover:bg-white/15 disabled:opacity-50 text-white font-medium py-2.5 rounded-xl text-sm transition"
+          >
+            {fetchingSheet ? 'Fetching sheet…' : 'Import from Google Sheets'}
+          </button>
+          <p className="text-white/30 text-xs">
+            Sheet must be shared as “Anyone with the link can view”. OAuth for private sheets is not required for public links.
+          </p>
+        </div>
 
         {csvHeaders.length > 0 && !mappingConfirmed && (
           <>

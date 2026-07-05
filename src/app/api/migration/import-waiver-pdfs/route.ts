@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isErrorResponse, requireStaffAuth } from '@/lib/auth/api';
 import { importSignedWaiverPdfs } from '@/services/waiver-import';
+import { assertPdfMagicBytes, validatePdfUpload } from '@/lib/upload-validation';
 import { handleRouteError } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
@@ -18,6 +19,14 @@ export async function POST(req: NextRequest) {
     for (const [key, value] of formData.entries()) {
       if (key === 'waiver_id') continue;
       if (value instanceof File && value.size > 0) {
+        const uploadError = validatePdfUpload(value);
+        if (uploadError) {
+          return NextResponse.json({ error: uploadError }, { status: 400 });
+        }
+        const magicError = await assertPdfMagicBytes(value);
+        if (magicError) {
+          return NextResponse.json({ error: `${value.name}: ${magicError}` }, { status: 400 });
+        }
         files.push({ name: value.name, bytes: new Uint8Array(await value.arrayBuffer()) });
       }
     }

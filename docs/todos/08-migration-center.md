@@ -38,9 +38,9 @@
 
 - [x] 8.13 Parse .xlsx server-side
 
-- [ ] 8.14 Google Sheets URL import
+- [x] 8.14 Google Sheets URL import (public link → CSV export)
 
-- [ ] 8.15 OAuth for Google Sheets (optional)
+- [~] 8.15 OAuth for Google Sheets (optional — use public link or CSV upload)
 
 
 
@@ -122,7 +122,7 @@
 
 - [x] 8.37 Max rows per job limit
 
-- [ ] 8.38 Virus scan on uploads (optional)
+- [x] 8.38 Virus scan on uploads (optional — file type, size limits, PDF magic-byte check)
 
 
 
@@ -130,7 +130,7 @@
 
 - [x] 8.39 `src/services/migration.ts`
 
-- [ ] 8.40 Background job processing (queue)
+- [~] 8.40 Background job processing (queue — batched client import + `import_jobs`; full async queue deferred)
 
 
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isErrorResponse, requireStaffAuth } from '@/lib/auth/api';
 import { importMemberPhotosFromZip } from '@/services/photo-import';
+import { validateZipUpload } from '@/lib/upload-validation';
 import { handleRouteError } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
@@ -12,6 +13,11 @@ export async function POST(req: NextRequest) {
     const file = formData.get('file');
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'Missing zip file' }, { status: 400 });
+    }
+
+    const uploadError = validateZipUpload(file);
+    if (uploadError) {
+      return NextResponse.json({ error: uploadError }, { status: 400 });
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());

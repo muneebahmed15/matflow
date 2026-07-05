@@ -5,6 +5,7 @@ import {
   parseXlsxSpreadsheet,
   parseCsvSpreadsheet,
 } from '@/lib/parse-spreadsheet';
+import { validateSpreadsheetUpload } from '@/lib/upload-validation';
 import { handleRouteError } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
@@ -16,6 +17,11 @@ export async function POST(req: NextRequest) {
     const file = formData.get('file');
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'Missing file' }, { status: 400 });
+    }
+
+    const uploadError = validateSpreadsheetUpload(file);
+    if (uploadError) {
+      return NextResponse.json({ error: uploadError }, { status: 400 });
     }
 
     const format = detectSpreadsheetFormat(file.name, file.type);

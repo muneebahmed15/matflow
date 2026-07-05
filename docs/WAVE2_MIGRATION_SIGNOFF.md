@@ -5,9 +5,11 @@ Use this checklist before pilot import (8.45) and production cutover (8.46).
 ## Pre-import (staging)
 
 - [ ] Migration SQL `20250704310000_wave2_complete.sql` applied
+- [ ] Migration SQL `20250704320000_wave4_shop_complete.sql` applied (if using shop bundles)
 - [ ] ECMMA field mapping reviewed — [ECMMA_FIELD_MAPPING.md](./ECMMA_FIELD_MAPPING.md)
 - [ ] CSV templates downloaded and validated with dry-run
 - [ ] `.xlsx` source files parse via Migration Center upload
+- [ ] Google Sheets public URL import tested (optional data source)
 - [ ] Duplicate email strategy chosen (skip / update / error)
 - [ ] Stripe customer ID mapping tested (no card data imported)
 - [ ] Signed waiver PDF batch tested (`email.pdf` naming → `waiver-imports` bucket)
