@@ -102,3 +102,50 @@ export async function toggleCrmNotePin(
 
   if (error) throw new ServiceError(500, error.message);
 }
+
+export type CrmNoteSearchResult = CrmNote & {
+  member_name: string | null;
+  lead_name: string | null;
+};
+
+export async function searchCrmNotes(
+  gymId: string,
+  query: string,
+  limit = 30
+): Promise<CrmNoteSearchResult[]> {
+  const q = query.trim();
+  if (!q) return [];
+
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('crm_notes')
+    .select('*, members(first_name, last_name), leads(first_name, last_name)')
+    .eq('gym_id', gymId)
+    .ilike('body', `%${q}%`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw new ServiceError(500, error.message);
+
+  return (data ?? []).map((row) => {
+    const note = row as CrmNote & {
+      members: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
+      leads: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
+    };
+    const member = Array.isArray(note.members) ? note.members[0] : note.members;
+    const lead = Array.isArray(note.leads) ? note.leads[0] : note.leads;
+    return {
+      id: note.id,
+      gym_id: note.gym_id,
+      member_id: note.member_id,
+      lead_id: note.lead_id,
+      author_id: note.author_id,
+      note_type: note.note_type,
+      body: note.body,
+      is_pinned: note.is_pinned,
+      created_at: note.created_at,
+      member_name: member ? `${member.first_name} ${member.last_name}`.trim() : null,
+      lead_name: lead ? `${lead.first_name} ${lead.last_name}`.trim() : null,
+    };
+  });
+}

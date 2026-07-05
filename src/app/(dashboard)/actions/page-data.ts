@@ -322,3 +322,33 @@ export async function setFamilyBillingContactAction(
     return toActionError(error);
   }
 }
+
+export async function mergeFamiliesAction(
+  targetFamilyId: string,
+  sourceFamilyId: string
+): Promise<ActionResult<{ family: import('@/services/families').FamilyDetail }>> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { mergeFamilies } = await import('@/services/families');
+    const family = await mergeFamilies(auth.gymId, targetFamilyId, sourceFamilyId);
+    revalidatePath('/families');
+    revalidatePath(`/families/${targetFamilyId}`);
+    return { ok: true, data: { family } };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function updateMemberRequiredFieldsAction(
+  fields: Record<string, boolean>
+): Promise<ActionResult<Awaited<ReturnType<typeof getGymSettings>>>> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { updateMemberRequiredFields } = await import('@/services/gym');
+    const settings = await updateMemberRequiredFields(auth.gymId, fields);
+    revalidatePath('/settings');
+    return { ok: true, data: settings };
+  } catch (error) {
+    return toActionError(error);
+  }
+}

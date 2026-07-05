@@ -20,12 +20,13 @@ import {
   updateMember,
 } from '@/services/members';
 
-function chain(result: { data?: unknown; error?: { message: string } | null }) {
+function chain(result: { data?: unknown; error?: { message: string } | null; count?: number }) {
   const builder: Record<string, unknown> = {};
-  for (const method of ['select', 'eq', 'update', 'insert', 'delete', 'order']) {
+  for (const method of ['select', 'eq', 'update', 'insert', 'delete', 'order', 'is', 'ilike']) {
     builder[method] = vi.fn(() => builder);
   }
   builder.single = vi.fn(async () => result);
+  builder.maybeSingle = vi.fn(async () => result);
   builder.then = (resolve: (value: typeof result) => void) => Promise.resolve(result).then(resolve);
   return builder;
 }
@@ -61,10 +62,17 @@ describe('members service', () => {
     mockFrom
       .mockReturnValueOnce(
         chain({
-          data: { id: 'm1', first_name: 'Jane', status: 'active', date_of_birth: '1990-01-01' },
+          data: { id: 'm1', first_name: 'Jane', status: 'active', date_of_birth: '1990-01-01', email: 'j@x.com', phone: '555' },
           error: null,
         })
       )
+      .mockReturnValueOnce(
+        chain({
+          data: { member_required_fields: {} },
+          error: null,
+        })
+      )
+      .mockReturnValueOnce(chain({ count: 0, error: null }))
       .mockReturnValueOnce(
         chain({ data: { id: 'm1', first_name: 'Janet' }, error: null })
       );

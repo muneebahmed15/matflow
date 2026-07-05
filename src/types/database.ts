@@ -1862,6 +1862,7 @@ export type Database = {
           hero_variant_b_headline: string | null
           hero_variant_b_subheadline: string | null
           marketing_enabled: boolean
+          member_required_fields: Json
           public_translations: Json
           seo_keywords: string[] | null
         }
@@ -1888,6 +1889,7 @@ export type Database = {
           kiosk_enabled?: boolean
           locale?: string
           logo_url?: string | null
+          member_required_fields?: Json
           meta_pixel_id?: string | null
           name: string
           owner_id: string
@@ -1927,6 +1929,7 @@ export type Database = {
           kiosk_enabled?: boolean
           locale?: string
           logo_url?: string | null
+          member_required_fields?: Json
           meta_pixel_id?: string | null
           name?: string
           owner_id?: string
@@ -2222,10 +2225,14 @@ export type Database = {
       }
       members: {
         Row: {
+          address_line1: string | null
+          address_line2: string | null
           auth_user_id: string | null
           belt_rank: string | null
+          city: string | null
           created_at: string
           date_of_birth: string | null
+          deleted_at: string | null
           email: string | null
           email_opt_out: boolean
           marketing_email_consent: boolean
@@ -2234,22 +2241,29 @@ export type Database = {
           external_id: string | null
           family_id: string | null
           first_name: string
+          gender: string | null
           gym_id: string
           id: string
           import_job_id: string | null
           last_name: string
           phone: string | null
           portal_role: string
+          postal_code: string | null
           profile_photo_url: string | null
+          state: string | null
           status: string
           stripe_count: number
           tags: string[]
         }
         Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
           auth_user_id?: string | null
           belt_rank?: string | null
+          city?: string | null
           created_at?: string
           date_of_birth?: string | null
+          deleted_at?: string | null
           email?: string | null
           email_opt_out?: boolean
           marketing_email_consent?: boolean
@@ -2258,22 +2272,29 @@ export type Database = {
           external_id?: string | null
           family_id?: string | null
           first_name: string
+          gender?: string | null
           gym_id: string
           id?: string
           import_job_id?: string | null
           last_name: string
           phone?: string | null
           portal_role?: string
+          postal_code?: string | null
           profile_photo_url?: string | null
+          state?: string | null
           status?: string
           stripe_count?: number
           tags?: string[]
         }
         Update: {
+          address_line1?: string | null
+          address_line2?: string | null
           auth_user_id?: string | null
           belt_rank?: string | null
+          city?: string | null
           created_at?: string
           date_of_birth?: string | null
+          deleted_at?: string | null
           email?: string | null
           email_opt_out?: boolean
           marketing_email_consent?: boolean
@@ -2282,13 +2303,16 @@ export type Database = {
           external_id?: string | null
           family_id?: string | null
           first_name?: string
+          gender?: string | null
           gym_id?: string
           id?: string
           import_job_id?: string | null
           last_name?: string
           phone?: string | null
           portal_role?: string
+          postal_code?: string | null
           profile_photo_url?: string | null
+          state?: string | null
           status?: string
           stripe_count?: number
           tags?: string[]
@@ -2562,16 +2586,66 @@ export type Database = {
           },
         ]
       }
+      product_variants: {
+        Row: {
+          created_at: string
+          gym_id: string
+          id: string
+          inventory_count: number
+          label: string
+          price_cents: number | null
+          product_id: string
+          sku: string | null
+        }
+        Insert: {
+          created_at?: string
+          gym_id: string
+          id?: string
+          inventory_count?: number
+          label: string
+          price_cents?: number | null
+          product_id: string
+          sku?: string | null
+        }
+        Update: {
+          created_at?: string
+          gym_id?: string
+          id?: string
+          inventory_count?: number
+          label?: string
+          price_cents?: number | null
+          product_id?: string
+          sku?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_variants_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_variants_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           category: string
           created_at: string
           description: string | null
+          gallery_urls: Json
           gym_id: string
           id: string
           image_url: string | null
           inventory_count: number
           is_active: boolean
+          members_only: boolean
           name: string
           price_cents: number
           sku: string | null
@@ -2580,11 +2654,13 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string | null
+          gallery_urls?: Json
           gym_id: string
           id?: string
           image_url?: string | null
           inventory_count?: number
           is_active?: boolean
+          members_only?: boolean
           name: string
           price_cents: number
           sku?: string | null
@@ -2593,11 +2669,13 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string | null
+          gallery_urls?: Json
           gym_id?: string
           id?: string
           image_url?: string | null
           inventory_count?: number
           is_active?: boolean
+          members_only?: boolean
           name?: string
           price_cents?: number
           sku?: string | null
@@ -2763,6 +2841,61 @@ export type Database = {
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_adjustments: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          delta: number
+          gym_id: string
+          id: string
+          product_id: string | null
+          reason: string | null
+          variant_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          delta: number
+          gym_id: string
+          id?: string
+          product_id?: string | null
+          reason?: string | null
+          variant_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          delta?: number
+          gym_id?: string
+          id?: string
+          product_id?: string | null
+          reason?: string | null
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_adjustments_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_adjustments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_adjustments_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
             referencedColumns: ["id"]
           },
         ]

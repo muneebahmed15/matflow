@@ -6,7 +6,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { canAccessRoute, type StaffRole } from '@/lib/permissions'
 import { getDashboardSessionAction } from '@/app/(dashboard)/actions'
-import { LayoutDashboard, Users, UserCheck, Calendar, CreditCard, Settings, LogOut, Menu, X, FileText, Dumbbell, Award, UserPlus, ShieldCheck, Upload, Megaphone, ShoppingBag, Sparkles, Globe, ScrollText, UsersRound, Bot, Inbox } from 'lucide-react'
+import { LayoutDashboard, Users, UserCheck, Calendar, CreditCard, Settings, LogOut, Menu, X, FileText, Dumbbell, Award, UserPlus, ShieldCheck, Upload, Megaphone, ShoppingBag, Sparkles, Globe, ScrollText, UsersRound, Bot, Inbox, StickyNote } from 'lucide-react'
 import Logo from '@/components/Logo'
 import { AppUiProvider } from '@/components/ui/AppUiProvider'
 import PageLoader from '@/components/PageLoader'
@@ -27,6 +27,7 @@ const navItems = [
   { label: 'Migration', href: '/migration', icon: Upload, adminOnly: true },
   { label: 'Marketing', href: '/marketing', icon: Megaphone, adminOnly: true },
   { label: 'Inbox', href: '/inbox', icon: Inbox, adminOnly: true },
+  { label: 'Notes', href: '/notes', icon: StickyNote, adminOnly: true },
   { label: 'Shop', href: '/shop', icon: ShoppingBag, adminOnly: true },
   { label: 'Insights', href: '/insights', icon: Sparkles, adminOnly: true },
   { label: 'AI Desk', href: '/ai-desk', icon: Bot, adminOnly: true },

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Users, ArrowLeft, CreditCard } from 'lucide-react';
 import PageLoader from '@/components/PageLoader';
-import { getFamilyDetailAction, setFamilyBillingContactAction } from '@/app/(dashboard)/actions';
+import { getFamilyDetailAction, setFamilyBillingContactAction, mergeFamiliesAction } from '@/app/(dashboard)/actions';
 
 const STATUS_STYLES: Record<string, string> = {
   active: 'bg-green-500/10 text-green-400',
@@ -37,6 +37,9 @@ export default function FamilyDetailPage() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [savingBilling, setSavingBilling] = useState(false);
+  const [sourceFamilyId, setSourceFamilyId] = useState('');
+  const [merging, setMerging] = useState(false);
+  const [mergeError, setMergeError] = useState('');
 
   const load = useCallback(async () => {
     const result = await getFamilyDetailAction(id);
@@ -115,6 +118,39 @@ export default function FamilyDetailPage() {
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-5 mb-8 space-y-3">
+        <h2 className="font-semibold text-white">Merge family</h2>
+        <p className="text-white/40 text-sm">
+          Move all members from another family into this one, then delete the source family.
+        </p>
+        <input
+          value={sourceFamilyId}
+          onChange={(e) => setSourceFamilyId(e.target.value)}
+          placeholder="Source family ID to merge in"
+          className={inputClass}
+        />
+        {mergeError && <p className="text-red-400 text-sm">{mergeError}</p>}
+        <button
+          disabled={merging || !sourceFamilyId.trim()}
+          onClick={async () => {
+            if (!confirm('Merge the source family into this one? This cannot be undone.')) return;
+            setMerging(true);
+            setMergeError('');
+            const result = await mergeFamiliesAction(family.id, sourceFamilyId.trim());
+            setMerging(false);
+            if (result.ok) {
+              setSourceFamilyId('');
+              void load();
+            } else {
+              setMergeError(result.error ?? 'Merge failed');
+            }
+          }}
+          className="text-sm text-amber-400 hover:underline disabled:opacity-40"
+        >
+          {merging ? 'Merging…' : 'Merge into this family'}
+        </button>
       </div>
 
       <h2 className="text-sm font-semibold text-white/40 uppercase tracking-wider mb-3">Members</h2>

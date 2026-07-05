@@ -19,7 +19,7 @@ export interface StaffInfo {
 /** @deprecated Use capability checks; kept for proxy compatibility */
 export const ADMIN_ONLY_ROUTES = [
   '/plans', '/subscriptions', '/settings', '/staff', '/leads',
-  '/migration', '/marketing', '/shop', '/insights', '/website-content', '/audit', '/families', '/ai-desk', '/inbox',
+  '/migration', '/marketing', '/shop', '/insights', '/website-content', '/audit', '/families', '/ai-desk', '/inbox', '/notes',
 ]
 
 export async function getCurrentStaffInfo(): Promise<StaffInfo> {

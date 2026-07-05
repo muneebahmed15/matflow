@@ -45,10 +45,11 @@ export type GymSettings = Pick<GymRow, 'id' | 'name' | 'slug' | 'kiosk_enabled'>
   seo_keywords: string[] | null;
   public_translations: Record<string, unknown>;
   locale: string;
+  member_required_fields: Record<string, unknown>;
 };
 
 const GYM_SETTINGS_COLUMNS =
-  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, marketing_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, hero_image_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, google_ads_conversion_id, review_checkin_threshold, require_waiver_for_checkin, timezone, locale, belt_system, belt_custom_order, belt_color_overrides, booking_cancel_hours, class_reminder_hours, hero_ab_enabled, hero_variant_b_headline, hero_variant_b_subheadline, seo_keywords, public_translations';
+  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, marketing_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, hero_image_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, google_ads_conversion_id, review_checkin_threshold, require_waiver_for_checkin, timezone, locale, belt_system, belt_custom_order, belt_color_overrides, booking_cancel_hours, class_reminder_hours, hero_ab_enabled, hero_variant_b_headline, hero_variant_b_subheadline, seo_keywords, public_translations, member_required_fields';
 
 function parseGymSettingsRow(data: Record<string, unknown>): GymSettings {
   const customOrder = data.belt_custom_order;
@@ -64,6 +65,11 @@ function parseGymSettingsRow(data: Record<string, unknown>): GymSettings {
       (data as GymSettings).public_translations &&
       typeof (data as GymSettings).public_translations === 'object'
         ? ((data as GymSettings).public_translations as Record<string, unknown>)
+        : {},
+    member_required_fields:
+      (data as GymSettings).member_required_fields &&
+      typeof (data as GymSettings).member_required_fields === 'object'
+        ? ((data as GymSettings).member_required_fields as Record<string, unknown>)
         : {},
     belt_custom_order: Array.isArray(customOrder)
       ? customOrder.filter((b): b is string => typeof b === 'string')
@@ -284,6 +290,22 @@ export async function completeGymSetup(gymId: string): Promise<GymSettings> {
   const { data, error } = await admin
     .from('gyms')
     .update({ setup_completed_at: new Date().toISOString() })
+    .eq('id', gymId)
+    .select(GYM_SETTINGS_COLUMNS)
+    .single();
+
+  if (error) throw new ServiceError(500, error.message);
+  return parseGymSettingsRow(data as Record<string, unknown>);
+}
+
+export async function updateMemberRequiredFields(
+  gymId: string,
+  fields: Record<string, boolean>
+): Promise<GymSettings> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('gyms')
+    .update({ member_required_fields: fields })
     .eq('id', gymId)
     .select(GYM_SETTINGS_COLUMNS)
     .single();

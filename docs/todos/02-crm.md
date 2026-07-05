@@ -6,12 +6,12 @@
 - [x] 2.3 List/search members dashboard (done)
 - [x] 2.4 Member detail page with tabs (done)
 - [x] 2.5 Member detail uses `getCurrentStaffInfo` not owner-only lookup
-- [~] 2.6 Member soft-delete with `deleted_at`
+- [x] 2.6 Member soft-delete with `deleted_at`
 - [x] 2.7 Member archive status vs hard delete
 - [x] 2.8 Member photo/avatar URL field
 - [x] 2.9 Member date of birth field (used for minor waiver flow)
-- [ ] 2.10 Member gender field (optional)
-- [ ] 2.11 Member address fields
+- [x] 2.10 Member gender field (optional)
+- [x] 2.11 Member address fields
 - [x] 2.12 Member tags (text[] on members, editable on member detail)
 - [x] 2.13 Bulk member export CSV
 - [x] 2.14 Bulk member import (see Migration module)
@@ -23,7 +23,7 @@
 - [x] 2.18 Family detail page (`/families/[id]` with member list)
 - [x] 2.19 View all members in a family (family detail page)
 - [x] 2.20 Family billing contact designation
-- [ ] 2.21 Merge duplicate families
+- [x] 2.21 Merge duplicate families
 
 ## Parents & Guardians
 - [x] 2.22 `emergency_contacts` table (Wave 1)
@@ -60,7 +60,7 @@
 - [x] 2.47 Member detail Notes tab
 - [x] 2.48 Lead detail Notes tab (LeadNotesPanel in expanded lead row)
 - [x] 2.49 Pin important notes (toggleMemberNotePinAction)
-- [ ] 2.50 Note search across gym
+- [x] 2.50 Note search across gym
 - [x] 2.51 Interaction timeline aggregates notes + attendance + promotions + waivers + subscriptions
 
 ## Communication Log
@@ -72,7 +72,7 @@
 ## Data Quality
 - [x] 2.56 Email format validation on create
 - [x] 2.57 Phone E.164 normalization
-- [ ] 2.58 Required fields configurable per gym
+- [x] 2.58 Required fields configurable per gym
 - [x] 2.59 Data completeness score per member
 
 ## Permissions

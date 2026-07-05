@@ -17,7 +17,7 @@ export default async function GymShopPage({ params }: Props) {
   const gym = await getPublicGymBySlug(gymSlug);
   if (!gym || !gym.store_enabled) notFound();
 
-  const products = await listProducts(gym.id, true);
+  const products = (await listProducts(gym.id, true)).filter((p) => !p.members_only);
   const accent = gymPrimaryColor(gym.primary_color);
   const admin = getAdminClient();
   const { data: gymMeta } = await admin.from('gyms').select('store_return_policy').eq('id', gym.id).single();

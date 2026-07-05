@@ -11,18 +11,57 @@ export type Product = {
   price_cents: number;
   category: string;
   image_url: string | null;
+  gallery_urls: string[];
   inventory_count: number;
   is_active: boolean;
+  members_only: boolean;
   created_at: string;
 };
 
-export async function listProducts(gymId: string, activeOnly = false): Promise<Product[]> {
+export type ProductVariant = {
+  id: string;
+  product_id: string;
+  gym_id: string;
+  label: string;
+  sku: string | null;
+  price_cents: number | null;
+  inventory_count: number;
+};
+
+export async function listProducts(
+  gymId: string,
+  activeOnly = false,
+  options?: { category?: string; membersOnly?: boolean }
+): Promise<Product[]> {
   const admin = getAdminClient();
   let query = admin.from('products').select('*').eq('gym_id', gymId).order('name');
   if (activeOnly) query = query.eq('is_active', true);
+  if (options?.category) query = query.eq('category', options.category);
+  if (options?.membersOnly !== undefined) query = query.eq('members_only', options.membersOnly);
   const { data, error } = await query;
   if (error) throw new ServiceError(500, error.message);
-  return (data ?? []) as Product[];
+  return (data ?? []).map(normalizeProduct);
+}
+
+export async function getProduct(gymId: string, productId: string): Promise<Product | null> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('products')
+    .select('*')
+    .eq('id', productId)
+    .eq('gym_id', gymId)
+    .maybeSingle();
+  if (error) throw new ServiceError(500, error.message);
+  return data ? normalizeProduct(data) : null;
+}
+
+function normalizeProduct(row: Record<string, unknown>): Product {
+  const gallery = row.gallery_urls;
+  return {
+    ...(row as Product),
+    gallery_urls: Array.isArray(gallery) ? gallery.filter((u): u is string => typeof u === 'string') : [],
+    members_only: Boolean(row.members_only),
+  };
 }
 
 export async function createProduct(input: {
@@ -34,6 +73,7 @@ export async function createProduct(input: {
   category?: string;
   imageUrl?: string;
   inventoryCount?: number;
+  membersOnly?: boolean;
 }): Promise<Product> {
   const admin = getAdminClient();
   const { data, error } = await admin
@@ -47,12 +87,117 @@ export async function createProduct(input: {
       category: input.category ?? 'apparel',
       image_url: input.imageUrl?.trim() || null,
       inventory_count: input.inventoryCount ?? 0,
+      members_only: input.membersOnly ?? false,
     })
     .select('*')
     .single();
 
   if (error) throw new ServiceError(500, error.message);
-  return data as Product;
+  return normalizeProduct(data as Record<string, unknown>);
+}
+
+export async function listProductVariants(gymId: string, productId: string): Promise<ProductVariant[]> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('product_variants')
+    .select('*')
+    .eq('gym_id', gymId)
+    .eq('product_id', productId)
+    .order('label');
+  if (error) throw new ServiceError(500, error.message);
+  return (data ?? []) as ProductVariant[];
+}
+
+export async function createProductVariant(input: {
+  gymId: string;
+  productId: string;
+  label: string;
+  sku?: string;
+  priceCents?: number | null;
+  inventoryCount?: number;
+}): Promise<ProductVariant> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('product_variants')
+    .insert({
+      gym_id: input.gymId,
+      product_id: input.productId,
+      label: input.label.trim(),
+      sku: input.sku?.trim() || null,
+      price_cents: input.priceCents ?? null,
+      inventory_count: input.inventoryCount ?? 0,
+    })
+    .select('*')
+    .single();
+  if (error) throw new ServiceError(500, error.message);
+  return data as ProductVariant;
+}
+
+export async function adjustProductStock(input: {
+  gymId: string;
+  productId: string;
+  delta: number;
+  reason?: string;
+  actorId?: string | null;
+}): Promise<number> {
+  const admin = getAdminClient();
+  const { data: product } = await admin
+    .from('products')
+    .select('inventory_count')
+    .eq('id', input.productId)
+    .eq('gym_id', input.gymId)
+    .maybeSingle();
+  if (!product) throw new ServiceError(404, 'Product not found');
+
+  const next = Math.max(0, (product.inventory_count ?? 0) + input.delta);
+  const { error } = await admin
+    .from('products')
+    .update({ inventory_count: next })
+    .eq('id', input.productId);
+  if (error) throw new ServiceError(500, error.message);
+
+  await admin.from('stock_adjustments').insert({
+    gym_id: input.gymId,
+    product_id: input.productId,
+    delta: input.delta,
+    reason: input.reason ?? null,
+    actor_id: input.actorId ?? null,
+  });
+
+  return next;
+}
+
+export async function getShopRevenueByProduct(gymId: string): Promise<
+  { productId: string; name: string; unitsSold: number; revenueCents: number }[]
+> {
+  const admin = getAdminClient();
+  const { data: items, error } = await admin
+    .from('order_items')
+    .select('quantity, unit_price_cents, product_id, products(name), orders!inner(gym_id, status)')
+    .eq('orders.gym_id', gymId)
+    .in('orders.status', ['paid', 'fulfilled']);
+
+  if (error) throw new ServiceError(500, error.message);
+
+  const map = new Map<string, { name: string; unitsSold: number; revenueCents: number }>();
+  for (const row of items ?? []) {
+    const item = row as {
+      quantity: number;
+      unit_price_cents: number;
+      product_id: string;
+      products: { name: string } | { name: string }[] | null;
+    };
+    const product = Array.isArray(item.products) ? item.products[0] : item.products;
+    const name = product?.name ?? 'Product';
+    const existing = map.get(item.product_id) ?? { name, unitsSold: 0, revenueCents: 0 };
+    existing.unitsSold += item.quantity;
+    existing.revenueCents += item.quantity * item.unit_price_cents;
+    map.set(item.product_id, existing);
+  }
+
+  return [...map.entries()]
+    .map(([productId, stats]) => ({ productId, ...stats }))
+    .sort((a, b) => b.revenueCents - a.revenueCents);
 }
 
 export async function updateProductInventory(

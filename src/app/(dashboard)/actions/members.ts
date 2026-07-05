@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { requireStaffSession } from '@/lib/auth/staff';
 
 
-import { createMember, archiveMember, deleteMember, exportMembersCsv, getMember, listFamilies, listMembers, updateMember, type CreateMemberInput, type MemberDetail, type MemberSummary } from '@/services/members';
+import { createMember, archiveMember, deleteMember, exportMembersCsv, getMember, listFamilies, listMembers, updateMember, softDeleteMember, type CreateMemberInput, type MemberDetail, type MemberSummary } from '@/services/members';
 
 
 
@@ -24,7 +24,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 
 
 
-import { createCrmNote, deleteCrmNote, listMemberNotes, toggleCrmNotePin, type CrmNote, type CrmNoteType } from '@/services/crm-notes';
+import { createCrmNote, deleteCrmNote, listMemberNotes, toggleCrmNotePin, searchCrmNotes, type CrmNote, type CrmNoteType, type CrmNoteSearchResult } from '@/services/crm-notes';
 
 import { createEmergencyContact, deleteEmergencyContact, listEmergencyContacts, type EmergencyContact } from '@/services/emergency-contacts';
 
@@ -124,6 +124,12 @@ export async function updateMemberAction(
     marketing_email_consent: boolean;
     sms_marketing_consent: boolean;
     tags: string[];
+    gender: string | null;
+    address_line1: string | null;
+    address_line2: string | null;
+    city: string | null;
+    state: string | null;
+    postal_code: string | null;
   }>
 ): Promise<ActionResult<MemberDetail>> {
   try {
@@ -144,6 +150,28 @@ export async function deleteMemberAction(memberId: string): Promise<ActionResult
     await deleteMember(auth.gymId, memberId);
     revalidatePath('/members');
     return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function softDeleteMemberAction(memberId: string): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ capability: 'members.write' });
+    await softDeleteMember(auth.gymId, memberId);
+    revalidatePath('/members');
+    revalidatePath(`/members/${memberId}`);
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function searchCrmNotesAction(query: string): Promise<ActionResult<CrmNoteSearchResult[]>> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const notes = await searchCrmNotes(auth.gymId, query);
+    return { ok: true, data: notes };
   } catch (error) {
     return toActionError(error);
   }

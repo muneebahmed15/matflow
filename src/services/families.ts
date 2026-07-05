@@ -100,3 +100,61 @@ export async function setFamilyBillingContact(
   if (error || !data) throw new ServiceError(500, error?.message ?? 'Update failed');
   return data as FamilyDetail;
 }
+
+export async function mergeFamilies(
+  gymId: string,
+  targetFamilyId: string,
+  sourceFamilyId: string
+): Promise<FamilyDetail> {
+  if (targetFamilyId === sourceFamilyId) {
+    throw new ServiceError(400, 'Cannot merge a family into itself.');
+  }
+
+  const admin = getAdminClient();
+  const { data: target } = await admin
+    .from('families')
+    .select('id, family_name, primary_email, billing_member_id, stripe_customer_id')
+    .eq('id', targetFamilyId)
+    .eq('gym_id', gymId)
+    .maybeSingle();
+
+  const { data: source } = await admin
+    .from('families')
+    .select('id, stripe_customer_id, primary_email')
+    .eq('id', sourceFamilyId)
+    .eq('gym_id', gymId)
+    .maybeSingle();
+
+  if (!target || !source) throw new ServiceError(404, 'Family not found.');
+
+  const { error: moveErr } = await admin
+    .from('members')
+    .update({ family_id: targetFamilyId })
+    .eq('family_id', sourceFamilyId)
+    .eq('gym_id', gymId);
+
+  if (moveErr) throw new ServiceError(500, moveErr.message);
+
+  const updates: Record<string, unknown> = {};
+  if (!target.primary_email && source.primary_email) {
+    updates.primary_email = source.primary_email;
+  }
+  if (!target.stripe_customer_id && source.stripe_customer_id) {
+    updates.stripe_customer_id = source.stripe_customer_id;
+  }
+  if (Object.keys(updates).length > 0) {
+    await admin.from('families').update(updates).eq('id', targetFamilyId);
+  }
+
+  const { error: delErr } = await admin.from('families').delete().eq('id', sourceFamilyId);
+  if (delErr) throw new ServiceError(500, delErr.message);
+
+  const { data: merged, error } = await admin
+    .from('families')
+    .select('id, family_name, primary_email, created_at, billing_member_id')
+    .eq('id', targetFamilyId)
+    .single();
+
+  if (error || !merged) throw new ServiceError(500, error?.message ?? 'Merge failed');
+  return merged as FamilyDetail;
+}

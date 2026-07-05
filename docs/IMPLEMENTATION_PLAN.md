@@ -1,6 +1,6 @@
 # MatsFlow — Master Implementation Plan
 
-> **Status:** Wave 1 in progress  
+> **Status:** Wave 2 complete · Wave 4 in progress  
 > **Scoring:** `[ ]` Not started · `[~]` Partial · `[x]` Done  
 > **Rule:** Each module has **50+** granular, testable todos. No item ships without schema + service + auth + UI (where applicable).
 
@@ -11,9 +11,9 @@
 | Wave | Focus | Target |
 |------|-------|--------|
 | **Wave 1** | Foundation schema, CRM notes/contacts, gym branding, public site shell, waiver expiry, class waitlists | East Coast MMA pilot-ready core |
-| **Wave 2** | Payments polish, belt stripes/requirements, migration CSV, marketing email | Revenue + onboarding |
+| **Wave 2** | Payments polish, belt stripes/requirements, migration CSV, marketing email, CRM completion | Revenue + onboarding — **complete** |
 | **Wave 3** | AI chat front desk, business assistant summaries | Differentiation |
-| **Wave 4** | Merch store, multi-location, white-label | Scale |
+| **Wave 4** | Merch store, multi-location, white-label | Scale — **in progress** |
 
 ---
 

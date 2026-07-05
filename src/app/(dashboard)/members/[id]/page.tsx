@@ -7,6 +7,7 @@ import {
   inviteMemberToPortalAction,
   sendWaiverLinkAction,
   archiveMemberAction,
+  softDeleteMemberAction,
   updateMemberStripesAction,
   getMemberTimelineAction,
   getMemberDetailPageDataAction,
@@ -42,6 +43,13 @@ interface Member {
   date_of_birth?: string | null
   profile_photo_url?: string | null
   tags?: string[]
+  gender?: string | null
+  address_line1?: string | null
+  address_line2?: string | null
+  city?: string | null
+  state?: string | null
+  postal_code?: string | null
+  deleted_at?: string | null
 }
 interface Plan {
   id: string; name: string; stripe_price_id: string | null; price_cents: number | null; interval: string
@@ -68,6 +76,7 @@ export default function MemberDetailPage() {
   const [sendingWaiverLink, setSendingWaiverLink] = useState(false)
   const [waiverLinkMsg, setWaiverLinkMsg] = useState('')
   const [archiving, setArchiving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [stripeUpdating, setStripeUpdating] = useState(false)
   const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'waivers' | 'notes' | 'contacts' | 'timeline'>('info')
   const [timeline, setTimeline] = useState<TimelineEvent[]>([])
@@ -131,7 +140,10 @@ export default function MemberDetailPage() {
 
   const handleEdit = async (field: string, value: string) => {
     if (!member) return
-    const result = await updateMemberAction(member.id, { [field]: value })
+    const payload: Parameters<typeof updateMemberAction>[1] = {
+      [field]: field === 'gender' && !value ? null : value,
+    } as Parameters<typeof updateMemberAction>[1]
+    const result = await updateMemberAction(member.id, payload)
     if (result.ok && result.data) setMember(result.data as Member)
   }
 
@@ -156,6 +168,26 @@ export default function MemberDetailPage() {
     if (res.ok) {
       setMember((m) => (m ? { ...m, status: 'inactive' } : m))
     }
+  }
+
+  const handleSoftDelete = async () => {
+    if (!confirm('Soft-delete this member? They will be hidden from member lists.')) return
+    setDeleting(true)
+    const res = await softDeleteMemberAction(id)
+    setDeleting(false)
+    if (res.ok) router.push('/members')
+  }
+
+  const handleAddressSave = async (fields: {
+    address_line1?: string | null
+    address_line2?: string | null
+    city?: string | null
+    state?: string | null
+    postal_code?: string | null
+  }) => {
+    if (!member) return
+    const result = await updateMemberAction(member.id, fields)
+    if (result.ok && result.data) setMember(result.data as Member)
   }
 
   const handleStripeChange = async (next: number) => {
@@ -267,13 +299,22 @@ export default function MemberDetailPage() {
               </span>
             </div>
           </div>
-          <button
-            onClick={() => void handleArchive()}
-            disabled={archiving || member.status === 'inactive'}
-            className="text-amber-400 text-sm hover:underline disabled:opacity-40"
-          >
-            {archiving ? 'Archiving…' : 'Archive'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => void handleArchive()}
+              disabled={archiving || member.status === 'inactive'}
+              className="text-amber-400 text-sm hover:underline disabled:opacity-40"
+            >
+              {archiving ? 'Archiving…' : 'Archive'}
+            </button>
+            <button
+              onClick={() => void handleSoftDelete()}
+              disabled={deleting || Boolean(member.deleted_at)}
+              className="text-red-400 text-sm hover:underline disabled:opacity-40"
+            >
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+          </div>
         </div>
 
         <div className="flex gap-1 bg-white/5 rounded-xl p-1">
@@ -330,6 +371,55 @@ export default function MemberDetailPage() {
               <option value="active" className="bg-gray-900">active</option>
               <option value="inactive" className="bg-gray-900">inactive</option>
             </select>
+          </div>
+          <div className="flex justify-between border-b border-white/10 pb-3">
+            <span className="text-gray-400 text-sm">Gender</span>
+            <select
+              value={member.gender ?? ''}
+              onChange={(e) => void handleEdit('gender', e.target.value || '')}
+              className="bg-transparent text-white text-sm cursor-pointer"
+            >
+              <option value="" className="bg-gray-900">Not specified</option>
+              <option value="male" className="bg-gray-900">Male</option>
+              <option value="female" className="bg-gray-900">Female</option>
+              <option value="non_binary" className="bg-gray-900">Non-binary</option>
+              <option value="prefer_not_to_say" className="bg-gray-900">Prefer not to say</option>
+            </select>
+          </div>
+          <div className="border-b border-white/10 pb-3 space-y-2">
+            <span className="text-gray-400 text-sm block">Address</span>
+            <input
+              defaultValue={member.address_line1 ?? ''}
+              onBlur={(e) => void handleAddressSave({ address_line1: e.target.value || null })}
+              placeholder="Address line 1"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm"
+            />
+            <input
+              defaultValue={member.address_line2 ?? ''}
+              onBlur={(e) => void handleAddressSave({ address_line2: e.target.value || null })}
+              placeholder="Address line 2"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm"
+            />
+            <div className="grid grid-cols-3 gap-2">
+              <input
+                defaultValue={member.city ?? ''}
+                onBlur={(e) => void handleAddressSave({ city: e.target.value || null })}
+                placeholder="City"
+                className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm"
+              />
+              <input
+                defaultValue={member.state ?? ''}
+                onBlur={(e) => void handleAddressSave({ state: e.target.value || null })}
+                placeholder="State"
+                className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm"
+              />
+              <input
+                defaultValue={member.postal_code ?? ''}
+                onBlur={(e) => void handleAddressSave({ postal_code: e.target.value || null })}
+                placeholder="ZIP"
+                className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm"
+              />
+            </div>
           </div>
           <div className="border-b border-white/10 pb-3 space-y-2">
             <span className="text-gray-400 text-sm block">Tags</span>

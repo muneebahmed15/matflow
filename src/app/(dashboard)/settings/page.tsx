@@ -5,7 +5,8 @@ import { useAsyncMount, useClientMount } from '@/hooks/use-async-mount'
 import { redirectTo } from '@/lib/navigation'
 import Link from 'next/link'
 import { ExternalLink, Globe, Monitor } from 'lucide-react'
-import { getGymSettingsAction, updateGymSettingsAction, getGbpStatusAction, syncDirectoryListingsAction, syncGbpHoursAction } from '@/app/(dashboard)/actions'
+import { getGymSettingsAction, updateGymSettingsAction, getGbpStatusAction, syncDirectoryListingsAction, syncGbpHoursAction, updateMemberRequiredFieldsAction } from '@/app/(dashboard)/actions'
+import { parseMemberRequiredFields, type MemberRequiredFields } from '@/lib/member-required-fields'
 import type { GymSettings } from '@/services/gym'
 import { resolveBeltSystem } from '@/lib/belt-systems'
 import { defaultBeltHex, getBeltBadgeStyle } from '@/lib/belt-colors'
@@ -23,6 +24,8 @@ export default function SettingsPage() {
   const [userEmail, setUserEmail] = useState('')
   const [origin, setOrigin] = useState('')
   const [gbpStatus, setGbpStatus] = useState<{ connected: boolean; oauthUrl: string | null } | null>(null)
+  const [requiredFields, setRequiredFields] = useState<MemberRequiredFields>({})
+  const [savingRequired, setSavingRequired] = useState(false)
 
   useClientMount(() => setOrigin(window.location.origin), [])
 
@@ -32,7 +35,10 @@ export default function SettingsPage() {
     if (user) setUserEmail(user.email || '')
 
     const result = await getGymSettingsAction()
-    if (result.ok && result.data) setSettings(result.data)
+    if (result.ok && result.data) {
+      setSettings(result.data)
+      setRequiredFields(parseMemberRequiredFields(result.data.member_required_fields))
+    }
     const gbp = await getGbpStatusAction()
     if (gbp.ok && gbp.data) setGbpStatus({ connected: gbp.data.connected, oauthUrl: gbp.data.oauthUrl })
     setLoading(false)
@@ -583,6 +589,45 @@ export default function SettingsPage() {
         </div>
 
         <LocationsPanel />
+
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-4">
+          <h2 className="font-semibold text-white">Member required fields</h2>
+          <p className="text-white/40 text-sm">
+            Active members must have these fields before saving profile changes.
+          </p>
+          {(
+            [
+              ['email', 'Email'],
+              ['phone', 'Phone'],
+              ['date_of_birth', 'Date of birth'],
+              ['emergency_contact', 'Emergency contact'],
+            ] as const
+          ).map(([key, label]) => (
+            <label key={key} className="flex items-center justify-between gap-4 py-2 border-b border-white/10">
+              <span className="text-gray-300 text-sm">{label}</span>
+              <input
+                type="checkbox"
+                checked={Boolean(requiredFields[key])}
+                onChange={(e) => setRequiredFields((prev) => ({ ...prev, [key]: e.target.checked }))}
+                className="h-4 w-4 rounded accent-blue-500"
+              />
+            </label>
+          ))}
+          <button
+            onClick={async () => {
+              setSavingRequired(true)
+              const result = await updateMemberRequiredFieldsAction(requiredFields as Record<string, boolean>)
+              setSavingRequired(false)
+              if (result.ok && result.data) {
+                setRequiredFields(parseMemberRequiredFields(result.data.member_required_fields))
+              }
+            }}
+            disabled={savingRequired}
+            className="text-sm text-blue-400 hover:underline disabled:opacity-40"
+          >
+            {savingRequired ? 'Saving…' : 'Save required fields'}
+          </button>
+        </div>
 
         <div className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-4">
           <h2 className="font-semibold text-white">Features</h2>

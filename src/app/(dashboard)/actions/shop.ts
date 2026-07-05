@@ -4,44 +4,16 @@ import { revalidatePath } from 'next/cache';
 
 import { requireStaffSession } from '@/lib/auth/staff';
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-import { listProducts, createProduct, listOrders } from '@/services/merchandise';
-
-
-
-
-import { fulfillOrder } from '@/services/merchandise';
-
-
-
-
-
-
-
-
-
-
+import {
+  listProducts,
+  createProduct,
+  listOrders,
+  fulfillOrder,
+  getShopRevenueByProduct,
+  createProductVariant,
+  adjustProductStock,
+  listProductVariants,
+} from '@/services/merchandise';
 
 import { type ActionResult, toActionError } from './_shared';
 
@@ -54,7 +26,6 @@ export async function listProductsAction() {
   }
 }
 
-
 export async function createProductAction(input: {
   name: string;
   description?: string;
@@ -62,6 +33,7 @@ export async function createProductAction(input: {
   priceCents: number;
   category?: string;
   inventoryCount?: number;
+  membersOnly?: boolean;
 }) {
   try {
     const auth = await requireStaffSession({ adminOnly: true });
@@ -73,7 +45,6 @@ export async function createProductAction(input: {
   }
 }
 
-
 export async function listOrdersAction() {
   try {
     const auth = await requireStaffSession({ capability: 'shop.read' });
@@ -82,7 +53,6 @@ export async function listOrdersAction() {
     return toActionError(error);
   }
 }
-
 
 export async function fulfillOrderAction(orderId: string, trackingNumber?: string) {
   try {
@@ -95,3 +65,56 @@ export async function fulfillOrderAction(orderId: string, trackingNumber?: strin
   }
 }
 
+export async function getShopRevenueAction() {
+  try {
+    const auth = await requireStaffSession({ capability: 'shop.read' });
+    return { ok: true as const, data: await getShopRevenueByProduct(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function listProductVariantsAction(productId: string) {
+  try {
+    const auth = await requireStaffSession({ capability: 'shop.read' });
+    return { ok: true as const, data: await listProductVariants(auth.gymId, productId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function createProductVariantAction(input: {
+  productId: string;
+  label: string;
+  sku?: string;
+  priceCents?: number | null;
+  inventoryCount?: number;
+}) {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const variant = await createProductVariant({ ...input, gymId: auth.gymId });
+    revalidatePath('/shop');
+    return { ok: true as const, data: variant };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function adjustStockAction(input: {
+  productId: string;
+  delta: number;
+  reason?: string;
+}) {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const next = await adjustProductStock({
+      ...input,
+      gymId: auth.gymId,
+      actorId: auth.user.id,
+    });
+    revalidatePath('/shop');
+    return { ok: true as const, data: { inventoryCount: next } };
+  } catch (error) {
+    return toActionError(error);
+  }
+}

@@ -48,6 +48,7 @@ const ROUTE_CAPABILITY: { prefix: string; capability: Capability }[] = [
   { prefix: '/migration', capability: 'settings.write' },
   { prefix: '/marketing', capability: 'marketing.read' },
   { prefix: '/inbox', capability: 'marketing.read' },
+  { prefix: '/notes', capability: 'settings.write' },
   { prefix: '/shop', capability: 'shop.read' },
   { prefix: '/insights', capability: 'reports.read' },
   { prefix: '/website-content', capability: 'settings.write' },

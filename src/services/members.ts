@@ -19,6 +19,7 @@ export async function listMembers(gymId: string): Promise<MemberSummary[]> {
     .from('members')
     .select('id, first_name, last_name, email, phone, belt_rank, status')
     .eq('gym_id', gymId)
+    .is('deleted_at', null)
     .order('first_name');
 
   if (error) throw new ServiceError(500, error.message);
@@ -32,6 +33,7 @@ export async function listActiveMembers(gymId: string): Promise<MemberSummary[]>
     .select('id, first_name, last_name, email, phone, belt_rank, status')
     .eq('gym_id', gymId)
     .eq('status', 'active')
+    .is('deleted_at', null)
     .order('first_name');
 
   if (error) throw new ServiceError(500, error.message);
@@ -148,6 +150,7 @@ export async function getMember(gymId: string, memberId: string): Promise<Member
     .select('*')
     .eq('id', memberId)
     .eq('gym_id', gymId)
+    .is('deleted_at', null)
     .single();
 
   if (error || !data) throw new ServiceError(404, 'Member not found');
@@ -160,7 +163,7 @@ export async function updateMember(
   fields: Partial<
     Pick<
       MemberRow,
-      'first_name' | 'last_name' | 'email' | 'phone' | 'belt_rank' | 'status' | 'email_opt_out' | 'marketing_email_consent' | 'sms_marketing_consent' | 'marketing_consent_at' | 'profile_photo_url' | 'tags'
+      'first_name' | 'last_name' | 'email' | 'phone' | 'belt_rank' | 'status' | 'email_opt_out' | 'marketing_email_consent' | 'sms_marketing_consent' | 'marketing_consent_at' | 'profile_photo_url' | 'tags' | 'gender' | 'address_line1' | 'address_line2' | 'city' | 'state' | 'postal_code'
     >
   > & {
     date_of_birth?: string | null;
@@ -187,6 +190,27 @@ export async function updateMember(
   if (nextStatus === 'active') {
     const { assertMinorHasEmergencyContact } = await import('@/services/emergency-contacts');
     await assertMinorHasEmergencyContact(gymId, memberId, nextDob);
+
+    const { getGymSettings } = await import('@/services/gym');
+    const { parseMemberRequiredFields, validateMemberRequiredFields } = await import(
+      '@/lib/member-required-fields'
+    );
+    const settings = await getGymSettings(gymId);
+    const config = parseMemberRequiredFields(settings.member_required_fields);
+    const nextEmail = fields.email !== undefined ? fields.email : existing.email;
+    const nextPhone = fields.phone !== undefined ? fields.phone : existing.phone;
+    const { count } = await admin
+      .from('emergency_contacts')
+      .select('*', { count: 'exact', head: true })
+      .eq('member_id', memberId);
+    const requiredErr = validateMemberRequiredFields({
+      config,
+      email: nextEmail,
+      phone: nextPhone,
+      dateOfBirth: nextDob,
+      hasEmergencyContact: (count ?? 0) > 0,
+    });
+    if (requiredErr) throw new ServiceError(400, requiredErr);
   }
 
   if (
@@ -231,8 +255,16 @@ export async function updateMember(
 }
 
 export async function deleteMember(gymId: string, memberId: string): Promise<void> {
+  return softDeleteMember(gymId, memberId);
+}
+
+export async function softDeleteMember(gymId: string, memberId: string): Promise<void> {
   const admin = getAdminClient();
-  const { error } = await admin.from('members').delete().eq('id', memberId).eq('gym_id', gymId);
+  const { error } = await admin
+    .from('members')
+    .update({ deleted_at: new Date().toISOString(), status: 'inactive' })
+    .eq('id', memberId)
+    .eq('gym_id', gymId);
   if (error) throw new ServiceError(500, error.message);
 }
 

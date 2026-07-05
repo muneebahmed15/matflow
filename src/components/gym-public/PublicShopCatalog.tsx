@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useClientMount } from '@/hooks/use-async-mount';
 import { ShoppingCart, X } from 'lucide-react';
 
@@ -10,6 +11,7 @@ type Product = {
   price_cents: number;
   inventory_count: number;
   image_url: string | null;
+  category: string;
 };
 
 type CartItem = { product: Product; quantity: number };
@@ -23,11 +25,29 @@ type Props = {
 
 const CART_KEY = (slug: string) => `matflow-cart-${slug}`;
 
+const CATEGORY_LABELS: Record<string, string> = {
+  all: 'All',
+  apparel: 'Apparel',
+  gis: 'Gis',
+  gear: 'Gear',
+};
+
 export default function PublicShopCatalog({ gymId, gymSlug, accent, products }: Props) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [email, setEmail] = useState('');
   const [checkingOut, setCheckingOut] = useState(false);
   const [message, setMessage] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+
+  const categories = useMemo(() => {
+    const cats = new Set(products.map((p) => p.category));
+    return ['all', ...Array.from(cats).sort()];
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    if (categoryFilter === 'all') return products;
+    return products.filter((p) => p.category === categoryFilter);
+  }, [products, categoryFilter]);
 
   useClientMount(() => {
     const params = new URLSearchParams(window.location.search);
@@ -153,22 +173,45 @@ export default function PublicShopCatalog({ gymId, gymSlug, accent, products }: 
         </div>
       )}
 
-      {products.length === 0 ? (
+      {categories.length > 1 && (
+        <div className="flex flex-wrap gap-2 mb-6">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              className={`text-xs font-medium px-3 py-1.5 rounded-full transition ${
+                categoryFilter === cat
+                  ? 'text-white'
+                  : 'bg-white/5 text-white/50 hover:text-white'
+              }`}
+              style={categoryFilter === cat ? { backgroundColor: accent } : undefined}
+            >
+              {CATEGORY_LABELS[cat] ?? cat}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {filteredProducts.length === 0 ? (
         <p className="text-white/30">No products available yet.</p>
       ) : (
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {products.map((p) => (
+          {filteredProducts.map((p) => (
             <div key={p.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-              {p.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.image_url} alt="" className="w-full aspect-square object-cover" />
-              ) : (
-                <div className="w-full aspect-square bg-white/5 flex items-center justify-center text-white/20 text-4xl font-bold">
-                  {p.name[0]}
-                </div>
-              )}
+              <Link href={`/g/${gymSlug}/shop/${p.id}`}>
+                {p.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.image_url} alt="" className="w-full aspect-square object-cover hover:opacity-90 transition" />
+                ) : (
+                  <div className="w-full aspect-square bg-white/5 flex items-center justify-center text-white/20 text-4xl font-bold hover:bg-white/10 transition">
+                    {p.name[0]}
+                  </div>
+                )}
+              </Link>
               <div className="p-4">
-                <h2 className="font-semibold text-white">{p.name}</h2>
+                <Link href={`/g/${gymSlug}/shop/${p.id}`} className="hover:underline">
+                  <h2 className="font-semibold text-white">{p.name}</h2>
+                </Link>
                 <p className="text-white/50 text-sm mt-1">${(p.price_cents / 100).toFixed(2)}</p>
                 {p.inventory_count > 0 ? (
                   <button
