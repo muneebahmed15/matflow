@@ -6,36 +6,12 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { canAccessRoute, type StaffRole } from '@/lib/permissions'
 import { getDashboardSessionAction } from '@/app/(dashboard)/actions'
-import { LayoutDashboard, Users, UserCheck, Calendar, CreditCard, Settings, LogOut, Menu, X, FileText, Dumbbell, Award, UserPlus, ShieldCheck, Upload, Megaphone, ShoppingBag, Sparkles, Globe, ScrollText, UsersRound, Bot, Inbox, StickyNote } from 'lucide-react'
+import { LogOut, Menu, X } from 'lucide-react'
 import Logo from '@/components/Logo'
 import { AppUiProvider } from '@/components/ui/AppUiProvider'
 import PageLoader from '@/components/PageLoader'
 import LocationFilterBar from '@/components/dashboard/LocationFilterBar'
-
-const navItems = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, adminOnly: false },
-  { label: 'Members', href: '/members', icon: Users, adminOnly: false },
-  { label: 'Leads', href: '/leads', icon: UserPlus, adminOnly: true },
-  { label: 'Classes', href: '/classes', icon: Dumbbell, adminOnly: false },
-  { label: 'Check-In', href: '/attendance/check-in', icon: UserCheck, adminOnly: false },
-  { label: 'Attendance Log', href: '/attendance/log', icon: Calendar, adminOnly: false },
-  { label: 'Belts', href: '/belts', icon: Award, adminOnly: false },
-  { label: 'Waivers', href: '/waivers', icon: FileText, adminOnly: false },
-  { label: 'Plans', href: '/plans', icon: CreditCard, adminOnly: true },
-  { label: 'Subscriptions', href: '/subscriptions', icon: CreditCard, adminOnly: true },
-  { label: 'Families', href: '/families', icon: UsersRound, adminOnly: true },
-  { label: 'Migration', href: '/migration', icon: Upload, adminOnly: true },
-  { label: 'Marketing', href: '/marketing', icon: Megaphone, adminOnly: true },
-  { label: 'Inbox', href: '/inbox', icon: Inbox, adminOnly: true },
-  { label: 'Notes', href: '/notes', icon: StickyNote, adminOnly: true },
-  { label: 'Shop', href: '/shop', icon: ShoppingBag, adminOnly: true },
-  { label: 'Insights', href: '/insights', icon: Sparkles, adminOnly: true },
-  { label: 'AI Desk', href: '/ai-desk', icon: Bot, adminOnly: true },
-  { label: 'Website', href: '/website-content', icon: Globe, adminOnly: true },
-  { label: 'Audit Log', href: '/audit', icon: ScrollText, adminOnly: true },
-  { label: 'Staff', href: '/staff', icon: ShieldCheck, adminOnly: true },
-  { label: 'Settings', href: '/settings', icon: Settings, adminOnly: true },
-]
+import DashboardSidebarNav from '@/components/dashboard/DashboardSidebarNav'
 
 export default function DashboardLayoutClient({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -82,16 +58,6 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
     router.push('/login')
   }
 
-  const isActive = (href: string) => {
-    if (href === '/dashboard') return pathname === '/dashboard'
-    return pathname.startsWith(href)
-  }
-
-  const visibleNavItems = navItems.filter((item) => {
-    if (item.href === '/marketing' && !marketingEnabled) return false
-    return canAccessRoute(role, item.href)
-  })
-
   if (!checked) {
     return (
       <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
@@ -115,19 +81,12 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
           </div>
           <p className="text-gray-500 text-xs mt-2 font-medium truncate">{gymName}</p>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {visibleNavItems.map(({ label, href, icon: Icon }) => {
-            const active = isActive(href)
-            return (
-              <a key={href} href={href} onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${active ? 'bg-blue-600/15 text-white border border-blue-600/20' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
-                <Icon size={18} className={active ? 'text-blue-500' : ''} />
-                {label}
-                {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-500" />}
-              </a>
-            )
-          })}
-        </nav>
+        <DashboardSidebarNav
+          pathname={pathname}
+          role={role}
+          marketingEnabled={marketingEnabled}
+          onNavigate={() => setSidebarOpen(false)}
+        />
         <div className="px-3 py-4 border-t border-[#1F1F1F]">
           <div className="flex items-center gap-3 px-3 py-2 rounded-xl">
             <div className="w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center text-xs font-bold text-blue-400">
