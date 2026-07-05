@@ -51,7 +51,7 @@ alter table public.stock_adjustments enable row level security;
 drop policy if exists product_variants_staff on public.product_variants;
 create policy product_variants_staff on public.product_variants
   for all using (
-    gym_id in (select gym_id from public.staff where auth_user_id = auth.uid())
+    gym_id in (select gym_id from public.staff_roles where user_id = auth.uid())
   );
 
 drop policy if exists product_variants_public_read on public.product_variants;
@@ -69,5 +69,5 @@ create policy product_variants_public_read on public.product_variants
 drop policy if exists stock_adjustments_staff on public.stock_adjustments;
 create policy stock_adjustments_staff on public.stock_adjustments
   for all using (
-    gym_id in (select gym_id from public.staff where auth_user_id = auth.uid())
+    gym_id in (select gym_id from public.staff_roles where user_id = auth.uid())
   );
