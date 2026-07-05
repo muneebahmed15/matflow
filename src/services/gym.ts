@@ -49,10 +49,14 @@ export type GymSettings = Pick<GymRow, 'id' | 'name' | 'slug' | 'kiosk_enabled'>
   shop_member_discount_percent: number;
   shop_flat_tax_cents: number;
   coaches_stripes_only: boolean;
+  stripe_tax_enabled: boolean;
+  payment_provider: string;
+  stripe_only: boolean;
+  waiver_retention_days: number | null;
 };
 
 const GYM_SETTINGS_COLUMNS =
-  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, marketing_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, hero_image_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, google_ads_conversion_id, review_checkin_threshold, require_waiver_for_checkin, timezone, locale, belt_system, belt_custom_order, belt_color_overrides, booking_cancel_hours, class_reminder_hours, hero_ab_enabled, hero_variant_b_headline, hero_variant_b_subheadline, seo_keywords, public_translations, member_required_fields, shop_member_discount_percent, shop_flat_tax_cents, coaches_stripes_only';
+  'id, name, slug, kiosk_enabled, website_enabled, store_enabled, marketing_enabled, ai_front_desk_enabled, daily_digest_enabled, logo_url, favicon_url, hero_image_url, setup_completed_at, primary_color, tagline, about_text, contact_email, contact_phone, address_line1, address_city, address_state, address_zip, custom_domain, white_label_enabled, store_return_policy, ga4_measurement_id, meta_pixel_id, google_place_id, google_ads_conversion_id, review_checkin_threshold, require_waiver_for_checkin, timezone, locale, belt_system, belt_custom_order, belt_color_overrides, booking_cancel_hours, class_reminder_hours, hero_ab_enabled, hero_variant_b_headline, hero_variant_b_subheadline, seo_keywords, public_translations, member_required_fields, shop_member_discount_percent, shop_flat_tax_cents, coaches_stripes_only, stripe_tax_enabled, payment_provider, stripe_only, waiver_retention_days';
 
 function parseGymSettingsRow(data: Record<string, unknown>): GymSettings {
   const customOrder = data.belt_custom_order;
@@ -77,6 +81,13 @@ function parseGymSettingsRow(data: Record<string, unknown>): GymSettings {
     shop_member_discount_percent: Number((data as GymSettings).shop_member_discount_percent ?? 0),
     shop_flat_tax_cents: Number((data as GymSettings).shop_flat_tax_cents ?? 0),
     coaches_stripes_only: Boolean((data as GymSettings).coaches_stripes_only),
+    stripe_tax_enabled: Boolean((data as GymSettings).stripe_tax_enabled),
+    payment_provider: String((data as GymSettings).payment_provider ?? 'stripe'),
+    stripe_only: (data as GymSettings).stripe_only !== false,
+    waiver_retention_days:
+      (data as GymSettings).waiver_retention_days != null
+        ? Number((data as GymSettings).waiver_retention_days)
+        : null,
     belt_custom_order: Array.isArray(customOrder)
       ? customOrder.filter((b): b is string => typeof b === 'string')
       : null,
@@ -148,6 +159,10 @@ export type UpdateGymSettingsInput = {
   shopMemberDiscountPercent?: number;
   shopFlatTaxCents?: number;
   coachesStripesOnly?: boolean;
+  stripeTaxEnabled?: boolean;
+  paymentProvider?: string;
+  stripeOnly?: boolean;
+  waiverRetentionDays?: number | null;
 };
 
 export async function updateGymSettings(
@@ -254,6 +269,10 @@ export async function updateGymSettings(
       ),
       shop_flat_tax_cents: Math.max(0, input.shopFlatTaxCents ?? 0),
       coaches_stripes_only: input.coachesStripesOnly ?? false,
+      stripe_tax_enabled: input.stripeTaxEnabled ?? false,
+      payment_provider: input.paymentProvider?.trim() || 'stripe',
+      stripe_only: input.stripeOnly !== false,
+      waiver_retention_days: input.waiverRetentionDays ?? null,
     })
     .eq('id', gymId)
     .select(GYM_SETTINGS_COLUMNS)

@@ -140,6 +140,10 @@ export async function updateGymSettingsAction(input: {
   shopMemberDiscountPercent?: number;
   shopFlatTaxCents?: number;
   coachesStripesOnly?: boolean;
+  stripeTaxEnabled?: boolean;
+  paymentProvider?: string;
+  stripeOnly?: boolean;
+  waiverRetentionDays?: number | null;
 }): Promise<ActionResult<GymSettings>> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });

@@ -44,15 +44,30 @@ export default function PortalSubscriptionPage() {
   useEffect(() => {
     if (!activeMember) return
     const load = async () => {
-      const { data: sub } = await supabase
+      let sub = null as Subscription | null
+      const { data: directSub } = await supabase
         .from('subscriptions')
-        .select('id, status, plan_id, stripe_subscription_id, current_period_end, plans(name, price_cents, interval)')
+        .select('id, status, plan_id, stripe_subscription_id, current_period_end, family_id, plans(name, price_cents, interval)')
         .eq('member_id', activeMember.id)
         .in('status', ['active', 'past_due', 'trialing', 'paused'])
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
-      setSubscription(sub as Subscription | null)
+      sub = directSub as Subscription | null
+
+      if (!sub && activeMember.family_id) {
+        const { data: familySub } = await supabase
+          .from('subscriptions')
+          .select('id, status, plan_id, stripe_subscription_id, current_period_end, family_id, plans(name, price_cents, interval)')
+          .eq('family_id', activeMember.family_id)
+          .in('status', ['active', 'past_due', 'trialing', 'paused'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        sub = familySub as Subscription | null
+      }
+
+      setSubscription(sub)
       if (billingAllowed) {
         const { data: plansData } = await supabase
           .from('plans')

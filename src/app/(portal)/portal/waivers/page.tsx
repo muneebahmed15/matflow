@@ -108,7 +108,15 @@ export default function PortalWaiversPage() {
     setSignedAt(isSigned ? info?.signedAt : undefined)
   }
 
-  const handleSign = async (typedName: string, guardianName?: string) => {
+  const handleSign = async (
+    typedName: string,
+    options?: {
+      guardianName?: string;
+      witnessName?: string;
+      signatureImageDataUrl?: string;
+      witnessSignatureDataUrl?: string;
+    }
+  ) => {
     if (!selected || !memberId) return
     const res = await fetch('/api/portal/waivers/sign', {
       method: 'POST',
@@ -117,7 +125,10 @@ export default function PortalWaiversPage() {
         waiver_id: selected.id,
         member_id: memberId,
         signed_name: typedName,
-        guardian_name: guardianName,
+        guardian_name: options?.guardianName,
+        witness_name: options?.witnessName,
+        signature_image_data_url: options?.signatureImageDataUrl,
+        witness_signature_data_url: options?.witnessSignatureDataUrl,
       }),
     })
     if (!res.ok) {

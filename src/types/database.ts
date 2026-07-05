@@ -287,6 +287,66 @@ export type Database = {
           },
         ]
       }
+      belt_promotion_requests: {
+        Row: {
+          ceremony_date: string | null
+          created_at: string
+          from_belt: string
+          gym_id: string
+          id: string
+          member_id: string
+          notes: string | null
+          proposed_by: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          to_belt: string
+        }
+        Insert: {
+          ceremony_date?: string | null
+          created_at?: string
+          from_belt: string
+          gym_id: string
+          id?: string
+          member_id: string
+          notes?: string | null
+          proposed_by?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          to_belt: string
+        }
+        Update: {
+          ceremony_date?: string | null
+          created_at?: string
+          from_belt?: string
+          gym_id?: string
+          id?: string
+          member_id?: string
+          notes?: string | null
+          proposed_by?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          to_belt?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "belt_promotion_requests_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "belt_promotion_requests_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       belt_requirements: {
         Row: {
           belt: string
@@ -1868,6 +1928,10 @@ export type Database = {
           shop_flat_tax_cents: number
           shop_member_discount_percent: number
           coaches_stripes_only: boolean
+          stripe_tax_enabled: boolean
+          payment_provider: string
+          stripe_only: boolean
+          waiver_retention_days: number | null
         }
         Insert: {
           about_text?: string | null
@@ -1905,6 +1969,10 @@ export type Database = {
           shop_flat_tax_cents?: number
           shop_member_discount_percent?: number
           coaches_stripes_only?: boolean
+          stripe_tax_enabled?: boolean
+          payment_provider?: string
+          stripe_only?: boolean
+          waiver_retention_days?: number | null
           store_return_policy?: string | null
           tagline?: string | null
           timezone?: string
@@ -1948,6 +2016,10 @@ export type Database = {
           shop_flat_tax_cents?: number
           shop_member_discount_percent?: number
           coaches_stripes_only?: boolean
+          stripe_tax_enabled?: boolean
+          payment_provider?: string
+          stripe_only?: boolean
+          waiver_retention_days?: number | null
           store_return_policy?: string | null
           tagline?: string | null
           timezone?: string
@@ -2560,6 +2632,8 @@ export type Database = {
           stripe_price_id: string | null
           stripe_product_id: string | null
           trial_days: number
+          setup_fee_cents: number
+          stripe_setup_price_id: string | null
         }
         Insert: {
           created_at?: string
@@ -2575,6 +2649,8 @@ export type Database = {
           stripe_price_id?: string | null
           stripe_product_id?: string | null
           trial_days?: number
+          setup_fee_cents?: number
+          stripe_setup_price_id?: string | null
         }
         Update: {
           created_at?: string
@@ -2590,6 +2666,8 @@ export type Database = {
           stripe_price_id?: string | null
           stripe_product_id?: string | null
           trial_days?: number
+          setup_fee_cents?: number
+          stripe_setup_price_id?: string | null
         }
         Relationships: [
           {
@@ -2950,6 +3028,51 @@ export type Database = {
           },
         ]
       }
+      staff_availability: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          end_time: string
+          gym_id: string
+          id: string
+          staff_id: string
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          gym_id: string
+          id?: string
+          staff_id: string
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          gym_id?: string
+          id?: string
+          staff_id?: string
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_availability_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_availability_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stripe_webhook_events: {
         Row: {
           created_at: string
@@ -2993,6 +3116,7 @@ export type Database = {
           status: string
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
+          family_id: string | null
         }
         Insert: {
           cancellation_reason?: string | null
@@ -3009,6 +3133,7 @@ export type Database = {
           status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          family_id?: string | null
         }
         Update: {
           cancellation_reason?: string | null
@@ -3025,6 +3150,7 @@ export type Database = {
           status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          family_id?: string | null
         }
         Relationships: [
           {
@@ -3058,13 +3184,17 @@ export type Database = {
           id: string
           ip_address: string | null
           lead_id: string | null
+          legal_hold: boolean
           member_id: string | null
           pdf_storage_path: string | null
+          signature_image_url: string | null
           signed_at: string
           signed_name: string
           user_agent: string | null
           waiver_id: string
           waiver_version: number
+          witness_name: string | null
+          witness_signature_url: string | null
         }
         Insert: {
           expires_at?: string | null
@@ -3073,13 +3203,17 @@ export type Database = {
           id?: string
           ip_address?: string | null
           lead_id?: string | null
+          legal_hold?: boolean
           member_id?: string | null
           pdf_storage_path?: string | null
+          signature_image_url?: string | null
           signed_at?: string
           signed_name: string
           user_agent?: string | null
           waiver_id: string
           waiver_version?: number
+          witness_name?: string | null
+          witness_signature_url?: string | null
         }
         Update: {
           expires_at?: string | null
@@ -3088,13 +3222,17 @@ export type Database = {
           id?: string
           ip_address?: string | null
           lead_id?: string | null
+          legal_hold?: boolean
           member_id?: string | null
           pdf_storage_path?: string | null
+          signature_image_url?: string | null
           signed_at?: string
           signed_name?: string
           user_agent?: string | null
           waiver_id?: string
           waiver_version?: number
+          witness_name?: string | null
+          witness_signature_url?: string | null
         }
         Relationships: [
           {

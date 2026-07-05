@@ -475,3 +475,145 @@ export async function exportMembersByBeltCsv(gymId: string): Promise<string> {
     rows
   );
 }
+
+export type PromotionRequest = {
+  id: string;
+  member_id: string;
+  from_belt: string;
+  to_belt: string;
+  notes: string | null;
+  ceremony_date: string | null;
+  status: string;
+  created_at: string;
+  members: { first_name: string; last_name: string } | null;
+};
+
+export async function proposePromotion(input: {
+  gymId: string;
+  memberId: string;
+  fromBelt: string;
+  toBelt: string;
+  notes?: string;
+  ceremonyDate?: string | null;
+  actorId?: string | null;
+}): Promise<void> {
+  const admin = getAdminClient();
+  const system = await getGymBeltSystem(input.gymId);
+  const toBelt = input.toBelt.trim().toLowerCase();
+  if (!isValidBelt(system, toBelt)) {
+    throw new ServiceError(400, `"${input.toBelt}" is not a valid rank.`);
+  }
+
+  const { error } = await admin.from('belt_promotion_requests').insert({
+    gym_id: input.gymId,
+    member_id: input.memberId,
+    from_belt: input.fromBelt.trim().toLowerCase(),
+    to_belt: toBelt,
+    notes: input.notes?.trim() || null,
+    ceremony_date: input.ceremonyDate || null,
+    proposed_by: input.actorId ?? null,
+    status: 'pending',
+  });
+
+  if (error) throw new ServiceError(500, error.message);
+}
+
+export async function listPromotionRequests(
+  gymId: string,
+  status: 'pending' | 'approved' | 'rejected' = 'pending'
+): Promise<PromotionRequest[]> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('belt_promotion_requests')
+    .select('*, members(first_name, last_name)')
+    .eq('gym_id', gymId)
+    .eq('status', status)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new ServiceError(500, error.message);
+  return (data ?? []) as PromotionRequest[];
+}
+
+export async function reviewPromotionRequest(input: {
+  gymId: string;
+  requestId: string;
+  approve: boolean;
+  actorId?: string | null;
+}): Promise<void> {
+  const admin = getAdminClient();
+  const { data: req } = await admin
+    .from('belt_promotion_requests')
+    .select('*')
+    .eq('id', input.requestId)
+    .eq('gym_id', input.gymId)
+    .eq('status', 'pending')
+    .maybeSingle();
+
+  if (!req) throw new ServiceError(404, 'Promotion request not found or already reviewed.');
+
+  const status = input.approve ? 'approved' : 'rejected';
+  const { error: updateErr } = await admin
+    .from('belt_promotion_requests')
+    .update({
+      status,
+      reviewed_by: input.actorId ?? null,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', input.requestId);
+
+  if (updateErr) throw new ServiceError(500, updateErr.message);
+
+  if (input.approve) {
+    await promoteMember({
+      gymId: input.gymId,
+      memberId: req.member_id,
+      fromBelt: req.from_belt,
+      toBelt: req.to_belt,
+      notes: req.notes ?? undefined,
+      ceremonyDate: req.ceremony_date,
+      actorId: input.actorId,
+      allowDemotion: true,
+    });
+  }
+}
+
+export type PromotionForecast = {
+  belt: string;
+  readyNow: number;
+  likelyNext30Days: number;
+};
+
+/**
+ * Heuristic forecast: members already ready + those within 30 days of meeting
+ * attendance/day requirements at current belt.
+ */
+export async function getPromotionForecast(gymId: string): Promise<PromotionForecast[]> {
+  const readiness = await getPromotionReadiness(gymId);
+  const byBelt = new Map<string, { readyNow: number; likelyNext30Days: number }>();
+
+  for (const r of readiness) {
+    const entry = byBelt.get(r.belt) ?? { readyNow: 0, likelyNext30Days: 0 };
+    if (r.ready) {
+      entry.readyNow += 1;
+    } else if (r.hasRequirement) {
+      const daysToAttendance =
+        r.missingDays > 0 && r.missingDays <= 30 ? 1 : r.missingDays <= 30 ? 0 : 999;
+      const attendanceGap = r.missingAttendance;
+      if (r.missingDays <= 30 || (attendanceGap > 0 && attendanceGap <= 10)) {
+        entry.likelyNext30Days += 1;
+      }
+      void daysToAttendance;
+    }
+    byBelt.set(r.belt, entry);
+  }
+
+  return [...byBelt.entries()]
+    .map(([belt, counts]) => ({ belt, ...counts }))
+    .sort((a, b) => b.readyNow - a.readyNow || b.likelyNext30Days - a.likelyNext30Days);
+}
+
+/** Members ready for promotion (4.50 who-is-ready panel). */
+export async function getWhoIsReady(gymId: string): Promise<MemberReadiness[]> {
+  const readiness = await getPromotionReadiness(gymId);
+  return readiness.filter((r) => r.ready);
+}

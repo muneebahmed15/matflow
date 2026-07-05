@@ -7,6 +7,9 @@ import {
   listStaffAction,
   removeStaffAction,
   updateStaffRoleAction,
+  listStaffAvailabilityAction,
+  addStaffAvailabilityAction,
+  deleteStaffAvailabilityAction,
 } from '@/app/(dashboard)/actions'
 import type { StaffRole } from '@/lib/auth/staff'
 import { useAppUi } from '@/components/ui/AppUiProvider'
@@ -180,6 +183,84 @@ export default function StaffPage() {
           ))}
         </div>
       )}
+
+      <div className="mt-10 bg-[#111] border border-white/10 rounded-2xl p-6 space-y-4">
+        <h2 className="font-semibold text-white">Coach availability</h2>
+        <p className="text-white/40 text-sm">Weekly hours when each coach is available for classes or private lessons.</p>
+        <StaffAvailabilityPanel staff={staff} />
+      </div>
     </div>
+  )
+}
+
+function StaffAvailabilityPanel({ staff }: { staff: Staff[] }) {
+  const [slots, setSlots] = useState<
+    { id: string; staff_id: string; day_of_week: number; start_time: string; end_time: string; staff_name: string | null; day_label?: string }[]
+  >([])
+  const [staffId, setStaffId] = useState('')
+  const [dayOfWeek, setDayOfWeek] = useState(1)
+  const [startTime, setStartTime] = useState('09:00')
+  const [endTime, setEndTime] = useState('17:00')
+  const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+  useEffect(() => {
+    void listStaffAvailabilityAction().then((res) => {
+      if (res.ok && res.data) setSlots(res.data)
+    })
+  }, [])
+
+  if (staff.length === 0) return null
+
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <select value={staffId} onChange={(e) => setStaffId(e.target.value)} className={inputClass}>
+          <option value="" className="bg-gray-900">Coach…</option>
+          {staff.map((s) => (
+            <option key={s.id} value={s.id} className="bg-gray-900">{s.full_name}</option>
+          ))}
+        </select>
+        <select value={dayOfWeek} onChange={(e) => setDayOfWeek(parseInt(e.target.value, 10))} className={inputClass}>
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, i) => (
+            <option key={d} value={i} className="bg-gray-900">{d}</option>
+          ))}
+        </select>
+        <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={inputClass} />
+        <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={inputClass} />
+      </div>
+      <button
+        type="button"
+        disabled={!staffId}
+        onClick={async () => {
+          const res = await addStaffAvailabilityAction({ staffId, dayOfWeek, startTime, endTime })
+          if (res.ok) {
+            const reload = await listStaffAvailabilityAction()
+            if (reload.ok && reload.data) setSlots(reload.data)
+          }
+        }}
+        className="text-sm bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl"
+      >
+        Add slot
+      </button>
+      <div className="space-y-2">
+        {slots.map((slot) => (
+          <div key={slot.id} className="flex items-center justify-between text-sm bg-white/5 rounded-xl px-4 py-2">
+            <span className="text-white/80">
+              {slot.staff_name ?? 'Staff'} · {slot.day_label ?? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][slot.day_of_week]} · {slot.start_time.slice(0, 5)}–{slot.end_time.slice(0, 5)}
+            </span>
+            <button
+              type="button"
+              onClick={async () => {
+                await deleteStaffAvailabilityAction(slot.id)
+                setSlots((prev) => prev.filter((s) => s.id !== slot.id))
+              }}
+              className="text-red-400 text-xs hover:underline"
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
   )
 }

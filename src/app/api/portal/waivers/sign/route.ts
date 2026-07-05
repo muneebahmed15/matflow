@@ -11,6 +11,9 @@ const schema = z.object({
   member_id: z.string().uuid(),
   signed_name: z.string().min(2).max(200),
   guardian_name: z.string().min(2).max(200).optional(),
+  witness_name: z.string().min(2).max(200).optional(),
+  signature_image_data_url: z.string().optional(),
+  witness_signature_data_url: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -32,6 +35,9 @@ export async function POST(req: NextRequest) {
       gymId: auth.gymId,
       signedName: parsed.data.signed_name,
       guardianName: parsed.data.guardian_name ?? null,
+      witnessName: parsed.data.witness_name ?? null,
+      signatureImageDataUrl: parsed.data.signature_image_data_url ?? null,
+      witnessSignatureDataUrl: parsed.data.witness_signature_data_url ?? null,
       ipAddress: ip,
       userAgent: req.headers.get('user-agent'),
     });

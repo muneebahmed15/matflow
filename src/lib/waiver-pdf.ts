@@ -7,6 +7,7 @@ export type WaiverPdfInput = {
   signedName: string;
   signedAt: string;
   memberEmail?: string | null;
+  witnessName?: string;
 };
 
 function wrapText(text: string, maxChars: number): string[] {
@@ -62,6 +63,7 @@ export async function buildWaiverPdf(input: WaiverPdfInput): Promise<Uint8Array>
   y -= 12;
   draw('—'.repeat(40));
   draw(`Signed by: ${input.signedName}`, 12, true);
+  if (input.witnessName) draw(`Witness: ${input.witnessName}`, 11);
   if (input.memberEmail) draw(`Email: ${input.memberEmail}`);
   draw(`Date: ${new Date(input.signedAt).toLocaleString()}`);
 

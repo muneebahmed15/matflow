@@ -66,13 +66,25 @@ export default function SignWaiverPage() {
     }
   };
 
-  const handleSign = async (typedName: string) => {
+  const handleSign = async (
+    typedName: string,
+    options?: {
+      guardianName?: string;
+      witnessName?: string;
+      signatureImageDataUrl?: string;
+      witnessSignatureDataUrl?: string;
+    }
+  ) => {
     if (!selected || !member) return;
     setError(null);
     const result = await signWaiverAction({
       waiverId: selected.id,
       memberId: member.id,
       signedName: typedName,
+      guardianName: options?.guardianName,
+      witnessName: options?.witnessName,
+      signatureImageDataUrl: options?.signatureImageDataUrl,
+      witnessSignatureDataUrl: options?.witnessSignatureDataUrl,
     });
     if (!result.ok) {
       setError(result.error);

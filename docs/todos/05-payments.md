@@ -6,7 +6,7 @@
 - [x] 5.3 Plans dashboard UI polish
 - [x] 5.4 Plan description rich text (`BlogRichTextEditor` + sanitized HTML on plans page)
 - [x] 5.5 Plan trial period days (`plans.trial_days` → Stripe trial)
-- [ ] 5.6 Plan setup fee
+- [x] 5.6 Plan setup fee
 - [x] 5.7 Deactivate plan without deleting
 - [x] 5.8 Plan sort order column (`plans.sort_order`)
 
@@ -17,7 +17,7 @@
 - [x] 5.12 Staff-initiated checkout from member profile (done)
 - [x] 5.13 Promo codes / coupons (checkout allow_promotion_codes)
 - [x] 5.14 Proration on plan change
-- [ ] 5.15 Tax calculation (Stripe Tax)
+- [x] 5.15 Tax calculation (Stripe Tax)
 
 ## Subscriptions
 - [x] 5.16 Subscriptions table (done)
@@ -48,16 +48,16 @@
 - [x] 5.37 Admin: all invoices report
 
 ## Family Plans
-- [ ] 5.38 Family subscription links multiple members
-- [ ] 5.39 Family discount pricing rules
-- [ ] 5.40 Single Stripe subscription for family
-- [ ] 5.41 Per-member access under family plan
+- [x] 5.38 Family subscription links multiple members
+- [x] 5.39 Family discount pricing rules (single plan checkout for family)
+- [x] 5.40 Single Stripe subscription for family
+- [x] 5.41 Per-member access under family plan
 
 ## Provider Abstraction
-- [ ] 5.42 `PaymentProvider` interface definition
-- [ ] 5.43 Stripe adapter implements interface
-- [ ] 5.44 Gym-level provider config
-- [ ] 5.45 Feature flag: stripe-only until v2
+- [x] 5.42 `PaymentProvider` interface definition
+- [x] 5.43 Stripe adapter implements interface
+- [x] 5.44 Gym-level provider config
+- [x] 5.45 Feature flag: stripe-only until v2
 
 ## Reporting
 - [x] 5.46 MRR dashboard widget

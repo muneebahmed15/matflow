@@ -36,7 +36,7 @@
 
 ## Excel / Sheets
 
-- [ ] 8.13 Parse .xlsx server-side
+- [x] 8.13 Parse .xlsx server-side
 
 - [ ] 8.14 Google Sheets URL import
 
@@ -56,11 +56,11 @@
 
 ## Waivers Import
 
-- [ ] 8.19 Upload signed PDF batch
+- [x] 8.19 Upload signed PDF batch
 
-- [ ] 8.20 Link PDF to member by email
+- [x] 8.20 Link PDF to member by email
 
-- [ ] 8.21 Store in Supabase Storage
+- [x] 8.21 Store in Supabase Storage
 
 
 
@@ -76,11 +76,11 @@
 
 ## Photos
 
-- [ ] 8.25 Bulk member photo upload (zip)
+- [x] 8.25 Bulk member photo upload (zip)
 
-- [ ] 8.26 Filename = email.jpg convention
+- [x] 8.26 Filename = email.jpg convention
 
-- [ ] 8.27 Image resize on upload
+- [x] 8.27 Image resize on upload
 
 
 
@@ -147,9 +147,9 @@
 
 - [x] 8.44 Document ECMMA-specific field mapping — [ECMMA_FIELD_MAPPING.md](../ECMMA_FIELD_MAPPING.md)
 
-- [ ] 8.45 Pilot import with real data (staging)
+- [ ] 8.45 Pilot import with real data (staging) — checklist template in [WAVE2_MIGRATION_SIGNOFF.md](../WAVE2_MIGRATION_SIGNOFF.md)
 
-- [ ] 8.46 Sign-off checklist
+- [x] 8.46 Sign-off checklist — [WAVE2_MIGRATION_SIGNOFF.md](../WAVE2_MIGRATION_SIGNOFF.md)
 
 
 

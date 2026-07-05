@@ -229,6 +229,9 @@ async function insertImmutableSignature(input: {
   leadId?: string;
   signedName: string;
   guardianName?: string | null;
+  witnessName?: string | null;
+  signatureImageDataUrl?: string | null;
+  witnessSignatureDataUrl?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
   waiver: { title: string; body: string; expires_after_days?: number | null; version?: number };
@@ -242,6 +245,43 @@ async function insertImmutableSignature(input: {
   const expiresAt = waiverExpiresAt(input.waiver.expires_after_days ?? null);
   const signatureId = crypto.randomUUID();
 
+  let signatureImageUrl: string | null = null;
+  let witnessSignatureUrl: string | null = null;
+
+  if (input.signatureImageDataUrl?.startsWith('data:image/')) {
+    try {
+      const base64 = input.signatureImageDataUrl.split(',')[1];
+      if (base64) {
+        const bytes = Buffer.from(base64, 'base64');
+        const path = `${input.gymId}/${signatureId}-sig.png`;
+        await admin.storage.from('waiver-signatures').upload(path, bytes, {
+          contentType: 'image/png',
+          upsert: false,
+        });
+        signatureImageUrl = path;
+      }
+    } catch {
+      signatureImageUrl = null;
+    }
+  }
+
+  if (input.witnessSignatureDataUrl?.startsWith('data:image/')) {
+    try {
+      const base64 = input.witnessSignatureDataUrl.split(',')[1];
+      if (base64) {
+        const bytes = Buffer.from(base64, 'base64');
+        const path = `${input.gymId}/${signatureId}-witness.png`;
+        await admin.storage.from('waiver-signatures').upload(path, bytes, {
+          contentType: 'image/png',
+          upsert: false,
+        });
+        witnessSignatureUrl = path;
+      }
+    } catch {
+      witnessSignatureUrl = null;
+    }
+  }
+
   let pdfStoragePath: string | null = null;
   try {
     const { buildWaiverPdf } = await import('@/lib/waiver-pdf');
@@ -252,6 +292,7 @@ async function insertImmutableSignature(input: {
       signedName: input.signedName.trim(),
       signedAt,
       memberEmail: input.signerEmail,
+      witnessName: input.witnessName ?? undefined,
     });
     pdfStoragePath = `${input.gymId}/${signatureId}.pdf`;
     await admin.storage.from('waiver-signatures').upload(pdfStoragePath, pdfBytes, {
@@ -270,6 +311,9 @@ async function insertImmutableSignature(input: {
     gym_id: input.gymId,
     signed_name: input.signedName.trim(),
     guardian_name: input.guardianName?.trim() || null,
+    witness_name: input.witnessName?.trim() || null,
+    signature_image_url: signatureImageUrl,
+    witness_signature_url: witnessSignatureUrl,
     signed_at: signedAt,
     expires_at: expiresAt,
     waiver_version: waiverVersion,
@@ -314,6 +358,9 @@ export async function signWaiver(input: {
   gymId: string;
   signedName: string;
   guardianName?: string | null;
+  witnessName?: string | null;
+  signatureImageDataUrl?: string | null;
+  witnessSignatureDataUrl?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
 }): Promise<{ signatureId: string; pdfStoragePath: string | null }> {
@@ -369,6 +416,9 @@ export async function signWaiver(input: {
     memberId: input.memberId,
     signedName: input.signedName,
     guardianName: input.guardianName,
+    witnessName: input.witnessName,
+    signatureImageDataUrl: input.signatureImageDataUrl,
+    witnessSignatureDataUrl: input.witnessSignatureDataUrl,
     ipAddress: input.ipAddress,
     userAgent: input.userAgent,
     waiver,
@@ -738,4 +788,109 @@ export async function exportWaiverSignaturesCsv(gymId: string): Promise<string> 
     ['waiver_title', 'member_name', 'member_email', 'signed_name', 'signed_at', 'expires_at'],
     rows
   );
+}
+
+export async function setWaiverLegalHold(
+  gymId: string,
+  signatureId: string,
+  legalHold: boolean
+): Promise<void> {
+  const admin = getAdminClient();
+  const { error } = await admin
+    .from('waiver_signatures')
+    .update({ legal_hold: legalHold })
+    .eq('id', signatureId)
+    .eq('gym_id', gymId);
+
+  if (error) throw new ServiceError(500, error.message);
+}
+
+export type MemberWaiverExport = {
+  member: { id: string; first_name: string; last_name: string; email: string | null };
+  signatures: {
+    id: string;
+    waiver_title: string;
+    signed_name: string;
+    signed_at: string;
+    expires_at: string | null;
+    legal_hold: boolean;
+    pdf_storage_path: string | null;
+  }[];
+  exportedAt: string;
+};
+
+/** GDPR export: member waiver history as structured JSON. */
+export async function exportMemberWaiverHistory(
+  gymId: string,
+  memberId: string
+): Promise<MemberWaiverExport> {
+  const admin = getAdminClient();
+  const { data: member, error: mErr } = await admin
+    .from('members')
+    .select('id, first_name, last_name, email')
+    .eq('id', memberId)
+    .eq('gym_id', gymId)
+    .maybeSingle();
+
+  if (mErr) throw new ServiceError(500, mErr.message);
+  if (!member) throw new ServiceError(404, 'Member not found.');
+
+  const { data: sigs, error: sErr } = await admin
+    .from('waiver_signatures')
+    .select('id, signed_name, signed_at, expires_at, legal_hold, pdf_storage_path, waivers(title)')
+    .eq('gym_id', gymId)
+    .eq('member_id', memberId)
+    .order('signed_at', { ascending: false });
+
+  if (sErr) throw new ServiceError(500, sErr.message);
+
+  return {
+    member,
+    signatures: (sigs ?? []).map((row) => {
+      const waivers = Array.isArray(row.waivers) ? row.waivers[0] : row.waivers;
+      return {
+        id: row.id,
+        waiver_title: (waivers as { title?: string } | null)?.title ?? '',
+        signed_name: row.signed_name,
+        signed_at: row.signed_at,
+        expires_at: row.expires_at,
+        legal_hold: Boolean((row as { legal_hold?: boolean }).legal_hold),
+        pdf_storage_path: row.pdf_storage_path,
+      };
+    }),
+    exportedAt: new Date().toISOString(),
+  };
+}
+
+/** Apply retention policy — delete expired signatures unless legal_hold (best-effort). */
+export async function applyWaiverRetentionPolicy(gymId: string): Promise<number> {
+  const admin = getAdminClient();
+  const { data: gym } = await admin
+    .from('gyms')
+    .select('waiver_retention_days')
+    .eq('id', gymId)
+    .maybeSingle();
+
+  const days = (gym as { waiver_retention_days?: number | null } | null)?.waiver_retention_days;
+  if (!days || days <= 0) return 0;
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+
+  const { data: expired } = await admin
+    .from('waiver_signatures')
+    .select('id, pdf_storage_path')
+    .eq('gym_id', gymId)
+    .eq('legal_hold', false)
+    .lt('signed_at', cutoff.toISOString());
+
+  let removed = 0;
+  for (const sig of expired ?? []) {
+    if (sig.pdf_storage_path) {
+      await admin.storage.from('waiver-signatures').remove([sig.pdf_storage_path]);
+    }
+    const { error } = await admin.from('waiver_signatures').delete().eq('id', sig.id);
+    if (!error) removed += 1;
+  }
+  return removed;
 }

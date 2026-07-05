@@ -196,3 +196,78 @@ export async function downloadPromotionCertificateAction(
   }
 }
 
+export async function proposePromotionAction(input: {
+  memberId: string;
+  fromBelt: string;
+  toBelt: string;
+  notes?: string;
+  ceremonyDate?: string | null;
+}): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession();
+    const { proposePromotion } = await import('@/services/belts');
+    await proposePromotion({ ...input, gymId: auth.gymId, actorId: auth.user.id });
+    revalidatePath('/belts');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function listPromotionRequestsAction(): Promise<
+  ActionResult<import('@/services/belts').PromotionRequest[]>
+> {
+  try {
+    const auth = await requireStaffSession();
+    const { listPromotionRequests } = await import('@/services/belts');
+    return { ok: true, data: await listPromotionRequests(auth.gymId, 'pending') };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function reviewPromotionRequestAction(
+  requestId: string,
+  approve: boolean
+): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { reviewPromotionRequest } = await import('@/services/belts');
+    await reviewPromotionRequest({
+      gymId: auth.gymId,
+      requestId,
+      approve,
+      actorId: auth.user.id,
+    });
+    revalidatePath('/belts');
+    revalidatePath('/members');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function getPromotionForecastAction(): Promise<
+  ActionResult<import('@/services/belts').PromotionForecast[]>
+> {
+  try {
+    const auth = await requireStaffSession({ capability: 'members.read' });
+    const { getPromotionForecast } = await import('@/services/belts');
+    return { ok: true, data: await getPromotionForecast(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function getWhoIsReadyAction(): Promise<
+  ActionResult<import('@/services/belts').MemberReadiness[]>
+> {
+  try {
+    const auth = await requireStaffSession({ capability: 'members.read' });
+    const { getWhoIsReady } = await import('@/services/belts');
+    return { ok: true, data: await getWhoIsReady(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+

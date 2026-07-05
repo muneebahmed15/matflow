@@ -1,8 +1,23 @@
+import sharp from 'sharp';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { ServiceError } from '@/services/errors';
 
 const MAX_BYTES = 2 * 1024 * 1024;
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const AVATAR_SIZE = 400;
+
+async function resizeProfilePhoto(bytes: Uint8Array, contentType: string): Promise<{
+  data: Buffer;
+  contentType: string;
+  ext: string;
+}> {
+  const resized = await sharp(bytes)
+    .rotate()
+    .resize(AVATAR_SIZE, AVATAR_SIZE, { fit: 'cover', position: 'centre' })
+    .jpeg({ quality: 85 })
+    .toBuffer();
+  return { data: resized, contentType: 'image/jpeg', ext: 'jpg' };
+}
 
 export async function uploadMemberProfilePhoto(input: {
   gymId: string;
@@ -17,18 +32,13 @@ export async function uploadMemberProfilePhoto(input: {
     throw new ServiceError(400, 'Photo must be under 2 MB.');
   }
 
-  const ext =
-    input.contentType === 'image/png'
-      ? 'png'
-      : input.contentType === 'image/webp'
-        ? 'webp'
-        : 'jpg';
+  const { data, contentType, ext } = await resizeProfilePhoto(input.bytes, input.contentType);
   const path = `${input.gymId}/${input.memberId}.${ext}`;
   const admin = getAdminClient();
 
   const { error: uploadErr } = await admin.storage
     .from('member-avatars')
-    .upload(path, input.bytes, { contentType: input.contentType, upsert: true });
+    .upload(path, data, { contentType, upsert: true });
 
   if (uploadErr) throw new ServiceError(500, uploadErr.message);
 

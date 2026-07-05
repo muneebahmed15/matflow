@@ -1,5 +1,17 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
+vi.mock('sharp', () => ({
+  default: () => ({
+    rotate: () => ({
+      resize: () => ({
+        jpeg: () => ({
+          toBuffer: async () => Buffer.from('jpeg-bytes'),
+        }),
+      }),
+    }),
+  }),
+}));
+
 const upload = vi.fn();
 const getPublicUrl = vi.fn();
 const update = vi.fn();

@@ -16,6 +16,7 @@ export default function NewPlanForm({ gymId }: Props) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
+  const [setupFee, setSetupFee] = useState('')
   const [interval, setInterval] = useState('month')
   const [error, setError] = useState('')
 
@@ -30,13 +31,14 @@ export default function NewPlanForm({ gymId }: Props) {
         name,
         description,
         price_cents: Math.round(parseFloat(price) * 100),
+        setup_fee_cents: setupFee ? Math.round(parseFloat(setupFee) * 100) : 0,
         interval,
         gym_id: gymId,
       }),
     })
     const data = await res.json()
     if (!res.ok) { setError(data.error || 'Failed to create plan'); setSubmitting(false); return }
-    setName(''); setDescription(''); setPrice(''); setInterval('month')
+    setName(''); setDescription(''); setPrice(''); setSetupFee(''); setInterval('month')
     setShowForm(false)
     setSubmitting(false)
     router.refresh()
@@ -77,6 +79,12 @@ export default function NewPlanForm({ gymId }: Props) {
               <label className="block text-sm font-medium text-gray-300 mb-1">Price (USD)</label>
               <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="99.00" className={inputClass} />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Setup fee (USD, optional)</label>
+              <input type="number" value={setupFee} onChange={(e) => setSetupFee(e.target.value)} placeholder="0.00" className={inputClass} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Billing Interval</label>
               <select value={interval} onChange={(e) => setInterval(e.target.value)} className={inputClass}>

@@ -59,6 +59,17 @@ These items are being implemented in the current sprint:
 - [x] E2E: waiver blocks check-in until signed (`npm run test:e2e:waiver`)
 - [ ] Remaining todos across Waves 3–4 (multi-location polish, AI modules)
 
+### Wave 2 — Completion (20250704310000_wave2_complete.sql)
+
+- [x] Migration: `.xlsx` parse, waiver PDF batch, photo zip + sharp resize, sign-off doc
+- [x] Payments: setup fee, Stripe Tax, family subscriptions, PaymentProvider abstraction
+- [x] Belts: promotion approval, share PNG, forecast, who-is-ready panel
+- [x] Waivers: canvas signature, witness, GDPR export, retention, legal hold
+- [x] CRM: coach availability on `/staff`
+- [x] Public: [LIGHTHOUSE_CHECKLIST.md](./LIGHTHOUSE_CHECKLIST.md)
+- [x] 400 vitest tests passing
+- Deferred: belts 4.42–4.48, waivers 6.10/6.45/6.50, CRM 2.54, marketing 11.31 (Buffer) → Wave 3+
+
 ### Wave 4 — Merchandise (20250704300000_wave2_wave4_options.sql)
 
 - [x] Shop settings: member discount %, flat tax, coaches stripes-only

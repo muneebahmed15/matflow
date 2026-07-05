@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Users, ArrowLeft, CreditCard } from 'lucide-react';
 import PageLoader from '@/components/PageLoader';
-import { getFamilyDetailAction, setFamilyBillingContactAction, mergeFamiliesAction } from '@/app/(dashboard)/actions';
+import { getFamilyDetailAction, setFamilyBillingContactAction, mergeFamiliesAction, getStaffContextAction } from '@/app/(dashboard)/actions';
 
 const STATUS_STYLES: Record<string, string> = {
   active: 'bg-green-500/10 text-green-400',
@@ -40,12 +40,25 @@ export default function FamilyDetailPage() {
   const [sourceFamilyId, setSourceFamilyId] = useState('');
   const [merging, setMerging] = useState(false);
   const [mergeError, setMergeError] = useState('');
+  const [familySubscribing, setFamilySubscribing] = useState(false);
+  const [plans, setPlans] = useState<{ id: string; name: string; stripe_price_id: string | null; price_cents: number }[]>([]);
+  const [selectedPlanPriceId, setSelectedPlanPriceId] = useState('');
+  const [gymId, setGymId] = useState('');
 
   const load = useCallback(async () => {
+    const ctx = await getStaffContextAction();
+    if (ctx.ok && ctx.data) setGymId(ctx.data.gymId);
     const result = await getFamilyDetailAction(id);
     if (result.ok && result.data) {
       setFamily(result.data.family);
       setMembers(result.data.members);
+    }
+    if (ctx.ok && ctx.data) {
+      const plansRes = await fetch(`/api/plans?gym_id=${ctx.data.gymId}`);
+      if (plansRes.ok) {
+        const json = await plansRes.json();
+        setPlans(json.data ?? []);
+      }
     }
     setLoading(false);
   }, [id]);
@@ -121,7 +134,55 @@ export default function FamilyDetailPage() {
       </div>
 
       <div className="bg-[#111] border border-white/10 rounded-2xl p-5 mb-8 space-y-3">
-        <h2 className="font-semibold text-white">Merge family</h2>
+        <h2 className="font-semibold text-white flex items-center gap-2">
+          <CreditCard size={16} className="text-green-400" /> Family subscription
+        </h2>
+        <p className="text-white/40 text-sm">
+          One Stripe subscription covers all members in this family. Checkout uses the billing contact.
+        </p>
+        <select
+          value={selectedPlanPriceId}
+          onChange={(e) => setSelectedPlanPriceId(e.target.value)}
+          className={inputClass}
+        >
+          <option value="" className="bg-gray-900">Select a plan…</option>
+          {plans.map((p) => (
+            <option key={p.id} value={p.stripe_price_id ?? ''} className="bg-gray-900">
+              {p.name} — ${((p.price_cents ?? 0) / 100).toFixed(2)}
+            </option>
+          ))}
+        </select>
+        <button
+          disabled={familySubscribing || !selectedPlanPriceId || !family.billing_member_id}
+          onClick={async () => {
+            const billing = members.find((m) => m.id === family.billing_member_id);
+            if (!billing?.email) return;
+            setFamilySubscribing(true);
+            const res = await fetch('/api/stripe/create-checkout', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                stripe_price_id: selectedPlanPriceId,
+                member_id: billing.id,
+                gym_id: gymId,
+                member_email: billing.email,
+                family_id: family.id,
+              }),
+            });
+            const data = await res.json();
+            if (data.url) window.location.href = data.url;
+            setFamilySubscribing(false);
+          }}
+          className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold py-2.5 rounded-xl"
+        >
+          {familySubscribing ? 'Starting checkout…' : 'Start family checkout'}
+        </button>
+        {!family.billing_member_id && (
+          <p className="text-amber-400/80 text-xs">Set a billing contact before starting checkout.</p>
+        )}
+      </div>
+
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-5 mb-8 space-y-3">
         <p className="text-white/40 text-sm">
           Move all members from another family into this one, then delete the source family.
         </p>

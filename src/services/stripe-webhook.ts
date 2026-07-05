@@ -109,7 +109,7 @@ export async function handleStripeWebhookEvent(event: Stripe.Event): Promise<voi
         break;
       }
 
-      const { member_id, gym_id } = metadata;
+      const { member_id, gym_id, family_id } = metadata;
       const stripeSubId =
         typeof session.subscription === 'string'
           ? session.subscription
@@ -119,11 +119,13 @@ export async function handleStripeWebhookEvent(event: Stripe.Event): Promise<voi
 
       const { data: member } = await admin
         .from('members')
-        .select('id')
+        .select('id, family_id')
         .eq('id', member_id)
         .eq('gym_id', gym_id)
         .maybeSingle();
       if (!member) return;
+
+      const resolvedFamilyId = family_id || member.family_id || null;
 
       const stripeSub = await stripe.subscriptions.retrieve(stripeSubId);
       const priceId = stripeSub.items.data[0]?.price.id;
@@ -135,10 +137,11 @@ export async function handleStripeWebhookEvent(event: Stripe.Event): Promise<voi
         .eq('gym_id', gym_id)
         .maybeSingle();
 
-      await admin.from('subscriptions').upsert(
+      const { data: subRow } = await admin.from('subscriptions').upsert(
         {
           gym_id,
           member_id,
+          family_id: resolvedFamilyId,
           plan_id: plan?.id || null,
           stripe_subscription_id: stripeSubId,
           stripe_customer_id: session.customer as string,
@@ -148,10 +151,20 @@ export async function handleStripeWebhookEvent(event: Stripe.Event): Promise<voi
             : null,
         },
         { onConflict: 'stripe_subscription_id' }
-      );
+      ).select('id').maybeSingle();
 
       const checkoutMemberStatus = memberStatusForSubscription(stripeSub.status) ?? 'active';
       await admin.from('members').update({ status: checkoutMemberStatus }).eq('id', member_id);
+
+      if (resolvedFamilyId && subRow?.id) {
+        const { grantFamilySubscriptionAccess } = await import('@/services/subscription-access');
+        await grantFamilySubscriptionAccess(
+          gym_id,
+          resolvedFamilyId,
+          subRow.id,
+          stripeSub.status
+        );
+      }
       break;
     }
     case 'customer.subscription.updated': {

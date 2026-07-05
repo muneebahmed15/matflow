@@ -46,6 +46,7 @@ export const createCheckoutSchema = z.object({
   member_id: uuid(),
   gym_id: uuid(),
   member_email: z.string().email().optional(),
+  family_id: uuid().optional(),
 });
 
 export const createPlanSchema = z.object({
@@ -54,6 +55,7 @@ export const createPlanSchema = z.object({
   price_cents: z.number().int().positive(),
   interval: z.enum(['month', 'year']),
   gym_id: uuid(),
+  setup_fee_cents: z.number().int().min(0).optional(),
 });
 
 export const cancelSubscriptionSchema = z.object({

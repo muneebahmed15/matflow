@@ -7,6 +7,10 @@ import {
   promoteMemberAction,
   undoPromotionAction,
   getPromotionReadinessAction,
+  getPromotionForecastAction,
+  listPromotionRequestsAction,
+  reviewPromotionRequestAction,
+  proposePromotionAction,
   getGymBeltSystemAction,
   listBeltRequirementsAction,
   saveBeltRequirementAction,
@@ -80,6 +84,10 @@ export default function BeltsPage() {
   const [ceremonySelected, setCeremonySelected] = useState<Set<string>>(new Set())
   const [ceremonyNotes, setCeremonyNotes] = useState('')
   const [ceremonyDateBulk, setCeremonyDateBulk] = useState('')
+  const [forecast, setForecast] = useState<{ belt: string; readyNow: number; likelyNext30Days: number }[]>([])
+  const [pendingRequests, setPendingRequests] = useState<
+    { id: string; from_belt: string; to_belt: string; notes: string | null; members: { first_name: string; last_name: string } | null }[]
+  >([])
 
   // requirements editor state
   const [reqBelt, setReqBelt] = useState('white')
@@ -87,10 +95,12 @@ export default function BeltsPage() {
   const [reqDays, setReqDays] = useState('365')
 
   const reload = async () => {
-    const [pageResult, readyResult, reqResult] = await Promise.all([
+    const [pageResult, readyResult, reqResult, forecastResult, requestsResult] = await Promise.all([
       getBeltsPageDataAction(),
       getPromotionReadinessAction(),
       listBeltRequirementsAction(),
+      getPromotionForecastAction(),
+      listPromotionRequestsAction(),
     ])
     if (pageResult.ok && pageResult.data) {
       setMembers(pageResult.data.members)
@@ -98,6 +108,8 @@ export default function BeltsPage() {
     }
     if (readyResult.ok && readyResult.data) setReadiness(readyResult.data)
     if (reqResult.ok && reqResult.data) setRequirements(reqResult.data)
+    if (forecastResult.ok && forecastResult.data) setForecast(forecastResult.data)
+    if (requestsResult.ok && requestsResult.data) setPendingRequests(requestsResult.data)
   }
 
   useEffect(() => {
@@ -249,6 +261,17 @@ export default function BeltsPage() {
     URL.revokeObjectURL(url)
   }
 
+  const handleDownloadShareImage = (promo: BeltPromotion) => {
+    const member = promo.members
+    const params = new URLSearchParams({
+      member_name: `${member.first_name} ${member.last_name}`,
+      from_belt: promo.from_belt,
+      to_belt: promo.to_belt,
+      promoted_at: promo.promoted_at,
+    })
+    window.open(`/api/belts/share-image?${params.toString()}`, '_blank')
+  }
+
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
 
   return (
@@ -269,6 +292,58 @@ export default function BeltsPage() {
           )}
         </div>
       </div>
+
+      {forecast.length > 0 && (
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-5 mb-6">
+          <h2 className="font-semibold text-white mb-3">Promotion forecast (next 30 days)</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {forecast.map((f) => (
+              <div key={f.belt} className="bg-white/5 rounded-xl p-3 text-sm">
+                <p className="capitalize font-medium text-white">{f.belt} belt</p>
+                <p className="text-green-400 text-xs mt-1">{f.readyNow} ready now</p>
+                <p className="text-white/40 text-xs">{f.likelyNext30Days} likely in 30 days</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isAdmin && pendingRequests.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5 mb-6 space-y-3">
+          <h2 className="font-semibold text-amber-200">Pending promotion requests ({pendingRequests.length})</h2>
+          {pendingRequests.map((req) => (
+            <div key={req.id} className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-white">
+                {req.members?.first_name} {req.members?.last_name}: {req.from_belt} → {req.to_belt}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const result = await reviewPromotionRequestAction(req.id, true)
+                    if (!result.ok) showError(result.error)
+                    else { showSuccess('Promotion approved'); await reload() }
+                  }}
+                  className="px-3 py-1 rounded-lg bg-green-600 text-white text-xs"
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const result = await reviewPromotionRequestAction(req.id, false)
+                    if (!result.ok) showError(result.error)
+                    else { showSuccess('Request rejected'); await reload() }
+                  }}
+                  className="px-3 py-1 rounded-lg bg-white/10 text-white/70 text-xs"
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {readyMembers.length > 0 && (
         <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-5 mb-6 space-y-4">
@@ -485,6 +560,13 @@ export default function BeltsPage() {
                     className="text-blue-400 text-xs hover:underline mt-1"
                   >
                     Certificate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadShareImage(p)}
+                    className="text-purple-400 text-xs hover:underline mt-1 block"
+                  >
+                    Share image
                   </button>
                   {isAdmin && (
                     <button onClick={() => void handleUndo(p.id)} className="text-white/20 hover:text-red-400 text-xs mt-1 transition">

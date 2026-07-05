@@ -86,6 +86,9 @@ export async function signWaiverAction(input: {
   memberId: string;
   signedName: string;
   guardianName?: string | null;
+  witnessName?: string | null;
+  signatureImageDataUrl?: string | null;
+  witnessSignatureDataUrl?: string | null;
 }): Promise<ActionResult> {
   try {
     const auth = await requireStaffSession();
@@ -97,6 +100,9 @@ export async function signWaiverAction(input: {
       gymId: auth.gymId,
       signedName: input.signedName,
       guardianName: input.guardianName ?? null,
+      witnessName: input.witnessName ?? null,
+      signatureImageDataUrl: input.signatureImageDataUrl ?? null,
+      witnessSignatureDataUrl: input.witnessSignatureDataUrl ?? null,
     });
     try {
       await sendMemberNotification({
@@ -196,6 +202,34 @@ export async function updateWaiverAction(input: {
   }
 }
 
+
+export async function exportMemberWaiverHistoryAction(
+  memberId: string
+): Promise<ActionResult<Awaited<ReturnType<typeof import('@/services/waivers').exportMemberWaiverHistory>>>> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { exportMemberWaiverHistory } = await import('@/services/waivers');
+    const data = await exportMemberWaiverHistory(auth.gymId, memberId);
+    return { ok: true, data };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function setWaiverLegalHoldAction(
+  signatureId: string,
+  legalHold: boolean
+): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { setWaiverLegalHold } = await import('@/services/waivers');
+    await setWaiverLegalHold(auth.gymId, signatureId, legalHold);
+    revalidatePath('/waivers');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
 
 export async function toggleWaiverStatusAction(
   waiverId: string,

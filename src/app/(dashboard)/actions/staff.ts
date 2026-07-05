@@ -119,3 +119,58 @@ export async function updateStaffRoleAction(
   }
 }
 
+export async function listStaffAvailabilityAction(): Promise<
+  ActionResult<
+    (import('@/services/staff-availability').StaffAvailabilitySlot & {
+      staff_name: string | null;
+    })[]
+  >
+> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { listStaffAvailability, DAY_LABELS } = await import('@/services/staff-availability');
+    const staff = await listStaffMembers(auth.gymId);
+    const slots = await listStaffAvailability(auth.gymId);
+    const nameById = new Map(staff.map((s) => [s.id, s.full_name]));
+    return {
+      ok: true,
+      data: slots.map((s) => ({
+        ...s,
+        staff_name: nameById.get(s.staff_id) ?? null,
+        day_label: DAY_LABELS[s.day_of_week],
+      })),
+    };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function addStaffAvailabilityAction(input: {
+  staffId: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { upsertStaffAvailability } = await import('@/services/staff-availability');
+    await upsertStaffAvailability({ gymId: auth.gymId, ...input });
+    revalidatePath('/staff');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function deleteStaffAvailabilityAction(slotId: string): Promise<ActionResult> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const { deleteStaffAvailability } = await import('@/services/staff-availability');
+    await deleteStaffAvailability(auth.gymId, slotId);
+    revalidatePath('/staff');
+    return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+

@@ -2,11 +2,10 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-const { requireStaffAuth, mockFrom, createProduct, createPrice } = vi.hoisted(() => ({
+const { requireStaffAuth, mockFrom, createPlanProduct } = vi.hoisted(() => ({
   requireStaffAuth: vi.fn(),
   mockFrom: vi.fn(),
-  createProduct: vi.fn(),
-  createPrice: vi.fn(),
+  createPlanProduct: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/api', async () => {
@@ -15,8 +14,10 @@ vi.mock('@/lib/auth/api', async () => {
 });
 
 vi.mock('@/lib/supabase/admin', () => ({ getAdminClient: () => ({ from: mockFrom }) }));
-vi.mock('@/lib/stripe', () => ({
-  stripe: { products: { create: createProduct }, prices: { create: createPrice } },
+vi.mock('@/lib/payments/provider', () => ({
+  getPaymentProviderForGym: vi.fn().mockResolvedValue({
+    createPlanProduct: (...args: unknown[]) => createPlanProduct(...args),
+  }),
 }));
 
 import { POST } from '@/app/api/stripe/create-plan/route';
@@ -26,14 +27,16 @@ describe('POST /api/stripe/create-plan', () => {
   beforeEach(() => {
     requireStaffAuth.mockReset();
     mockFrom.mockReset();
-    createProduct.mockReset();
-    createPrice.mockReset();
+    createPlanProduct.mockReset();
   });
 
   it('creates a plan for the golden path', async () => {
     requireStaffAuth.mockResolvedValue(makeStaffAuth({ gymId: VALID_GYM_ID }));
-    createProduct.mockResolvedValue({ id: 'prod_1' });
-    createPrice.mockResolvedValue({ id: 'price_1' });
+    createPlanProduct.mockResolvedValue({
+      productId: 'prod_1',
+      priceId: 'price_1',
+      setupPriceId: null,
+    });
     mockFrom.mockReturnValueOnce(chain({ error: null }));
 
     const res = await POST(
@@ -63,7 +66,7 @@ describe('POST /api/stripe/create-plan', () => {
     );
 
     expect(res.status).toBe(400);
-    expect(createProduct).not.toHaveBeenCalled();
+    expect(createPlanProduct).not.toHaveBeenCalled();
   });
 
   it('forbids non-admin staff from creating a plan', async () => {
@@ -81,6 +84,6 @@ describe('POST /api/stripe/create-plan', () => {
     );
 
     expect(res.status).toBe(403);
-    expect(createProduct).not.toHaveBeenCalled();
+    expect(createPlanProduct).not.toHaveBeenCalled();
   });
 });

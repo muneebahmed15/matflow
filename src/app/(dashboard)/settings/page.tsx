@@ -98,6 +98,10 @@ export default function SettingsPage() {
       shopMemberDiscountPercent: settings.shop_member_discount_percent,
       shopFlatTaxCents: settings.shop_flat_tax_cents,
       coachesStripesOnly: settings.coaches_stripes_only,
+      stripeTaxEnabled: settings.stripe_tax_enabled,
+      paymentProvider: settings.payment_provider,
+      stripeOnly: settings.stripe_only,
+      waiverRetentionDays: settings.waiver_retention_days,
     })
     setSaving(false)
     if (!result.ok) {
@@ -244,6 +248,46 @@ export default function SettingsPage() {
               className="h-4 w-4 rounded accent-blue-500"
             />
           </label>
+          <label className="flex items-center justify-between gap-4 py-3 border-b border-white/10">
+            <div>
+              <span className="text-gray-300 text-sm">Stripe automatic tax</span>
+              <p className="text-white/30 text-xs">Enable Stripe Tax on checkout sessions</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.stripe_tax_enabled ?? false}
+              onChange={(e) => update({ stripe_tax_enabled: e.target.checked })}
+              className="h-4 w-4 rounded accent-blue-500"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-4 py-3 border-b border-white/10">
+            <div>
+              <span className="text-gray-300 text-sm">Stripe-only payments (v1)</span>
+              <p className="text-white/30 text-xs">Reserved for future multi-provider support</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.stripe_only !== false}
+              onChange={(e) => update({ stripe_only: e.target.checked })}
+              className="h-4 w-4 rounded accent-blue-500"
+            />
+          </label>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Waiver retention (days)</label>
+            <input
+              type="number"
+              min={0}
+              value={settings.waiver_retention_days ?? ''}
+              onChange={(e) =>
+                update({
+                  waiver_retention_days: e.target.value ? parseInt(e.target.value, 10) : null,
+                })
+              }
+              placeholder="Leave blank for no auto-deletion"
+              className={inputClass}
+            />
+            <p className="text-white/20 text-xs mt-1">Signatures on legal hold are never deleted.</p>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Booking cancellation window (hours)</label>
             <input

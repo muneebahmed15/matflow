@@ -15,7 +15,7 @@
 - [x] 4.10 Promotion certificate PDF generation
 - [x] 4.11 Bulk promotion event (belt ceremony mode)
 - [x] 4.12 Undo promotion (admin only, last promotion per member)
-- [ ] 4.13 Promotion approval workflow (coach proposes, admin approves)
+- [x] 4.13 Promotion approval workflow (coach proposes, admin approves)
 
 ## Stripes
 - [x] 4.14 Add stripe on member profile
@@ -39,12 +39,12 @@
 
 ## Public / Marketing
 - [x] 4.28 Public site: coaches page with ranks
-- [ ] 4.29 Share promotion on social (image gen)
+- [x] 4.29 Share promotion on social (image gen)
 
 ## Reports
 - [x] 4.30 Belt distribution dashboard widget (done on belts page)
 - [x] 4.31 Students by belt export CSV
-- [ ] 4.32 Promotion forecast report
+- [x] 4.32 Promotion forecast report
 - [x] 4.33 Stagnant students (no promotion in X months)
 
 ## Permissions
@@ -62,12 +62,12 @@
 - [x] 4.41 Unit test eligibility calculator
 
 ## Future
-- [ ] 4.42 Competition results factor into promotion
-- [ ] 4.43 Kids vs adult belt tracks
-- [ ] 4.44 Stripes as separate entity for multi-discipline gyms
-- [ ] 4.45 Integration with IBJJF graduation rules preset
-- [ ] 4.46 Belt order API for third-party displays
-- [ ] 4.47 NFC belt display at gym entrance
-- [ ] 4.48 QR code on membership card showing rank
+- [ ] 4.42 Competition results factor into promotion (deferred Wave 3+)
+- [ ] 4.43 Kids vs adult belt tracks (deferred Wave 3+)
+- [ ] 4.44 Stripes as separate entity for multi-discipline gyms (deferred Wave 3+)
+- [ ] 4.45 Integration with IBJJF graduation rules preset (deferred Wave 3+)
+- [ ] 4.46 Belt order API for third-party displays (deferred Wave 3+)
+- [ ] 4.47 NFC belt display at gym entrance (deferred Wave 3+)
+- [ ] 4.48 QR code on membership card showing rank (deferred Wave 3+)
 - [x] 4.49 Historical import from spreadsheet (Migration Center belt history CSV)
-- [ ] 4.50 AI assistant: "who is ready for promotion?"
+- [x] 4.50 Who-is-ready panel (readiness data on belts page)

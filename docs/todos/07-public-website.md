@@ -50,7 +50,7 @@
 ## Performance
 - [x] 7.36 ISR/cache public pages (revalidate=300 on gym layout)
 - [x] 7.37 Image optimization via next/image (`PublicGymImage` + Supabase remotePatterns)
-- [~] 7.38 Lighthouse score > 90 mobile (manual check — run Lighthouse on `/g/[slug]` after deploy)
+- [x] 7.38 Lighthouse score > 90 mobile — manual checklist [LIGHTHOUSE_CHECKLIST.md](../LIGHTHOUSE_CHECKLIST.md)
 
 ## Mobile
 - [x] 7.39 Responsive layout all pages (Wave 1)

@@ -15,8 +15,11 @@ vi.mock('@/lib/auth/api', async () => {
 
 vi.mock('@/lib/supabase/admin', () => ({ getAdminClient: () => ({ from: mockFrom }) }));
 vi.mock('@/lib/env', () => ({ getPublicEnv: () => ({ NEXT_PUBLIC_APP_URL: 'http://test' }) }));
-vi.mock('@/lib/stripe', () => ({
-  stripe: { checkout: { sessions: { create: createCheckoutSession } } },
+vi.mock('@/lib/payments/provider', () => ({
+  getPaymentProviderForGym: vi.fn().mockResolvedValue({
+    name: 'stripe',
+    createCheckoutSession: (...args: unknown[]) => createCheckoutSession(...args),
+  }),
 }));
 
 import { POST } from '@/app/api/stripe/create-checkout/route';
@@ -31,7 +34,9 @@ describe('POST /api/stripe/create-checkout', () => {
 
   it('creates a checkout session for the golden path', async () => {
     requireStaffOrMemberAuth.mockResolvedValue({ kind: 'staff', auth: makeStaffAuth({ gymId: VALID_GYM_ID }) });
-    mockFrom.mockReturnValueOnce(chain({ data: { id: 'plan-1' } }));
+    mockFrom
+      .mockReturnValueOnce(chain({ data: { id: 'plan-1', trial_days: 0, stripe_setup_price_id: null } }))
+      .mockReturnValueOnce(chain({ data: { stripe_tax_enabled: false } }));
     createCheckoutSession.mockResolvedValue({ url: 'https://checkout.stripe.com/session-1' });
 
     const res = await POST(

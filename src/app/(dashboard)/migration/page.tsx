@@ -36,6 +36,8 @@ import {
   type ImportType,
 } from '@/lib/import-maps';
 import type { ImportJob } from '@/services/migration';
+import { listWaiversAction } from '@/app/(dashboard)/actions';
+import type { Waiver } from '@/services/waivers';
 import MigrationStepper, { type MigrationStep } from '@/components/migration/MigrationStepper';
 import CsvColumnMapper from '@/components/migration/CsvColumnMapper';
 
@@ -66,10 +68,20 @@ export default function MigrationPage() {
   const [mappingConfirmed, setMappingConfirmed] = useState(false);
   const [duplicateStrategy, setDuplicateStrategy] = useState<DuplicateEmailStrategy>('skip');
   const [rawCsvText, setRawCsvText] = useState('');
+  const [waivers, setWaivers] = useState<Waiver[]>([]);
+  const [waiverImportId, setWaiverImportId] = useState('');
+  const [waiverImportResult, setWaiverImportResult] = useState<string | null>(null);
+  const [photoImportResult, setPhotoImportResult] = useState<string | null>(null);
+  const [bulkUploading, setBulkUploading] = useState(false);
 
   const load = async () => {
     const res = await listImportJobsAction();
     if (res.ok && res.data) setJobs(res.data);
+    const waiverRes = await listWaiversAction();
+    if (waiverRes.ok && waiverRes.data) {
+      setWaivers(waiverRes.data.filter((w) => w.is_active));
+      if (waiverRes.data[0]) setWaiverImportId(waiverRes.data[0].id);
+    }
     setLoading(false);
   };
 
@@ -132,7 +144,30 @@ export default function MigrationPage() {
     setDryRunResult(null);
     setProgress(0);
     setMappingConfirmed(false);
-    const text = await file.text();
+
+    const isXlsx = file.name.toLowerCase().endsWith('.xlsx');
+    let text: string;
+
+    if (isXlsx) {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch('/api/migration/parse-spreadsheet', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) {
+        setDryRunResult(`Error: ${data.error ?? 'Failed to parse spreadsheet'}`);
+        return;
+      }
+      text = data.csvText as string;
+      setCsvHeaders(data.headers as string[]);
+      setColumnMapping(guessColumnMap(data.headers as string[], IMPORT_TARGET_FIELDS[importType]));
+      setFileName(file.name);
+      setRawCsvText(text);
+      setPreview([]);
+      setParsedRows([]);
+      return;
+    }
+
+    text = await file.text();
     setRawCsvText(text);
     const rows = parseCsv(text);
     if (rows.length < 2) {
@@ -300,7 +335,7 @@ export default function MigrationPage() {
             ? 3
             : 1;
 
-  const steps: MigrationStep[] = ['Choose type', 'Upload CSV', 'Preview', 'Commit'].map(
+  const steps: MigrationStep[] = ['Choose type', 'Upload file', 'Preview', 'Commit'].map(
     (label, i) => ({
       id: String(i),
       label,
@@ -312,7 +347,7 @@ export default function MigrationPage() {
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
       <h1 className="text-3xl font-extrabold mb-2">Migration Center</h1>
       <p className="text-white/40 text-sm mb-6">
-        Import members, leads, class schedules, attendance history, or belt history from CSV.
+        Import members, leads, class schedules, attendance history, or belt history from CSV or Excel (.xlsx).
       </p>
 
       <MigrationStepper steps={steps} />
@@ -371,11 +406,11 @@ export default function MigrationPage() {
         <label className="flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-xl p-10 cursor-pointer hover:border-blue-500/50 transition">
           <Upload size={32} className="text-white/20 mb-2" />
           <span className="text-white/40 text-sm">
-            {fileName ? `Selected: ${fileName}` : importing ? 'Validating...' : 'Upload CSV file'}
+            {fileName ? `Selected: ${fileName}` : importing ? 'Validating...' : 'Upload CSV or .xlsx file'}
           </span>
           <input
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="hidden"
             disabled={importing || committing}
             onChange={(e) => e.target.files?.[0] && void handleFile(e.target.files[0])}
@@ -431,6 +466,79 @@ export default function MigrationPage() {
           <pre className="text-xs text-white/60 overflow-x-auto">{JSON.stringify(preview, null, 2)}</pre>
         </div>
       )}
+
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8 space-y-6">
+        <h2 className="font-semibold text-white">Bulk imports</h2>
+
+        <div className="space-y-3">
+          <p className="text-white/40 text-sm">Signed waiver PDFs — name files <code className="text-white/60">email.pdf</code></p>
+          <select
+            value={waiverImportId}
+            onChange={(e) => setWaiverImportId(e.target.value)}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white text-sm"
+          >
+            {waivers.map((w) => (
+              <option key={w.id} value={w.id} className="bg-gray-900">{w.title}</option>
+            ))}
+          </select>
+          <label className="flex flex-col items-center border border-dashed border-white/10 rounded-xl p-6 cursor-pointer hover:border-blue-500/40">
+            <span className="text-white/40 text-sm">Select PDF files (multi)</span>
+            <input
+              type="file"
+              accept="application/pdf"
+              multiple
+              className="hidden"
+              onChange={async (e) => {
+                const files = e.target.files;
+                if (!files?.length || !waiverImportId) return;
+                setBulkUploading(true);
+                setWaiverImportResult(null);
+                const form = new FormData();
+                form.append('waiver_id', waiverImportId);
+                for (const f of files) form.append('files', f);
+                const res = await fetch('/api/migration/import-waiver-pdfs', { method: 'POST', body: form });
+                const data = await res.json();
+                setBulkUploading(false);
+                setWaiverImportResult(
+                  res.ok
+                    ? `Imported ${data.success} waiver(s), ${data.errors?.length ?? 0} error(s).`
+                    : `Error: ${data.error ?? 'Import failed'}`
+                );
+              }}
+            />
+          </label>
+          {waiverImportResult && <p className="text-sm text-green-400/80">{waiverImportResult}</p>}
+        </div>
+
+        <div className="space-y-3 border-t border-white/10 pt-6">
+          <p className="text-white/40 text-sm">Member photos — upload a zip of <code className="text-white/60">email.jpg</code> files (auto-resized)</p>
+          <label className="flex flex-col items-center border border-dashed border-white/10 rounded-xl p-6 cursor-pointer hover:border-blue-500/40">
+            <span className="text-white/40 text-sm">{bulkUploading ? 'Uploading…' : 'Select photo zip'}</span>
+            <input
+              type="file"
+              accept=".zip,application/zip"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setBulkUploading(true);
+                setPhotoImportResult(null);
+                const form = new FormData();
+                form.append('file', file);
+                const res = await fetch('/api/migration/import-photo-zip', { method: 'POST', body: form });
+                const data = await res.json();
+                setBulkUploading(false);
+                setPhotoImportResult(
+                  res.ok
+                    ? `Updated ${data.success} photo(s), ${data.errors?.length ?? 0} error(s).`
+                    : `Error: ${data.error ?? 'Import failed'}`
+                );
+              }}
+            />
+          </label>
+          {photoImportResult && <p className="text-sm text-green-400/80">{photoImportResult}</p>}
+        </div>
+      </div>
 
       <h2 className="font-semibold text-white mb-3">Import History</h2>
       {loading ? (

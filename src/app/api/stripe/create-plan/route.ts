@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { assertGymScope, isErrorResponse, requireStaffAuth } from '@/lib/auth/api';
 import { parseJsonBody } from '@/lib/api-validate';
 import { createPlanSchema } from '@/lib/api-schemas';
 import { handleRouteError } from '@/lib/api-error';
+import { getPaymentProviderForGym } from '@/lib/payments/provider';
 
 export async function POST(req: NextRequest) {
   const auth = await requireStaffAuth({ adminOnly: true });
@@ -12,21 +12,19 @@ export async function POST(req: NextRequest) {
 
   const parsed = await parseJsonBody(req, createPlanSchema);
   if (!parsed.success) return parsed.response;
-  const { name, description, price_cents, interval, gym_id } = parsed.data;
+  const { name, description, price_cents, interval, gym_id, setup_fee_cents } = parsed.data;
 
   const scopeError = assertGymScope(auth, gym_id);
   if (scopeError) return scopeError;
 
   try {
-    const product = await stripe.products.create({
+    const provider = await getPaymentProviderForGym(gym_id);
+    const { productId, priceId, setupPriceId } = await provider.createPlanProduct({
       name,
       description: description || undefined,
-    });
-    const price = await stripe.prices.create({
-      product: product.id,
-      unit_amount: price_cents,
-      currency: 'usd',
-      recurring: { interval },
+      priceCents: price_cents,
+      interval,
+      setupFeeCents: setup_fee_cents ?? 0,
     });
 
     const admin = getAdminClient();
@@ -36,8 +34,10 @@ export async function POST(req: NextRequest) {
       description,
       price_cents,
       interval,
-      stripe_product_id: product.id,
-      stripe_price_id: price.id,
+      stripe_product_id: productId,
+      stripe_price_id: priceId,
+      setup_fee_cents: setup_fee_cents ?? 0,
+      stripe_setup_price_id: setupPriceId,
       is_active: true,
     });
 

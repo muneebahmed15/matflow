@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
 import { getPublicEnv } from '@/lib/env';
 import { getAdminClient } from '@/lib/supabase/admin';
 import {
@@ -9,23 +8,31 @@ import {
 import { parseJsonBody } from '@/lib/api-validate';
 import { createCheckoutSchema } from '@/lib/api-schemas';
 import { handleRouteError } from '@/lib/api-error';
+import { getPaymentProviderForGym } from '@/lib/payments/provider';
 
 export async function POST(req: NextRequest) {
   const parsed = await parseJsonBody(req, createCheckoutSchema);
   if (!parsed.success) return parsed.response;
-  const { stripe_price_id, member_id, gym_id, member_email } = parsed.data;
+  const { stripe_price_id, member_id, gym_id, member_email, family_id } = parsed.data;
 
   const access = await requireStaffOrMemberAuth({ gymId: gym_id, memberId: member_id });
   if (isErrorResponse(access)) return access;
 
   const admin = getAdminClient();
-  const { data: plan } = await admin
-    .from('plans')
-    .select('id, trial_days')
-    .eq('gym_id', gym_id)
-    .eq('stripe_price_id', stripe_price_id)
-    .eq('is_active', true)
-    .maybeSingle();
+  const [{ data: plan }, { data: gym }] = await Promise.all([
+    admin
+      .from('plans')
+      .select('id, trial_days, setup_fee_cents, stripe_setup_price_id')
+      .eq('gym_id', gym_id)
+      .eq('stripe_price_id', stripe_price_id)
+      .eq('is_active', true)
+      .maybeSingle(),
+    admin
+      .from('gyms')
+      .select('stripe_tax_enabled')
+      .eq('id', gym_id)
+      .maybeSingle(),
+  ]);
 
   if (!plan) {
     return NextResponse.json({ error: 'Invalid plan for this gym' }, { status: 400 });
@@ -42,18 +49,24 @@ export async function POST(req: NextRequest) {
       : '/subscriptions?cancelled=true';
 
   try {
+    const provider = await getPaymentProviderForGym(gym_id);
     const trialDays = (plan as { trial_days?: number | null }).trial_days ?? 0;
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      line_items: [{ price: stripe_price_id, quantity: 1 }],
-      customer_email: member_email,
-      success_url: `${NEXT_PUBLIC_APP_URL}${successPath}`,
-      cancel_url: `${NEXT_PUBLIC_APP_URL}${cancelPath}`,
-      metadata: { member_id, gym_id },
-      allow_promotion_codes: true,
-      ...(trialDays > 0 ? { subscription_data: { trial_period_days: trialDays } } : {}),
+    const setupPriceId = (plan as { stripe_setup_price_id?: string | null }).stripe_setup_price_id;
+
+    const session = await provider.createCheckoutSession({
+      gymId: gym_id,
+      memberId: member_id,
+      memberEmail: member_email,
+      stripePriceId: stripe_price_id,
+      setupFeePriceId: setupPriceId,
+      trialDays,
+      familyId: family_id ?? null,
+      successPath,
+      cancelPath,
+      appUrl: NEXT_PUBLIC_APP_URL,
+      automaticTax: Boolean((gym as { stripe_tax_enabled?: boolean } | null)?.stripe_tax_enabled),
     });
+
     return NextResponse.json({ url: session.url });
   } catch (err: unknown) {
     return handleRouteError(err, {
