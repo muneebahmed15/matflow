@@ -18,7 +18,7 @@
 
 - [x] 8.5 CSV template download
 
-- [~] 8.6 CSV column mapping UI (fixed column map)
+- [x] 8.6 CSV column mapping UI (interactive mapper with header aliases)
 
 - [x] 8.7 Validate required fields
 
@@ -28,7 +28,7 @@
 
 - [x] 8.10 Commit import with progress bar
 
-- [~] 8.11 Duplicate email handling strategy (service-level)
+- [x] 8.11 Duplicate email handling strategy (skip / update / error)
 
 - [x] 8.12 Import error report download
 
@@ -94,7 +94,7 @@
 
 ## Classes
 
-- [ ] 8.30 Import class schedule CSV
+- [x] 8.30 Import class schedule CSV
 
 
 
@@ -116,7 +116,7 @@
 
 ## Validation Engine
 
-- [~] 8.35 Zod schemas per import type (members/leads)
+- [x] 8.35 Zod schemas per import type (members/leads)
 
 - [x] 8.36 Row-level error messages
 
@@ -138,9 +138,8 @@
 
 - [x] 8.41 Admin-only access
 
-- [ ] 8.42 Rate limit imports
-
-- [ ] 8.43 Audit log on import commit
+- [x] 8.42 Rate limit imports
+- [x] 8.43 Audit log on import commit
 
 
 
@@ -158,9 +157,9 @@
 
 - [x] 8.47 Unit test CSV parser
 
-- [ ] 8.48 Integration test dry-run import
+- [x] 8.48 Integration test dry-run import
 
-- [ ] 8.49 Sample fixtures in `tests/fixtures/`
+- [x] 8.49 Sample fixtures in `tests/fixtures/`
 
 - [x] 8.50 Migration center empty state copy
 

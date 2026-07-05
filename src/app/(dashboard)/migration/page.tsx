@@ -17,6 +17,7 @@ import {
   listImportJobsAction,
   rollbackImportJobAction,
   startImportJobAction,
+  type DuplicateEmailStrategy,
 } from '@/app/(dashboard)/actions';
 import {
   parseCsv,
@@ -27,55 +28,14 @@ import {
   BELT_HISTORY_IMPORT_TEMPLATE,
   CLASS_IMPORT_TEMPLATE,
 } from '@/lib/csv';
+import {
+  guessColumnMap,
+  IMPORT_TARGET_FIELDS,
+  type ImportType,
+} from '@/lib/import-maps';
 import type { ImportJob } from '@/services/migration';
 import MigrationStepper, { type MigrationStep } from '@/components/migration/MigrationStepper';
-
-type ImportType = 'members' | 'leads' | 'attendance' | 'belt_history' | 'classes';
-
-const COLUMN_MAPS: Record<ImportType, Record<string, string>> = {
-  members: {
-    first_name: 'first_name',
-    last_name: 'last_name',
-    email: 'email',
-    phone: 'phone',
-    belt_rank: 'belt_rank',
-    status: 'status',
-    external_id: 'external_id',
-  },
-  leads: {
-    first_name: 'first_name',
-    last_name: 'last_name',
-    email: 'email',
-    phone: 'phone',
-    source: 'source',
-    notes: 'notes',
-  },
-  attendance: {
-    email: 'email',
-    external_id: 'external_id',
-    checked_in_at: 'checked_in_at',
-    notes: 'notes',
-  },
-  belt_history: {
-    email: 'email',
-    external_id: 'external_id',
-    from_belt: 'from_belt',
-    to_belt: 'to_belt',
-    promoted_at: 'promoted_at',
-    notes: 'notes',
-  },
-  classes: {
-    name: 'name',
-    instructor: 'instructor',
-    day_of_week: 'day_of_week',
-    start_time: 'start_time',
-    end_time: 'end_time',
-    capacity: 'capacity',
-    category_tag: 'category_tag',
-    color: 'color',
-    description: 'description',
-  },
-};
+import CsvColumnMapper from '@/components/migration/CsvColumnMapper';
 
 const TEMPLATES: Record<ImportType, string> = {
   members: MEMBER_IMPORT_TEMPLATE,
@@ -98,6 +58,11 @@ export default function MigrationPage() {
   const [parsedRows, setParsedRows] = useState<Record<string, string>[]>([]);
   const [fileName, setFileName] = useState('');
   const [rollingBack, setRollingBack] = useState<string | null>(null);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
+  const [mappingConfirmed, setMappingConfirmed] = useState(false);
+  const [duplicateStrategy, setDuplicateStrategy] = useState<DuplicateEmailStrategy>('skip');
+  const [rawCsvText, setRawCsvText] = useState('');
 
   const load = async () => {
     const res = await listImportJobsAction();
@@ -114,33 +79,36 @@ export default function MigrationPage() {
     setDryRunResult(null);
     setResult(null);
     setProgress(0);
+    setCsvHeaders([]);
+    setColumnMapping({});
+    setMappingConfirmed(false);
+    setRawCsvText('');
   };
 
-  const handleFile = async (file: File) => {
-    setImporting(true);
-    setResult(null);
-    setDryRunResult(null);
-    setProgress(0);
-    const text = await file.text();
-    const rows = parseCsv(text);
-    const { objects } = csvRowsToObjects(rows, COLUMN_MAPS[importType]);
-    const typedRows = objects as Record<string, string>[];
-    setPreview(typedRows.slice(0, 10));
-    setParsedRows(typedRows);
-    setFileName(file.name);
+  const applyMapping = (rows: string[][], mapping: Record<string, string>) => {
+    const { objects } = csvRowsToObjects(rows, mapping);
+    return objects as Record<string, string>[];
+  };
 
-    /* eslint-disable @typescript-eslint/no-explicit-any */
+  const runDryRun = async (typedRows: Record<string, string>[], name: string) => {
+    setImporting(true);
+    setDryRunResult(null);
+
     const action =
       importType === 'members'
-        ? importMembersCsvAction({ rows: objects as any, fileName: file.name, dryRun: true })
+        ? importMembersCsvAction({
+            rows: typedRows,
+            fileName: name,
+            dryRun: true,
+            duplicateEmailStrategy: duplicateStrategy,
+          })
         : importType === 'leads'
-          ? importLeadsCsvAction({ rows: objects as any, fileName: file.name, dryRun: true })
+          ? importLeadsCsvAction({ rows: typedRows, fileName: name, dryRun: true })
           : importType === 'attendance'
-            ? importAttendanceCsvAction({ rows: objects as any, fileName: file.name, dryRun: true })
+            ? importAttendanceCsvAction({ rows: typedRows, fileName: name, dryRun: true })
             : importType === 'classes'
-              ? importClassesCsvAction({ rows: objects as any, fileName: file.name, dryRun: true })
-              : importBeltHistoryCsvAction({ rows: objects as any, fileName: file.name, dryRun: true });
-    /* eslint-enable @typescript-eslint/no-explicit-any */
+              ? importClassesCsvAction({ rows: typedRows, fileName: name, dryRun: true })
+              : importBeltHistoryCsvAction({ rows: typedRows, fileName: name, dryRun: true });
 
     const res = await action;
     setImporting(false);
@@ -152,6 +120,37 @@ export default function MigrationPage() {
     setDryRunResult(
       `Validation complete: ${d.success} rows OK, ${d.errors.length} errors. Review preview, then commit to import.`
     );
+  };
+
+  const handleFile = async (file: File) => {
+    setResult(null);
+    setDryRunResult(null);
+    setProgress(0);
+    setMappingConfirmed(false);
+    const text = await file.text();
+    setRawCsvText(text);
+    const rows = parseCsv(text);
+    if (rows.length < 2) {
+      setDryRunResult('Error: CSV must include a header row and at least one data row.');
+      return;
+    }
+    const headers = rows[0].map((h) => h.trim()).filter(Boolean);
+    const mapping = guessColumnMap(headers, IMPORT_TARGET_FIELDS[importType]);
+    setCsvHeaders(headers);
+    setColumnMapping(mapping);
+    setFileName(file.name);
+    setPreview([]);
+    setParsedRows([]);
+  };
+
+  const handleValidateMapped = async () => {
+    if (!rawCsvText) return;
+    const rows = parseCsv(rawCsvText);
+    const typedRows = applyMapping(rows, columnMapping);
+    setPreview(typedRows.slice(0, 10));
+    setParsedRows(typedRows);
+    setMappingConfirmed(true);
+    await runDryRun(typedRows, fileName);
   };
 
   const handleCommit = async () => {
@@ -185,8 +184,13 @@ export default function MigrationPage() {
         const batch = parsedRows.slice(i, i + IMPORT_BATCH_SIZE);
         const batchAction =
           importType === 'members'
-            ? importMembersBatchAction({ jobId, rows: batch as never, startIndex: i })
-            : importLeadsBatchAction({ jobId, rows: batch as never, startIndex: i });
+            ? importMembersBatchAction({
+                jobId,
+                rows: batch,
+                startIndex: i,
+                duplicateEmailStrategy: duplicateStrategy,
+              })
+            : importLeadsBatchAction({ jobId, rows: batch, startIndex: i });
         const res = await batchAction;
         if (!res.ok) {
           setCommitting(false);
@@ -203,17 +207,21 @@ export default function MigrationPage() {
         setProgress(Math.round(((i + batch.length) / parsedRows.length) * 100));
       }
 
-      await finalizeImportJobAction({ jobId, success: totalSuccess, errors: allErrors });
+      await finalizeImportJobAction({
+        jobId,
+        importType,
+        fileName,
+        success: totalSuccess,
+        errors: allErrors,
+      });
     } else {
       setProgress(20);
-      /* eslint-disable @typescript-eslint/no-explicit-any */
       const action =
         importType === 'attendance'
-          ? importAttendanceCsvAction({ rows: parsedRows as any, fileName, dryRun: false })
+          ? importAttendanceCsvAction({ rows: parsedRows, fileName, dryRun: false })
           : importType === 'classes'
-            ? importClassesCsvAction({ rows: parsedRows as any, fileName, dryRun: false })
-            : importBeltHistoryCsvAction({ rows: parsedRows as any, fileName, dryRun: false });
-      /* eslint-enable @typescript-eslint/no-explicit-any */
+            ? importClassesCsvAction({ rows: parsedRows, fileName, dryRun: false })
+            : importBeltHistoryCsvAction({ rows: parsedRows, fileName, dryRun: false });
       setProgress(60);
       const res = await action;
       if (!res.ok) {
@@ -275,7 +283,15 @@ export default function MigrationPage() {
   };
 
   const stepIndex =
-    parsedRows.length === 0 ? 0 : dryRunResult && !result ? 2 : committing || result ? 3 : 1;
+    csvHeaders.length === 0
+      ? 0
+      : !mappingConfirmed
+        ? 1
+        : dryRunResult && !result
+          ? 2
+          : committing || result
+            ? 3
+            : 1;
 
   const steps: MigrationStep[] = ['Choose type', 'Upload CSV', 'Preview', 'Commit'].map(
     (label, i) => ({
@@ -318,9 +334,27 @@ export default function MigrationPage() {
         >
           <Download size={16} /> Download {importType} CSV template
         </button>
+
+        {importType === 'members' && (
+          <label className="flex items-center justify-between gap-4 text-sm text-white/70">
+            <span>Duplicate email strategy</span>
+            <select
+              value={duplicateStrategy}
+              onChange={(e) => setDuplicateStrategy(e.target.value as DuplicateEmailStrategy)}
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm"
+            >
+              <option value="skip">Skip existing</option>
+              <option value="update">Update existing</option>
+              <option value="error">Fail on duplicate</option>
+            </select>
+          </label>
+        )}
+
         <label className="flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-xl p-10 cursor-pointer hover:border-blue-500/50 transition">
           <Upload size={32} className="text-white/20 mb-2" />
-          <span className="text-white/40 text-sm">{importing ? 'Validating...' : 'Upload CSV to validate'}</span>
+          <span className="text-white/40 text-sm">
+            {fileName ? `Selected: ${fileName}` : importing ? 'Validating...' : 'Upload CSV file'}
+          </span>
           <input
             type="file"
             accept=".csv,text/csv"
@@ -329,6 +363,26 @@ export default function MigrationPage() {
             onChange={(e) => e.target.files?.[0] && void handleFile(e.target.files[0])}
           />
         </label>
+
+        {csvHeaders.length > 0 && !mappingConfirmed && (
+          <>
+            <CsvColumnMapper
+              importType={importType}
+              csvHeaders={csvHeaders}
+              mapping={columnMapping}
+              onChange={setColumnMapping}
+            />
+            <button
+              type="button"
+              onClick={() => void handleValidateMapped()}
+              disabled={importing}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition"
+            >
+              {importing ? 'Validating...' : 'Apply mapping & validate'}
+            </button>
+          </>
+        )}
+
         {dryRunResult && <p className="text-sm text-white/60">{dryRunResult}</p>}
         {(committing || progress > 0) && (
           <div>
@@ -341,7 +395,7 @@ export default function MigrationPage() {
             </div>
           </div>
         )}
-        {parsedRows.length > 0 && !committing && (
+        {parsedRows.length > 0 && mappingConfirmed && !committing && (
           <button
             onClick={() => void handleCommit()}
             disabled={Boolean(dryRunResult?.startsWith('Error'))}

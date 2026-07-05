@@ -8,6 +8,120 @@ import type { CreateClassInput } from '@/services/classes';
 export const MAX_IMPORT_ROWS = 5000;
 export const IMPORT_BATCH_SIZE = 25;
 
+export type DuplicateEmailStrategy = 'error' | 'skip' | 'update';
+
+async function findMemberIdByEmail(
+  gymId: string,
+  email: string | undefined
+): Promise<string | null> {
+  if (!email?.trim()) return null;
+  const admin = getAdminClient();
+  const { data } = await admin
+    .from('members')
+    .select('id')
+    .eq('gym_id', gymId)
+    .ilike('email', email.trim().toLowerCase())
+    .maybeSingle();
+  return data?.id ?? null;
+}
+
+async function upsertImportedMember(
+  gymId: string,
+  jobId: string,
+  row: MemberImportRow,
+  duplicateStrategy: DuplicateEmailStrategy
+): Promise<'created' | 'updated' | 'skipped'> {
+  const admin = getAdminClient();
+  const { updateMember } = await import('@/services/members');
+
+  if (row.external_id) {
+    const { data: existing } = await admin
+      .from('members')
+      .select('id')
+      .eq('gym_id', gymId)
+      .eq('external_id', row.external_id)
+      .maybeSingle();
+
+    if (existing) {
+      throw new ServiceError(409, `Duplicate external_id: ${row.external_id}`);
+    }
+  }
+
+  const existingId = await findMemberIdByEmail(gymId, row.email);
+  if (existingId) {
+    if (duplicateStrategy === 'skip') return 'skipped';
+    if (duplicateStrategy === 'update') {
+      await updateMember(gymId, existingId, {
+        first_name: row.first_name,
+        last_name: row.last_name,
+        phone: row.phone,
+        belt_rank: row.belt_rank ?? undefined,
+        status: row.status ?? undefined,
+      });
+      await admin
+        .from('members')
+        .update({
+          ...(row.external_id ? { external_id: row.external_id } : {}),
+          import_job_id: jobId,
+        })
+        .eq('id', existingId);
+      return 'updated';
+    }
+    throw new ServiceError(409, 'A member with this email already exists.');
+  }
+
+  const member = await createMember({
+    gymId,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    phone: row.phone,
+    beltRank: row.belt_rank ?? 'white',
+    status: row.status ?? 'active',
+    familyOption: 'none',
+  });
+
+  if (row.external_id) {
+    await admin
+      .from('members')
+      .update({ external_id: row.external_id, import_job_id: jobId })
+      .eq('id', member.id);
+  } else {
+    await admin.from('members').update({ import_job_id: jobId }).eq('id', member.id);
+  }
+
+  return 'created';
+}
+
+export async function logImportCommit(input: {
+  gymId: string;
+  actorId?: string | null;
+  jobId: string;
+  importType: string;
+  success: number;
+  errorCount: number;
+  fileName?: string | null;
+}): Promise<void> {
+  try {
+    const { logAuditEvent } = await import('@/services/audit');
+    await logAuditEvent({
+      gymId: input.gymId,
+      actorId: input.actorId ?? null,
+      action: 'import.commit',
+      entityType: 'import_job',
+      entityId: input.jobId,
+      payload: {
+        import_type: input.importType,
+        success_rows: input.success,
+        error_rows: input.errorCount,
+        file_name: input.fileName ?? null,
+      },
+    });
+  } catch {
+    // Audit logging must not block imports.
+  }
+}
+
 export type ImportJob = {
   id: string;
   gym_id: string;
@@ -47,7 +161,12 @@ export type MemberImportRow = {
 export async function importMembersFromRows(
   gymId: string,
   rows: MemberImportRow[],
-  options: { fileName?: string; createdBy?: string; dryRun?: boolean }
+  options: {
+    fileName?: string;
+    createdBy?: string;
+    dryRun?: boolean;
+    duplicateEmailStrategy?: DuplicateEmailStrategy;
+  }
 ): Promise<{ jobId: string; success: number; errors: { row: number; message: string }[] }> {
   if (rows.length > MAX_IMPORT_ROWS) {
     throw new ServiceError(400, `Import limited to ${MAX_IMPORT_ROWS} rows per job.`);
@@ -87,40 +206,16 @@ export async function importMembersFromRows(
     }
 
     try {
-      if (row.external_id) {
-        const { data: existing } = await admin
-          .from('members')
-          .select('id')
-          .eq('gym_id', gymId)
-          .eq('external_id', row.external_id)
-          .maybeSingle();
-
-        if (existing) {
-          errors.push({ row: rowNum, message: `Duplicate external_id: ${row.external_id}` });
-          continue;
-        }
-      }
-
-      const member = await createMember({
+      const outcome = await upsertImportedMember(
         gymId,
-        firstName: row.first_name,
-        lastName: row.last_name,
-        email: row.email,
-        phone: row.phone,
-        beltRank: row.belt_rank ?? 'white',
-        status: row.status ?? 'active',
-        familyOption: 'none',
-      });
-
-      if (row.external_id) {
-        await admin
-          .from('members')
-          .update({ external_id: row.external_id, import_job_id: job.id })
-          .eq('id', member.id);
-      } else {
-        await admin.from('members').update({ import_job_id: job.id }).eq('id', member.id);
+        job.id,
+        row,
+        options.duplicateEmailStrategy ?? 'error'
+      );
+      if (outcome === 'skipped') {
+        success++;
+        continue;
       }
-
       success++;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Import failed';
@@ -143,6 +238,18 @@ export async function importMembersFromRows(
       completed_at: new Date().toISOString(),
     })
     .eq('id', job.id);
+
+  if (!options.dryRun) {
+    await logImportCommit({
+      gymId,
+      actorId: options.createdBy,
+      jobId: job.id,
+      importType: 'members',
+      success,
+      errorCount: errors.length,
+      fileName: options.fileName,
+    });
+  }
 
   return { jobId: job.id, success, errors };
 }
@@ -174,7 +281,8 @@ export async function createImportJob(
 export async function completeImportJob(
   jobId: string,
   success: number,
-  errors: { row: number; message: string }[]
+  errors: { row: number; message: string }[],
+  options?: { gymId?: string; actorId?: string | null; importType?: string; fileName?: string | null }
 ): Promise<void> {
   const admin = getAdminClient();
   const { error } = await admin
@@ -188,13 +296,26 @@ export async function completeImportJob(
     .eq('id', jobId);
 
   if (error) throw new ServiceError(500, error.message);
+
+  if (options?.gymId) {
+    await logImportCommit({
+      gymId: options.gymId,
+      actorId: options.actorId,
+      jobId,
+      importType: options.importType ?? 'unknown',
+      success,
+      errorCount: errors.length,
+      fileName: options.fileName,
+    });
+  }
 }
 
 export async function importMembersBatch(
   gymId: string,
   jobId: string,
   rows: MemberImportRow[],
-  startIndex: number
+  startIndex: number,
+  duplicateEmailStrategy: DuplicateEmailStrategy = 'error'
 ): Promise<{ success: number; errors: { row: number; message: string }[] }> {
   const admin = getAdminClient();
   const errors: { row: number; message: string }[] = [];
@@ -210,40 +331,11 @@ export async function importMembersBatch(
     }
 
     try {
-      if (row.external_id) {
-        const { data: existing } = await admin
-          .from('members')
-          .select('id')
-          .eq('gym_id', gymId)
-          .eq('external_id', row.external_id)
-          .maybeSingle();
-
-        if (existing) {
-          errors.push({ row: rowNum, message: `Duplicate external_id: ${row.external_id}` });
-          continue;
-        }
+      const outcome = await upsertImportedMember(gymId, jobId, row, duplicateEmailStrategy);
+      if (outcome === 'skipped') {
+        success++;
+        continue;
       }
-
-      const member = await createMember({
-        gymId,
-        firstName: row.first_name,
-        lastName: row.last_name,
-        email: row.email,
-        phone: row.phone,
-        beltRank: row.belt_rank ?? 'white',
-        status: row.status ?? 'active',
-        familyOption: 'none',
-      });
-
-      if (row.external_id) {
-        await admin
-          .from('members')
-          .update({ external_id: row.external_id, import_job_id: jobId })
-          .eq('id', member.id);
-      } else {
-        await admin.from('members').update({ import_job_id: jobId }).eq('id', member.id);
-      }
-
       success++;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Import failed';
@@ -424,6 +516,18 @@ export async function importLeadsFromRows(
     })
     .eq('id', job.id);
 
+  if (!options.dryRun) {
+    await logImportCommit({
+      gymId,
+      actorId: options.createdBy,
+      jobId: job.id,
+      importType: 'leads',
+      success,
+      errorCount: errors.length,
+      fileName: options.fileName,
+    });
+  }
+
   return { jobId: job.id, success, errors };
 }
 
@@ -580,6 +684,18 @@ export async function importAttendanceFromRows(
     })
     .eq('id', job.id);
 
+  if (!options.dryRun) {
+    await logImportCommit({
+      gymId,
+      actorId: options.createdBy,
+      jobId: job.id,
+      importType: 'attendance',
+      success,
+      errorCount: errors.length,
+      fileName: options.fileName,
+    });
+  }
+
   return { jobId: job.id, success, errors };
 }
 
@@ -712,6 +828,18 @@ export async function importBeltHistoryFromRows(
       completed_at: new Date().toISOString(),
     })
     .eq('id', job.id);
+
+  if (!options.dryRun) {
+    await logImportCommit({
+      gymId,
+      actorId: options.createdBy,
+      jobId: job.id,
+      importType: 'belt_history',
+      success,
+      errorCount: errors.length,
+      fileName: options.fileName,
+    });
+  }
 
   return { jobId: job.id, success, errors };
 }
@@ -864,6 +992,18 @@ export async function importClassesFromRows(
       completed_at: new Date().toISOString(),
     })
     .eq('id', job.id);
+
+  if (!options.dryRun) {
+    await logImportCommit({
+      gymId,
+      actorId: options.createdBy,
+      jobId: job.id,
+      importType: 'classes',
+      success,
+      errorCount: errors.length,
+      fileName: options.fileName,
+    });
+  }
 
   return { jobId: job.id, success, errors };
 }

@@ -1,10 +1,42 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   buildMemberLookup,
   resolveMemberId,
   parseImportTimestamp,
   validateClassImportRow,
+  importMembersFromRows,
 } from '@/services/migration';
+import { parseCsv, csvRowsToObjects } from '@/lib/csv';
+import { guessColumnMap, IMPORT_TARGET_FIELDS } from '@/lib/import-maps';
+
+const mockFrom = vi.fn();
+
+vi.mock('@/lib/supabase/admin', () => ({
+  getAdminClient: () => ({ from: mockFrom }),
+}));
+
+vi.mock('@/services/members', () => ({
+  createMember: vi.fn(async () => ({ id: 'new-member' })),
+  updateMember: vi.fn(async () => ({ id: 'updated' })),
+}));
+
+vi.mock('@/services/audit', () => ({
+  logAuditEvent: vi.fn(async () => undefined),
+}));
+
+function chain(result: { data?: unknown; error?: { message: string } | null }) {
+  const builder: Record<string, unknown> = {};
+  for (const method of ['select', 'eq', 'in', 'order', 'insert', 'update', 'not', 'ilike']) {
+    builder[method] = vi.fn(() => builder);
+  }
+  builder.maybeSingle = vi.fn(async () => result);
+  builder.single = vi.fn(async () => result);
+  builder.then = (resolve: (value: unknown) => unknown) =>
+    Promise.resolve(resolve({ error: result.error ?? null, data: result.data ?? null }));
+  return builder;
+}
 
 describe('buildMemberLookup / resolveMemberId', () => {
   const lookup = buildMemberLookup([
@@ -88,5 +120,34 @@ describe('validateClassImportRow', () => {
 
   it('rejects invalid hex colors', () => {
     expect(validateClassImportRow({ ...validRow, color: 'blue' }).ok).toBe(false);
+  });
+});
+
+describe('member import dry-run', () => {
+  beforeEach(() => {
+    mockFrom.mockReset();
+    mockFrom.mockReturnValue(
+      chain({
+        data: { id: 'job-1' },
+      })
+    );
+  });
+
+  it('validates fixture CSV through column mapping without committing members', async () => {
+    const fixturePath = join(process.cwd(), 'tests/fixtures/members-import.csv');
+    const text = readFileSync(fixturePath, 'utf8');
+    const rows = parseCsv(text);
+    const headers = rows[0].map((h) => h.trim());
+    const mapping = guessColumnMap(headers, IMPORT_TARGET_FIELDS.members);
+    const { objects } = csvRowsToObjects(rows, mapping);
+
+    const result = await importMembersFromRows(
+      'gym-1',
+      objects as { first_name: string; last_name: string; email?: string }[],
+      { dryRun: true, fileName: 'members-import.csv' }
+    );
+
+    expect(result.success).toBe(2);
+    expect(result.errors).toHaveLength(0);
   });
 });

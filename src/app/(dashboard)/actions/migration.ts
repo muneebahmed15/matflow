@@ -5,6 +5,14 @@ import { revalidatePath } from 'next/cache';
 import { requireStaffSession } from '@/lib/auth/staff';
 import { checkRateLimit } from '@/lib/rate-limit';
 import {
+  memberImportRowSchema,
+  leadImportRowSchema,
+  attendanceImportRowSchema,
+  beltHistoryImportRowSchema,
+  classImportRowSchema,
+  validateImportRows,
+} from '@/lib/import-schemas';
+import {
   importMembersFromRows,
   listImportJobs,
   importLeadsFromRows,
@@ -16,6 +24,7 @@ import {
   importLeadsBatch,
   IMPORT_BATCH_SIZE,
   type ImportJob,
+  type DuplicateEmailStrategy,
 } from '@/services/migration';
 import { type ActionResult, toActionError } from './_shared';
 
@@ -42,17 +51,10 @@ export async function listImportJobsAction(): Promise<ActionResult<ImportJob[]>>
 }
 
 export async function importMembersCsvAction(input: {
-  rows: {
-    first_name: string;
-    last_name: string;
-    email?: string;
-    phone?: string;
-    belt_rank?: string;
-    status?: string;
-    external_id?: string;
-  }[];
+  rows: Record<string, string>[];
   fileName?: string;
   dryRun?: boolean;
+  duplicateEmailStrategy?: DuplicateEmailStrategy;
 }): Promise<ActionResult<{ jobId: string; success: number; errors: { row: number; message: string }[] }>> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });
@@ -60,28 +62,38 @@ export async function importMembersCsvAction(input: {
     if (!limit.allowed) {
       return { ok: false, error: 'Import rate limit exceeded. Try again in an hour.' };
     }
-    const result = await importMembersFromRows(auth.gymId, input.rows, {
+
+    const { rows: validatedRows, errors: schemaErrors } = validateImportRows(
+      memberImportRowSchema,
+      input.rows
+    );
+    if (schemaErrors.length > 0 && validatedRows.length === 0) {
+      return { ok: true, data: { jobId: '', success: 0, errors: schemaErrors } };
+    }
+
+    const result = await importMembersFromRows(auth.gymId, validatedRows, {
       fileName: input.fileName,
       createdBy: auth.user.id,
       dryRun: input.dryRun,
+      duplicateEmailStrategy: input.duplicateEmailStrategy ?? 'error',
     });
     revalidatePath('/migration');
     revalidatePath('/members');
-    return { ok: true, data: result };
+    return {
+      ok: true,
+      data: {
+        ...result,
+        errors: [...schemaErrors, ...result.errors],
+        success: result.success,
+      },
+    };
   } catch (error) {
     return toActionError(error);
   }
 }
 
 export async function importLeadsCsvAction(input: {
-  rows: {
-    first_name: string;
-    last_name: string;
-    email?: string;
-    phone?: string;
-    source?: string;
-    notes?: string;
-  }[];
+  rows: Record<string, string>[];
   fileName?: string;
   dryRun?: boolean;
 }) {
@@ -91,26 +103,33 @@ export async function importLeadsCsvAction(input: {
     if (!limit.allowed) {
       return { ok: false as const, error: 'Import rate limit exceeded. Try again in an hour.' };
     }
-    const result = await importLeadsFromRows(auth.gymId, input.rows, {
+
+    const { rows: validatedRows, errors: schemaErrors } = validateImportRows(
+      leadImportRowSchema,
+      input.rows
+    );
+    if (schemaErrors.length > 0 && validatedRows.length === 0) {
+      return { ok: true as const, data: { jobId: '', success: 0, errors: schemaErrors } };
+    }
+
+    const result = await importLeadsFromRows(auth.gymId, validatedRows, {
       fileName: input.fileName,
       createdBy: auth.user.id,
       dryRun: input.dryRun,
     });
     revalidatePath('/migration');
     revalidatePath('/leads');
-    return { ok: true as const, data: result };
+    return {
+      ok: true as const,
+      data: { ...result, errors: [...schemaErrors, ...result.errors] },
+    };
   } catch (error) {
     return toActionError(error);
   }
 }
 
 export async function importAttendanceCsvAction(input: {
-  rows: {
-    email?: string;
-    external_id?: string;
-    checked_in_at: string;
-    notes?: string;
-  }[];
+  rows: Record<string, string>[];
   fileName?: string;
   dryRun?: boolean;
 }) {
@@ -120,29 +139,34 @@ export async function importAttendanceCsvAction(input: {
     if (!limit.allowed) {
       return { ok: false as const, error: 'Import rate limit exceeded. Try again in an hour.' };
     }
+
+    const { rows: validatedRows, errors: schemaErrors } = validateImportRows(
+      attendanceImportRowSchema,
+      input.rows
+    );
+    if (schemaErrors.length > 0 && validatedRows.length === 0) {
+      return { ok: true as const, data: { jobId: '', success: 0, errors: schemaErrors } };
+    }
+
     const { importAttendanceFromRows } = await import('@/services/migration');
-    const result = await importAttendanceFromRows(auth.gymId, input.rows, {
+    const result = await importAttendanceFromRows(auth.gymId, validatedRows, {
       fileName: input.fileName,
       createdBy: auth.user.id,
       dryRun: input.dryRun,
     });
     revalidatePath('/migration');
     revalidatePath('/attendance');
-    return { ok: true as const, data: result };
+    return {
+      ok: true as const,
+      data: { ...result, errors: [...schemaErrors, ...result.errors] },
+    };
   } catch (error) {
     return toActionError(error);
   }
 }
 
 export async function importBeltHistoryCsvAction(input: {
-  rows: {
-    email?: string;
-    external_id?: string;
-    from_belt?: string;
-    to_belt: string;
-    promoted_at: string;
-    notes?: string;
-  }[];
+  rows: Record<string, string>[];
   fileName?: string;
   dryRun?: boolean;
 }) {
@@ -152,32 +176,34 @@ export async function importBeltHistoryCsvAction(input: {
     if (!limit.allowed) {
       return { ok: false as const, error: 'Import rate limit exceeded. Try again in an hour.' };
     }
+
+    const { rows: validatedRows, errors: schemaErrors } = validateImportRows(
+      beltHistoryImportRowSchema,
+      input.rows
+    );
+    if (schemaErrors.length > 0 && validatedRows.length === 0) {
+      return { ok: true as const, data: { jobId: '', success: 0, errors: schemaErrors } };
+    }
+
     const { importBeltHistoryFromRows } = await import('@/services/migration');
-    const result = await importBeltHistoryFromRows(auth.gymId, input.rows, {
+    const result = await importBeltHistoryFromRows(auth.gymId, validatedRows, {
       fileName: input.fileName,
       createdBy: auth.user.id,
       dryRun: input.dryRun,
     });
     revalidatePath('/migration');
     revalidatePath('/belts');
-    return { ok: true as const, data: result };
+    return {
+      ok: true as const,
+      data: { ...result, errors: [...schemaErrors, ...result.errors] },
+    };
   } catch (error) {
     return toActionError(error);
   }
 }
 
 export async function importClassesCsvAction(input: {
-  rows: {
-    name: string;
-    instructor: string;
-    day_of_week: string;
-    start_time: string;
-    end_time: string;
-    capacity: string | number;
-    category_tag?: string;
-    color?: string;
-    description?: string;
-  }[];
+  rows: Record<string, string>[];
   fileName?: string;
   dryRun?: boolean;
 }) {
@@ -187,15 +213,27 @@ export async function importClassesCsvAction(input: {
     if (!limit.allowed) {
       return { ok: false as const, error: 'Import rate limit exceeded. Try again in an hour.' };
     }
+
+    const { rows: validatedRows, errors: schemaErrors } = validateImportRows(
+      classImportRowSchema,
+      input.rows
+    );
+    if (schemaErrors.length > 0 && validatedRows.length === 0) {
+      return { ok: true as const, data: { jobId: '', success: 0, errors: schemaErrors } };
+    }
+
     const { importClassesFromRows } = await import('@/services/migration');
-    const result = await importClassesFromRows(auth.gymId, input.rows, {
+    const result = await importClassesFromRows(auth.gymId, validatedRows, {
       fileName: input.fileName,
       createdBy: auth.user.id,
       dryRun: input.dryRun,
     });
     revalidatePath('/migration');
     revalidatePath('/classes');
-    return { ok: true as const, data: result };
+    return {
+      ok: true as const,
+      data: { ...result, errors: [...schemaErrors, ...result.errors] },
+    };
   } catch (error) {
     return toActionError(error);
   }
@@ -229,21 +267,25 @@ export async function startImportJobAction(input: {
 
 export async function importMembersBatchAction(input: {
   jobId: string;
-  rows: {
-    first_name: string;
-    last_name: string;
-    email?: string;
-    phone?: string;
-    belt_rank?: string;
-    status?: string;
-    external_id?: string;
-  }[];
+  rows: Record<string, string>[];
   startIndex: number;
+  duplicateEmailStrategy?: DuplicateEmailStrategy;
 }): Promise<ActionResult<{ success: number; errors: { row: number; message: string }[] }>> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });
-    const result = await importMembersBatch(auth.gymId, input.jobId, input.rows, input.startIndex);
-    return { ok: true, data: result };
+    const { rows: validatedRows, errors: schemaErrors } = validateImportRows(
+      memberImportRowSchema,
+      input.rows,
+      input.startIndex
+    );
+    const result = await importMembersBatch(
+      auth.gymId,
+      input.jobId,
+      validatedRows,
+      input.startIndex,
+      input.duplicateEmailStrategy ?? 'error'
+    );
+    return { ok: true, data: { ...result, errors: [...schemaErrors, ...result.errors] } };
   } catch (error) {
     return toActionError(error);
   }
@@ -251,20 +293,18 @@ export async function importMembersBatchAction(input: {
 
 export async function importLeadsBatchAction(input: {
   jobId: string;
-  rows: {
-    first_name: string;
-    last_name: string;
-    email?: string;
-    phone?: string;
-    source?: string;
-    notes?: string;
-  }[];
+  rows: Record<string, string>[];
   startIndex: number;
 }): Promise<ActionResult<{ success: number; errors: { row: number; message: string }[] }>> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });
-    const result = await importLeadsBatch(auth.gymId, input.jobId, input.rows, input.startIndex);
-    return { ok: true, data: result };
+    const { rows: validatedRows, errors: schemaErrors } = validateImportRows(
+      leadImportRowSchema,
+      input.rows,
+      input.startIndex
+    );
+    const result = await importLeadsBatch(auth.gymId, input.jobId, validatedRows, input.startIndex);
+    return { ok: true, data: { ...result, errors: [...schemaErrors, ...result.errors] } };
   } catch (error) {
     return toActionError(error);
   }
@@ -272,12 +312,19 @@ export async function importLeadsBatchAction(input: {
 
 export async function finalizeImportJobAction(input: {
   jobId: string;
+  importType: 'members' | 'leads';
+  fileName?: string;
   success: number;
   errors: { row: number; message: string }[];
 }): Promise<ActionResult> {
   try {
-    await requireStaffSession({ adminOnly: true });
-    await completeImportJob(input.jobId, input.success, input.errors);
+    const auth = await requireStaffSession({ adminOnly: true });
+    await completeImportJob(input.jobId, input.success, input.errors, {
+      gymId: auth.gymId,
+      actorId: auth.user.id,
+      importType: input.importType,
+      fileName: input.fileName ?? null,
+    });
     revalidatePath('/migration');
     return { ok: true };
   } catch (error) {
@@ -286,3 +333,4 @@ export async function finalizeImportJobAction(input: {
 }
 
 export { IMPORT_BATCH_SIZE };
+export type { DuplicateEmailStrategy };

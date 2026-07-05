@@ -14,7 +14,7 @@
 - [ ] 2.11 Member address fields
 - [x] 2.12 Member tags (text[] on members, editable on member detail)
 - [x] 2.13 Bulk member export CSV
-- [ ] 2.14 Bulk member import (see Migration module)
+- [x] 2.14 Bulk member import (see Migration module)
 - [x] 2.15 Member duplicate detection by email
 
 ## Families
@@ -30,7 +30,7 @@
 - [x] 2.23 CRUD emergency contacts per member (MemberEmergencyContactsPanel)
 - [x] 2.24 Emergency contact: name, phone, relationship
 - [x] 2.25 Parent/guardian as primary contact flag (isPrimary)
-- [ ] 2.26 Minors require emergency contact validation
+- [x] 2.26 Minors require emergency contact validation
 - [x] 2.27 Portal: member can view own emergency contacts (portal profile page)
 
 ## Leads / Prospects
