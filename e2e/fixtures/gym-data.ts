@@ -39,6 +39,35 @@ export async function setWebsiteEnabled(gymId: string, enabled: boolean): Promis
   await admin.from('gyms').update({ website_enabled: enabled }).eq('id', gymId);
 }
 
+export async function setStoreEnabled(gymId: string, enabled: boolean): Promise<void> {
+  const admin = adminClient();
+  await admin.from('gyms').update({ store_enabled: enabled }).eq('id', gymId);
+}
+
+export async function createShopProduct(
+  gymId: string,
+  input: { name: string; priceCents: number; inventoryCount?: number }
+): Promise<{ id: string; name: string }> {
+  const admin = adminClient();
+  const { data, error } = await admin
+    .from('products')
+    .insert({
+      gym_id: gymId,
+      name: input.name,
+      price_cents: input.priceCents,
+      inventory_count: input.inventoryCount ?? 10,
+      is_active: true,
+      category: 'gis',
+    })
+    .select('id, name')
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Failed to create shop product: ${error?.message}`);
+  }
+  return data;
+}
+
 export async function completeGymSetupForE2E(gymId: string): Promise<void> {
   const admin = adminClient();
   await admin

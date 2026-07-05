@@ -1,6 +1,6 @@
 # MatsFlow — Master Implementation Plan
 
-> **Status:** Wave 2 complete · Wave 4 merchandise largely complete  
+> **Status:** Wave 2 complete · Wave 4 merchandise complete (bundles, QuickBooks, coach inventory)  
 > **Scoring:** `[ ]` Not started · `[~]` Partial · `[x]` Done  
 > **Rule:** Each module has **50+** granular, testable todos. No item ships without schema + service + auth + UI (where applicable).
 
@@ -70,13 +70,17 @@ These items are being implemented in the current sprint:
 - [x] 400 vitest tests passing
 - Deferred: belts 4.42–4.48, waivers 6.10/6.45/6.50, CRM 2.54, marketing 11.31 (Buffer) → Wave 3+
 
-### Wave 4 — Merchandise (20250704300000_wave2_wave4_options.sql)
+### Wave 4 — Merchandise complete (20250704320000_wave4_shop_complete.sql)
 
 - [x] Shop settings: member discount %, flat tax, coaches stripes-only
 - [x] Checkout: pickup/ship, shipping address, Stripe promo codes
 - [x] Stale pending order cron (`/api/cron/shop-orders`)
 - [x] Packing slip PDF, POS mode, inventory valuation, best sellers widget
 - [x] Gi sizing chart, ECMMA seed script, store off by default for new gyms
+- [x] Product bundles (gi + belt deals), QuickBooks CSV export
+- [x] Coach read-only shop inventory view (`shop.read`)
+- [x] E2E: public cart → checkout (`npm run test:e2e:shop`)
+- Deferred: Stripe Connect (13.33), Printful dropship (13.34) → future integrations
 
 ---
 

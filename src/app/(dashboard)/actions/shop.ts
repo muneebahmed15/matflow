@@ -16,6 +16,9 @@ import {
   getInventoryValuation,
   createPosOrder,
   getOrderForPackingSlip,
+  listProductBundles,
+  createProductBundle,
+  exportShopOrdersForQuickBooks,
 } from '@/services/merchandise';
 
 import { type ActionResult, toActionError } from './_shared';
@@ -188,6 +191,47 @@ export async function downloadPackingSlipAction(
         base64: Buffer.from(pdf).toString('base64'),
         filename: `packing-slip-${order.id.slice(0, 8)}.pdf`,
       },
+    };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function listProductBundlesAction() {
+  try {
+    const auth = await requireStaffSession({ capability: 'shop.read' });
+    return { ok: true as const, data: await listProductBundles(auth.gymId) };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function createProductBundleAction(input: {
+  name: string;
+  description?: string;
+  bundlePriceCents: number;
+  items: { productId: string; quantity: number }[];
+}) {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const bundle = await createProductBundle({ ...input, gymId: auth.gymId });
+    revalidatePath('/shop');
+    return { ok: true as const, data: bundle };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function exportQuickBooksAction(): Promise<
+  ActionResult<{ csv: string; filename: string }>
+> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const csv = await exportShopOrdersForQuickBooks(auth.gymId);
+    const date = new Date().toISOString().slice(0, 10);
+    return {
+      ok: true,
+      data: { csv, filename: `shop-orders-${date}.csv` },
     };
   } catch (error) {
     return toActionError(error);

@@ -8,17 +8,17 @@
 - [x] 13.5 Product CRUD admin UI
 
 ## Inventory
-- [~] 13.6 `inventory_levels` per variant (inventory_count on product)
+- [x] 13.6 `inventory_levels` per variant (inventory_count on product + variant rows)
 - [x] 13.7 Low stock alerts
 - [x] 13.8 Stock adjustment log
-- [~] 13.9 Reserve stock on checkout (decrement on payment)
+- [x] 13.9 Reserve stock on checkout (decrement on payment via `completeShopOrder`)
 - [x] 13.10 Release on payment timeout (cancel stale pending orders cron)
 
 ## Storefront
 - [x] 13.11 Public store `/g/[slug]/shop`
 - [x] 13.12 Product grid with filters
 - [x] 13.13 Product detail page
-- [~] 13.14 Cart session (local state)
+- [x] 13.14 Cart session (localStorage per gym slug)
 - [x] 13.15 Member-only vs public products flag
 
 ## Checkout
@@ -44,12 +44,12 @@
 ## Discounts
 - [x] 13.30 Member discount auto-apply
 - [x] 13.31 Promo codes for shop (Stripe allow_promotion_codes)
-- [ ] 13.32 Bundle deals (gi + belt)
+- [x] 13.32 Bundle deals (gi + belt)
 
 ## Integrations
 - [ ] 13.33 Stripe Connect for gym payouts (future)
 - [ ] 13.34 Printful dropship integration (future)
-- [ ] 13.35 QuickBooks export
+- [x] 13.35 QuickBooks export (CSV)
 
 ## Reporting
 - [x] 13.36 Revenue by product report
@@ -58,7 +58,7 @@
 
 ## Permissions
 - [x] 13.39 Admin-only product management
-- [ ] 13.40 Coach read-only inventory (optional)
+- [x] 13.40 Coach read-only inventory (optional)
 
 ## RLS
 - [x] 13.41 Members see own orders only
@@ -70,7 +70,7 @@
 
 ## Testing
 - [x] 13.45 Unit test inventory decrement
-- [ ] 13.46 E2E: add to cart → checkout (test mode)
+- [x] 13.46 E2E: add to cart → checkout (test mode)
 
 ## Pilot
 - [x] 13.47 East Coast MMA product seed data

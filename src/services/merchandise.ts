@@ -301,7 +301,264 @@ export async function createOrder(input: {
   return { orderId: order.id, totalCents };
 }
 
-export type ShopLineItem = { productId: string; quantity: number };
+export type ShopLineItem =
+  | { productId: string; quantity: number }
+  | { bundleId: string; quantity: number };
+
+export type ProductBundle = {
+  id: string;
+  gym_id: string;
+  name: string;
+  description: string | null;
+  bundle_price_cents: number;
+  is_active: boolean;
+  created_at: string;
+  items?: { product_id: string; quantity: number; products?: { name: string; price_cents: number } | null }[];
+};
+
+export async function listProductBundles(
+  gymId: string,
+  activeOnly = false
+): Promise<ProductBundle[]> {
+  const admin = getAdminClient();
+  let query = admin
+    .from('product_bundles')
+    .select('*, product_bundle_items(product_id, quantity, products(name, price_cents))')
+    .eq('gym_id', gymId)
+    .order('name');
+  if (activeOnly) query = query.eq('is_active', true);
+  const { data, error } = await query;
+  if (error) throw new ServiceError(500, error.message);
+  return (data ?? []).map((row) => ({
+    ...(row as ProductBundle),
+    items: (row as { product_bundle_items?: ProductBundle['items'] }).product_bundle_items ?? [],
+  }));
+}
+
+export async function createProductBundle(input: {
+  gymId: string;
+  name: string;
+  description?: string;
+  bundlePriceCents: number;
+  items: { productId: string; quantity: number }[];
+}): Promise<ProductBundle> {
+  if (input.items.length < 2) {
+    throw new ServiceError(400, 'A bundle needs at least two products');
+  }
+
+  const admin = getAdminClient();
+  const { data: bundle, error } = await admin
+    .from('product_bundles')
+    .insert({
+      gym_id: input.gymId,
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      bundle_price_cents: input.bundlePriceCents,
+    })
+    .select('*')
+    .single();
+
+  if (error || !bundle) throw new ServiceError(500, error?.message ?? 'Bundle create failed');
+
+  for (const item of input.items) {
+    const { error: itemError } = await admin.from('product_bundle_items').insert({
+      bundle_id: bundle.id,
+      product_id: item.productId,
+      quantity: item.quantity,
+    });
+    if (itemError) throw new ServiceError(500, itemError.message);
+  }
+
+  const created = await listProductBundles(input.gymId);
+  return created.find((b) => b.id === bundle.id) ?? (bundle as ProductBundle);
+}
+
+function splitBundlePrice(
+  bundlePriceCents: number,
+  components: { productId: string; quantity: number; unitPriceCents: number }[]
+): { productId: string; quantity: number; unitPriceCents: number }[] {
+  const totalListCents = components.reduce(
+    (sum, c) => sum + c.unitPriceCents * c.quantity,
+    0
+  );
+  if (totalListCents <= 0) {
+    const even = Math.floor(bundlePriceCents / components.length);
+    return components.map((c, i) => ({
+      ...c,
+      unitPriceCents:
+        i === components.length - 1
+          ? bundlePriceCents - even * (components.length - 1)
+          : even,
+    }));
+  }
+
+  let allocated = 0;
+  return components.map((c, i) => {
+    if (i === components.length - 1) {
+      const lineTotal = bundlePriceCents - allocated;
+      return { ...c, unitPriceCents: Math.max(0, Math.round(lineTotal / c.quantity)) };
+    }
+    const share = Math.round((bundlePriceCents * c.unitPriceCents * c.quantity) / totalListCents);
+    allocated += share;
+    return { ...c, unitPriceCents: Math.max(0, Math.round(share / c.quantity)) };
+  });
+}
+
+async function resolveShopLineItems(
+  gymId: string,
+  items: ShopLineItem[]
+): Promise<{
+  productLines: { productId: string; quantity: number; unitPriceCents: number; name: string }[];
+  stripeLines: { name: string; priceCents: number; quantity: number }[];
+  orderLines: {
+    product_id: string;
+    quantity: number;
+    unit_price_cents: number;
+    bundle_id?: string | null;
+  }[];
+  subtotalCents: number;
+}> {
+  const admin = getAdminClient();
+  const productLines: { productId: string; quantity: number; unitPriceCents: number; name: string }[] =
+    [];
+  const stripeLines: { name: string; priceCents: number; quantity: number }[] = [];
+  const orderLines: {
+    product_id: string;
+    quantity: number;
+    unit_price_cents: number;
+    bundle_id?: string | null;
+  }[] = [];
+  let subtotalCents = 0;
+
+  for (const item of items) {
+    if ('productId' in item) {
+      const { data: product } = await admin
+        .from('products')
+        .select('id, name, price_cents, inventory_count, is_active')
+        .eq('id', item.productId)
+        .eq('gym_id', gymId)
+        .maybeSingle();
+
+      if (!product?.is_active) throw new ServiceError(400, 'Product unavailable');
+      if (product.inventory_count < item.quantity) {
+        throw new ServiceError(400, `Insufficient stock for ${product.name}`);
+      }
+
+      subtotalCents += product.price_cents * item.quantity;
+      productLines.push({
+        productId: product.id,
+        quantity: item.quantity,
+        unitPriceCents: product.price_cents,
+        name: product.name,
+      });
+      stripeLines.push({
+        name: product.name,
+        priceCents: product.price_cents,
+        quantity: item.quantity,
+      });
+      orderLines.push({
+        product_id: product.id,
+        quantity: item.quantity,
+        unit_price_cents: product.price_cents,
+      });
+      continue;
+    }
+
+    const { data: bundle } = await admin
+      .from('product_bundles')
+      .select('id, name, bundle_price_cents, is_active, product_bundle_items(product_id, quantity, products(name, price_cents))')
+      .eq('id', item.bundleId)
+      .eq('gym_id', gymId)
+      .maybeSingle();
+
+    if (!bundle?.is_active) throw new ServiceError(400, 'Bundle unavailable');
+
+    const bundleItems = (bundle.product_bundle_items ?? []) as {
+      product_id: string;
+      quantity: number;
+      products: { name: string; price_cents: number } | { name: string; price_cents: number }[] | null;
+    }[];
+
+    if (bundleItems.length === 0) throw new ServiceError(400, 'Bundle has no items');
+
+    const components: { productId: string; quantity: number; unitPriceCents: number; name: string }[] =
+      [];
+
+    for (const bi of bundleItems) {
+      const product = Array.isArray(bi.products) ? bi.products[0] : bi.products;
+      const { data: stock } = await admin
+        .from('products')
+        .select('inventory_count, is_active, name, price_cents')
+        .eq('id', bi.product_id)
+        .eq('gym_id', gymId)
+        .maybeSingle();
+
+      if (!stock?.is_active) throw new ServiceError(400, 'Bundle product unavailable');
+      const needed = bi.quantity * item.quantity;
+      if ((stock.inventory_count ?? 0) < needed) {
+        throw new ServiceError(400, `Insufficient stock for bundle (${stock.name})`);
+      }
+
+      components.push({
+        productId: bi.product_id,
+        quantity: needed,
+        unitPriceCents: product?.price_cents ?? stock.price_cents,
+        name: product?.name ?? stock.name,
+      });
+    }
+
+    const bundleLineTotal = bundle.bundle_price_cents * item.quantity;
+    subtotalCents += bundleLineTotal;
+    stripeLines.push({
+      name: bundle.name,
+      priceCents: bundle.bundle_price_cents,
+      quantity: item.quantity,
+    });
+
+    const priced = splitBundlePrice(
+      bundleLineTotal,
+      components.map((c) => ({
+        productId: c.productId,
+        quantity: c.quantity,
+        unitPriceCents: c.unitPriceCents,
+      }))
+    );
+
+    for (const line of priced) {
+      const component = components.find((c) => c.productId === line.productId);
+      productLines.push({
+        productId: line.productId,
+        quantity: line.quantity,
+        unitPriceCents: line.unitPriceCents,
+        name: component?.name ?? 'Bundle item',
+      });
+      orderLines.push({
+        product_id: line.productId,
+        quantity: line.quantity,
+        unit_price_cents: line.unitPriceCents,
+        bundle_id: bundle.id,
+      });
+    }
+  }
+
+  return { productLines, stripeLines, orderLines, subtotalCents };
+}
+
+export async function exportShopOrdersForQuickBooks(gymId: string): Promise<string> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('orders')
+    .select('id, created_at, customer_email, status, total_cents, order_items(quantity, unit_price_cents, products(name))')
+    .eq('gym_id', gymId)
+    .in('status', ['paid', 'fulfilled'])
+    .order('created_at', { ascending: false })
+    .limit(500);
+
+  if (error) throw new ServiceError(500, error.message);
+
+  const { formatShopOrdersForQuickBooks } = await import('@/lib/quickbooks-export');
+  return formatShopOrdersForQuickBooks((data ?? []) as Parameters<typeof formatShopOrdersForQuickBooks>[0]);
+}
 
 async function getGymShopSettings(gymId: string) {
   const admin = getAdminClient();
@@ -344,34 +601,13 @@ export async function prepareShopOrder(input: {
   }
 
   let subtotalCents = 0;
-  const lineItems: { product_id: string; quantity: number; unit_price_cents: number }[] = [];
-  const stripeLineItems: { name: string; priceCents: number; quantity: number }[] = [];
+  const lineItems: { product_id: string; quantity: number; unit_price_cents: number; bundle_id?: string | null }[] = [];
+  let stripeLineItems: { name: string; priceCents: number; quantity: number }[] = [];
 
-  for (const item of input.items) {
-    const { data: product } = await admin
-      .from('products')
-      .select('id, name, price_cents, inventory_count, is_active')
-      .eq('id', item.productId)
-      .eq('gym_id', input.gymId)
-      .maybeSingle();
-
-    if (!product?.is_active) throw new ServiceError(400, 'Product unavailable');
-    if (product.inventory_count < item.quantity) {
-      throw new ServiceError(400, `Insufficient stock for ${product.name}`);
-    }
-
-    subtotalCents += product.price_cents * item.quantity;
-    lineItems.push({
-      product_id: product.id,
-      quantity: item.quantity,
-      unit_price_cents: product.price_cents,
-    });
-    stripeLineItems.push({
-      name: product.name,
-      priceCents: product.price_cents,
-      quantity: item.quantity,
-    });
-  }
+  const resolved = await resolveShopLineItems(input.gymId, input.items);
+  subtotalCents = resolved.subtotalCents;
+  lineItems.push(...resolved.orderLines);
+  stripeLineItems = resolved.stripeLines;
 
   const memberDiscountPercent =
     input.memberId && shopSettings.memberDiscountPercent > 0
@@ -416,6 +652,7 @@ export async function prepareShopOrder(input: {
       product_id: line.product_id,
       quantity: line.quantity,
       unit_price_cents: line.unit_price_cents,
+      bundle_id: line.bundle_id ?? null,
     });
   }
 
@@ -504,29 +741,10 @@ export async function createPosOrder(input: {
 }): Promise<{ orderId: string; totalCents: number }> {
   const admin = getAdminClient();
   const shopSettings = await getGymShopSettings(input.gymId);
-  let subtotalCents = 0;
-  const lineItems: { product_id: string; quantity: number; unit_price_cents: number }[] = [];
 
-  for (const item of input.items) {
-    const { data: product } = await admin
-      .from('products')
-      .select('id, price_cents, inventory_count, is_active')
-      .eq('id', item.productId)
-      .eq('gym_id', input.gymId)
-      .maybeSingle();
-
-    if (!product?.is_active) throw new ServiceError(400, 'Product unavailable');
-    if (product.inventory_count < item.quantity) {
-      throw new ServiceError(400, 'Insufficient inventory');
-    }
-
-    subtotalCents += product.price_cents * item.quantity;
-    lineItems.push({
-      product_id: product.id,
-      quantity: item.quantity,
-      unit_price_cents: product.price_cents,
-    });
-  }
+  const resolved = await resolveShopLineItems(input.gymId, input.items);
+  const subtotalCents = resolved.subtotalCents;
+  const lineItems = resolved.orderLines;
 
   const memberDiscountPercent =
     input.memberId && shopSettings.memberDiscountPercent > 0
@@ -566,6 +784,7 @@ export async function createPosOrder(input: {
       product_id: line.product_id,
       quantity: line.quantity,
       unit_price_cents: line.unit_price_cents,
+      bundle_id: line.bundle_id ?? null,
     });
 
     const { data: p } = await admin

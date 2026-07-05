@@ -16,6 +16,10 @@ import {
   createPosOrderAction,
   downloadPackingSlipAction,
   listMembersAction,
+  listProductBundlesAction,
+  createProductBundleAction,
+  exportQuickBooksAction,
+  getStaffContextAction,
 } from '@/app/(dashboard)/actions';
 
 const CATEGORIES = [
@@ -51,7 +55,16 @@ type RevenueRow = {
 
 type MemberOption = { id: string; first_name: string; last_name: string; email: string | null };
 
-type Tab = 'products' | 'pos' | 'orders';
+type Tab = 'products' | 'bundles' | 'pos' | 'orders';
+
+type BundleRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  bundle_price_cents: number;
+  is_active: boolean;
+  items?: { product_id: string; quantity: number; products?: { name: string } | null }[];
+};
 
 export default function ShopAdminPage() {
   const [tab, setTab] = useState<Tab>('products');
@@ -67,6 +80,11 @@ export default function ShopAdminPage() {
   const [posMemberId, setPosMemberId] = useState('');
   const [posCart, setPosCart] = useState<{ productId: string; quantity: number }[]>([]);
   const [posSubmitting, setPosSubmitting] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [bundles, setBundles] = useState<BundleRow[]>([]);
+  const [bundleName, setBundleName] = useState('');
+  const [bundlePrice, setBundlePrice] = useState('');
+  const [bundleProductIds, setBundleProductIds] = useState<string[]>([]);
   const [variantsByProduct, setVariantsByProduct] = useState<Record<string, Variant[]>>({});
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
@@ -77,13 +95,16 @@ export default function ShopAdminPage() {
   const [variantForms, setVariantForms] = useState<Record<string, { label: string; sku: string; stock: string }>>({});
 
   const load = async () => {
-    const [prodRes, ordRes, revRes, valRes, memRes] = await Promise.all([
+    const [prodRes, ordRes, revRes, valRes, memRes, bundleRes, ctxRes] = await Promise.all([
       listProductsAction(),
       listOrdersAction(),
       getShopRevenueAction(),
       getInventoryValuationAction(),
       listMembersAction(),
+      listProductBundlesAction(),
+      getStaffContextAction(),
     ]);
+    if (ctxRes.ok && ctxRes.data) setIsAdmin(ctxRes.data.role === 'admin');
     if (prodRes.ok && prodRes.data) {
       const prods = prodRes.data as Product[];
       setProducts(prods);
@@ -100,6 +121,7 @@ export default function ShopAdminPage() {
     if (revRes.ok && revRes.data) setRevenue(revRes.data);
     if (valRes.ok && valRes.data) setInventoryValue(valRes.data);
     if (memRes.ok && memRes.data) setMembers(memRes.data as MemberOption[]);
+    if (bundleRes.ok && bundleRes.data) setBundles(bundleRes.data as BundleRow[]);
     setLoading(false);
   };
 
@@ -137,6 +159,38 @@ export default function ShopAdminPage() {
     const reason = window.prompt(`Reason for ${delta > 0 ? 'adding' : 'removing'} stock:`) ?? undefined;
     await adjustStockAction({ productId, delta, reason });
     void load();
+  };
+
+  const addBundle = async () => {
+    const cents = Math.round(parseFloat(bundlePrice) * 100);
+    if (!bundleName || isNaN(cents) || bundleProductIds.length < 2) return;
+    await createProductBundleAction({
+      name: bundleName,
+      bundlePriceCents: cents,
+      items: bundleProductIds.map((productId) => ({ productId, quantity: 1 })),
+    });
+    setBundleName('');
+    setBundlePrice('');
+    setBundleProductIds([]);
+    void load();
+  };
+
+  const exportQuickBooks = async () => {
+    const result = await exportQuickBooksAction();
+    if (!result.ok || !result.data) return;
+    const blob = new Blob([result.data.csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = result.data.filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const toggleBundleProduct = (productId: string) => {
+    setBundleProductIds((prev) =>
+      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
+    );
   };
 
   const downloadPackingSlip = async (orderId: string) => {
@@ -189,10 +243,14 @@ export default function ShopAdminPage() {
   return (
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
       <h1 className="text-3xl font-extrabold mb-2">Shop</h1>
-      <p className="text-white/40 text-sm mb-6">Manage merchandise. Enable the store in Settings.</p>
+      <p className="text-white/40 text-sm mb-6">
+        {isAdmin
+          ? 'Manage merchandise. Enable the store in Settings.'
+          : 'View inventory and orders (read-only).'}
+      </p>
 
-      <div className="flex gap-2 mb-6">
-        {(['products', 'pos', 'orders'] as Tab[]).map((t) => (
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {(['products', 'bundles', 'pos', 'orders'] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -203,6 +261,14 @@ export default function ShopAdminPage() {
             {t === 'pos' ? 'POS' : t}
           </button>
         ))}
+        {isAdmin && tab === 'orders' && (
+          <button
+            onClick={() => void exportQuickBooks()}
+            className="ml-auto px-4 py-2 rounded-xl text-sm font-medium bg-white/5 text-white/70 hover:text-white"
+          >
+            Export QuickBooks CSV
+          </button>
+        )}
       </div>
 
       {inventoryValue && (
@@ -231,6 +297,7 @@ export default function ShopAdminPage() {
 
       {tab === 'products' && (
         <>
+      {isAdmin && (
       <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8 space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Product name" className={inputClass} />
@@ -257,6 +324,7 @@ export default function ShopAdminPage() {
           Add Product
         </button>
       </div>
+      )}
 
       {loading ? (
         <p className="text-white/30">Loading...</p>
@@ -287,6 +355,8 @@ export default function ShopAdminPage() {
                 </span>
               </div>
               <div className="flex gap-2 mb-3">
+                {isAdmin && (
+                  <>
                 <button
                   onClick={() => void adjustStock(p.id, 1)}
                   className="text-xs text-green-400 hover:underline"
@@ -299,6 +369,8 @@ export default function ShopAdminPage() {
                 >
                   −1 stock
                 </button>
+                  </>
+                )}
               </div>
               {(variantsByProduct[p.id] ?? []).length > 0 && (
                 <div className="mb-3 space-y-1">
@@ -312,6 +384,7 @@ export default function ShopAdminPage() {
                   ))}
                 </div>
               )}
+              {isAdmin && (
               <div className="flex gap-2">
                 <input
                   value={variantForms[p.id]?.label ?? ''}
@@ -342,6 +415,7 @@ export default function ShopAdminPage() {
                   Add variant
                 </button>
               </div>
+              )}
             </div>
           ))}
         </div>
@@ -349,7 +423,75 @@ export default function ShopAdminPage() {
         </>
       )}
 
-      {tab === 'pos' && (
+      {tab === 'bundles' && (
+        <>
+          {isAdmin && (
+            <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8 space-y-3">
+              <h2 className="font-semibold text-white">Create bundle (e.g. gi + belt)</h2>
+              <input
+                value={bundleName}
+                onChange={(e) => setBundleName(e.target.value)}
+                placeholder="Bundle name"
+                className={inputClass}
+              />
+              <input
+                value={bundlePrice}
+                onChange={(e) => setBundlePrice(e.target.value)}
+                placeholder="Bundle price ($)"
+                className={inputClass}
+              />
+              <p className="text-white/40 text-xs">Select at least 2 products:</p>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {products.map((p) => (
+                  <label key={p.id} className="flex items-center gap-2 text-sm text-white/70">
+                    <input
+                      type="checkbox"
+                      checked={bundleProductIds.includes(p.id)}
+                      onChange={() => toggleBundleProduct(p.id)}
+                    />
+                    {p.name} (${(p.price_cents / 100).toFixed(2)})
+                  </label>
+                ))}
+              </div>
+              <button
+                onClick={() => void addBundle()}
+                disabled={bundleProductIds.length < 2}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm"
+              >
+                Create bundle
+              </button>
+            </div>
+          )}
+          {bundles.length === 0 ? (
+            <p className="text-white/30 text-sm">No bundles yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {bundles.map((b) => (
+                <div key={b.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
+                  <div className="flex justify-between">
+                    <span className="text-white font-medium">{b.name}</span>
+                    <span className="text-white/40 text-sm">
+                      ${(b.bundle_price_cents / 100).toFixed(2)}
+                    </span>
+                  </div>
+                  <ul className="text-white/40 text-xs mt-2 space-y-0.5">
+                    {(b.items ?? []).map((item) => {
+                      const product = Array.isArray(item.products) ? item.products[0] : item.products;
+                      return (
+                        <li key={item.product_id}>
+                          {item.quantity}× {product?.name ?? 'Product'}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === 'pos' && isAdmin && (
         <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8 space-y-4">
           <h2 className="font-semibold text-white">In-gym POS</h2>
           <p className="text-white/40 text-sm">Sell at the front desk — order is marked paid immediately (cash/card at desk).</p>
@@ -400,6 +542,10 @@ export default function ShopAdminPage() {
         </div>
       )}
 
+      {tab === 'pos' && !isAdmin && (
+        <p className="text-white/30 text-sm">POS mode is available to admins only.</p>
+      )}
+
       {tab === 'orders' && (
         <>
       <h2 className="font-semibold text-white mb-3">Revenue by Product</h2>
@@ -431,7 +577,7 @@ export default function ShopAdminPage() {
                   ${(o.total_cents / 100).toFixed(2)} · {o.status}
                 </span>
               </div>
-              {o.status === 'paid' && (
+              {o.status === 'paid' && isAdmin && (
                 <div className="flex gap-3">
                   <button
                     onClick={() => void downloadPackingSlip(o.id)}

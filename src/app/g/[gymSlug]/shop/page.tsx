@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getPublicGymBySlug, gymPrimaryColor } from '@/lib/gym-public';
-import { listProducts } from '@/services/merchandise';
+import { listProducts, listProductBundles } from '@/services/merchandise';
 import { getAdminClient } from '@/lib/supabase/admin';
 import PublicShopCatalog from '@/components/gym-public/PublicShopCatalog';
 import { resolveGymPageMetadata } from '@/lib/seo/gym-seo';
@@ -18,6 +18,7 @@ export default async function GymShopPage({ params }: Props) {
   if (!gym || !gym.store_enabled) notFound();
 
   const products = (await listProducts(gym.id, true)).filter((p) => !p.members_only);
+  const bundles = await listProductBundles(gym.id, true);
   const accent = gymPrimaryColor(gym.primary_color);
   const admin = getAdminClient();
   const { data: gymMeta } = await admin.from('gyms').select('store_return_policy').eq('id', gym.id).single();
@@ -36,6 +37,19 @@ export default async function GymShopPage({ params }: Props) {
         gymSlug={gym.slug}
         accent={accent}
         products={products}
+        bundles={bundles.map((b) => ({
+          id: b.id,
+          name: b.name,
+          description: b.description,
+          bundle_price_cents: b.bundle_price_cents,
+          items: (b.items ?? []).map((item) => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            name:
+              (Array.isArray(item.products) ? item.products[0]?.name : item.products?.name) ??
+              'Item',
+          })),
+        }))}
       />
     </div>
   );

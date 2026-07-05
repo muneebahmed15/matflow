@@ -35,7 +35,7 @@ export const CAPABILITIES: Record<Capability, StaffRole[]> = {
   'checkin.write': ['admin', 'supervisor', 'coach'],
   'belts.promote': ['admin', 'supervisor'],
   'reports.read': ['admin', 'supervisor'],
-  'shop.read': ['admin', 'supervisor'],
+  'shop.read': ['admin', 'supervisor', 'coach'],
   'shop.write': ['admin'],
 };
 

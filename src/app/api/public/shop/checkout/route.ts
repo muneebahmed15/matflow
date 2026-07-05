@@ -29,10 +29,15 @@ const schema = z.object({
   shipping_address: shippingAddressSchema.optional(),
   items: z
     .array(
-      z.object({
-        product_id: z.string().uuid(),
-        quantity: z.number().int().min(1).max(10),
-      })
+      z
+        .object({
+          product_id: z.string().uuid().optional(),
+          bundle_id: z.string().uuid().optional(),
+          quantity: z.number().int().min(1).max(10),
+        })
+        .refine((item) => Boolean(item.product_id) !== Boolean(item.bundle_id), {
+          message: 'Each item must have product_id or bundle_id',
+        })
     )
     .min(1),
 });
@@ -74,7 +79,11 @@ export async function POST(req: NextRequest) {
       customerEmail: customer_email,
       fulfillmentType: fulfillment_type,
       shippingAddress: shipping_address ?? null,
-      items: items.map((i) => ({ productId: i.product_id, quantity: i.quantity })),
+      items: items.map((i) =>
+        i.bundle_id
+          ? { bundleId: i.bundle_id, quantity: i.quantity }
+          : { productId: i.product_id!, quantity: i.quantity }
+      ),
     });
 
     const { NEXT_PUBLIC_APP_URL } = getPublicEnv();

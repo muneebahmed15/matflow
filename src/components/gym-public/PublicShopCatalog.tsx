@@ -14,13 +14,24 @@ type Product = {
   category: string;
 };
 
-type CartItem = { product: Product; quantity: number };
+type Bundle = {
+  id: string;
+  name: string;
+  description: string | null;
+  bundle_price_cents: number;
+  items: { product_id: string; quantity: number; name: string }[];
+};
+
+type CartProductItem = { type: 'product'; product: Product; quantity: number };
+type CartBundleItem = { type: 'bundle'; bundle: Bundle; quantity: number };
+type CartItem = CartProductItem | CartBundleItem;
 
 type Props = {
   gymId: string;
   gymSlug: string;
   accent: string;
   products: Product[];
+  bundles?: Bundle[];
 };
 
 const CART_KEY = (slug: string) => `matflow-cart-${slug}`;
@@ -32,7 +43,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   gear: 'Gear',
 };
 
-export default function PublicShopCatalog({ gymId, gymSlug, accent, products }: Props) {
+export default function PublicShopCatalog({ gymId, gymSlug, accent, products, bundles = [] }: Props) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [email, setEmail] = useState('');
   const [fulfillmentType, setFulfillmentType] = useState<'pickup' | 'ship'>('pickup');
@@ -71,45 +82,80 @@ export default function PublicShopCatalog({ gymId, gymSlug, accent, products }: 
     try {
       const raw = localStorage.getItem(CART_KEY(gymSlug));
       if (!raw) return;
-      const ids: { id: string; quantity: number }[] = JSON.parse(raw);
+      const ids: { type?: string; id: string; quantity: number }[] = JSON.parse(raw);
       const items: CartItem[] = [];
       for (const row of ids) {
-        const product = products.find((p) => p.id === row.id);
-        if (product) items.push({ product, quantity: row.quantity });
+        if (row.type === 'bundle') {
+          const bundle = bundles.find((b) => b.id === row.id);
+          if (bundle) items.push({ type: 'bundle', bundle, quantity: row.quantity });
+        } else {
+          const product = products.find((p) => p.id === row.id);
+          if (product) items.push({ type: 'product', product, quantity: row.quantity });
+        }
       }
       setCart(items);
     } catch {
       // ignore corrupt cart
     }
-  }, [gymSlug, products]);
+  }, [gymSlug, products, bundles]);
 
   const persist = (items: CartItem[]) => {
     localStorage.setItem(
       CART_KEY(gymSlug),
-      JSON.stringify(items.map((i) => ({ id: i.product.id, quantity: i.quantity })))
+      JSON.stringify(
+        items.map((i) =>
+          i.type === 'bundle'
+            ? { type: 'bundle', id: i.bundle.id, quantity: i.quantity }
+            : { type: 'product', id: i.product.id, quantity: i.quantity }
+        )
+      )
     );
     setCart(items);
   };
 
   const addToCart = (product: Product) => {
-    const existing = cart.find((c) => c.product.id === product.id);
-    if (existing) {
+    const existing = cart.find((c) => c.type === 'product' && c.product.id === product.id);
+    if (existing && existing.type === 'product') {
       if (existing.quantity >= product.inventory_count) return;
       persist(
         cart.map((c) =>
-          c.product.id === product.id ? { ...c, quantity: c.quantity + 1 } : c
+          c.type === 'product' && c.product.id === product.id
+            ? { ...c, quantity: c.quantity + 1 }
+            : c
         )
       );
     } else {
-      persist([...cart, { product, quantity: 1 }]);
+      persist([...cart, { type: 'product', product, quantity: 1 }]);
     }
   };
 
-  const removeFromCart = (productId: string) => {
-    persist(cart.filter((c) => c.product.id !== productId));
+  const addBundleToCart = (bundle: Bundle) => {
+    const existing = cart.find((c) => c.type === 'bundle' && c.bundle.id === bundle.id);
+    if (existing && existing.type === 'bundle') {
+      persist(
+        cart.map((c) =>
+          c.type === 'bundle' && c.bundle.id === bundle.id
+            ? { ...c, quantity: c.quantity + 1 }
+            : c
+        )
+      );
+    } else {
+      persist([...cart, { type: 'bundle', bundle, quantity: 1 }]);
+    }
   };
 
-  const totalCents = cart.reduce((sum, i) => sum + i.product.price_cents * i.quantity, 0);
+  const removeFromCart = (key: string) => {
+    persist(
+      cart.filter((c) =>
+        c.type === 'product' ? c.product.id !== key : c.bundle.id !== key
+      )
+    );
+  };
+
+  const totalCents = cart.reduce((sum, i) => {
+    if (i.type === 'product') return sum + i.product.price_cents * i.quantity;
+    return sum + i.bundle.bundle_price_cents * i.quantity;
+  }, 0);
 
   const checkout = async () => {
     if (!email.trim() || cart.length === 0) return;
@@ -140,7 +186,11 @@ export default function PublicShopCatalog({ gymId, gymSlug, accent, products }: 
                 postal_code: shipPostal.trim(),
               }
             : undefined,
-        items: cart.map((c) => ({ product_id: c.product.id, quantity: c.quantity })),
+        items: cart.map((c) =>
+          c.type === 'bundle'
+            ? { bundle_id: c.bundle.id, quantity: c.quantity }
+            : { product_id: c.product.id, quantity: c.quantity }
+        ),
       }),
     });
     const data = await res.json();
@@ -164,21 +214,32 @@ export default function PublicShopCatalog({ gymId, gymSlug, accent, products }: 
             <h2 className="font-semibold text-white">Cart ({cart.length})</h2>
           </div>
           <div className="space-y-2 mb-4">
-            {cart.map((item) => (
-              <div key={item.product.id} className="flex justify-between items-center text-sm">
+            {cart.map((item) => {
+              const key = item.type === 'product' ? item.product.id : item.bundle.id;
+              const label =
+                item.type === 'product'
+                  ? item.product.name
+                  : `${item.bundle.name} (bundle)`;
+              const lineCents =
+                item.type === 'product'
+                  ? item.product.price_cents * item.quantity
+                  : item.bundle.bundle_price_cents * item.quantity;
+              return (
+              <div key={key} className="flex justify-between items-center text-sm">
                 <span className="text-white/70">
-                  {item.product.name} × {item.quantity}
+                  {label} × {item.quantity}
                 </span>
                 <div className="flex items-center gap-3">
                   <span className="text-white/40">
-                    ${((item.product.price_cents * item.quantity) / 100).toFixed(2)}
+                    ${(lineCents / 100).toFixed(2)}
                   </span>
-                  <button onClick={() => removeFromCart(item.product.id)} className="text-white/30 hover:text-white">
+                  <button onClick={() => removeFromCart(key)} className="text-white/30 hover:text-white">
                     <X size={14} />
                   </button>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
           <p className="text-white font-semibold mb-3">Total: ${(totalCents / 100).toFixed(2)}</p>
           <div className="flex gap-2 mb-3">
@@ -281,6 +342,39 @@ export default function PublicShopCatalog({ gymId, gymSlug, accent, products }: 
               {CATEGORY_LABELS[cat] ?? cat}
             </button>
           ))}
+        </div>
+      )}
+
+      {bundles.length > 0 && (
+        <div className="mb-10">
+          <h2 className="text-xl font-bold text-white mb-4">Bundle deals</h2>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {bundles.map((bundle) => (
+              <div key={bundle.id} className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                <h3 className="font-semibold text-white">{bundle.name}</h3>
+                {bundle.description && (
+                  <p className="text-white/40 text-sm mt-1">{bundle.description}</p>
+                )}
+                <ul className="text-white/50 text-xs mt-2 space-y-0.5">
+                  {bundle.items.map((item) => (
+                    <li key={item.product_id}>
+                      {item.quantity}× {item.name}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-white font-semibold mt-3">
+                  ${(bundle.bundle_price_cents / 100).toFixed(2)}
+                </p>
+                <button
+                  onClick={() => addBundleToCart(bundle)}
+                  className="mt-3 w-full text-center text-sm font-semibold py-2 rounded-xl text-white hover:opacity-90"
+                  style={{ backgroundColor: accent }}
+                >
+                  Add bundle to cart
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
