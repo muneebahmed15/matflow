@@ -120,9 +120,14 @@ export default function AiChatWidget({ gymId, gymName, gymSlug, accent }: Props)
         <div className="fixed bottom-36 md:bottom-24 right-6 z-50 w-[min(100vw-2rem,380px)] bg-[#111] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
           <div className="px-4 py-3 border-b border-white/10 font-semibold text-sm flex justify-between items-center">
             <span>{gymName} Assistant</span>
-            <a href={`/g/${gymSlug}/trial`} className="text-xs opacity-60 hover:opacity-100">
-              Book trial
-            </a>
+            <div className="flex items-center gap-3">
+              <a href={`/g/${gymSlug}/contact`} className="text-xs opacity-60 hover:opacity-100">
+                Talk to staff
+              </a>
+              <a href={`/g/${gymSlug}/trial`} className="text-xs opacity-60 hover:opacity-100">
+                Book trial
+              </a>
+            </div>
           </div>
           <div className="flex-1 max-h-80 overflow-y-auto p-4 space-y-3">
             {messages.map((m, i) => (

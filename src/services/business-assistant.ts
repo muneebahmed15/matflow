@@ -1,10 +1,14 @@
 import { getAdminClient } from '@/lib/supabase/admin';
 import { isLowAttendanceClass, lowAttendanceDescription } from '@/lib/class-attendance-alerts';
+import { ServiceError } from '@/services/errors';
 
 export type BusinessMetrics = {
   newLeads7d: number;
+  newLeads24h: number;
+  leadsNotContacted48h: number;
   pastDueMembers: number;
   inactiveMembers14d: number;
+  inactiveMembers30d: number;
   failedPayments: number;
   readyForPromotion: number;
   lowAttendanceClasses: number;
@@ -23,11 +27,19 @@ export async function computeGymMetrics(gymId: string): Promise<BusinessMetrics>
   const admin = getAdminClient();
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const oneDayAgo = new Date();
+  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+  const twoDaysAgo = new Date();
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
   const fourteenDaysAgo = new Date();
   fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
   const [
     { count: newLeads7d },
+    { count: newLeads24h },
+    { count: leadsNotContacted48h },
     { count: pastDueMembers },
     { data: activeMembers },
     { count: failedPayments },
@@ -37,6 +49,17 @@ export async function computeGymMetrics(gymId: string): Promise<BusinessMetrics>
       .select('*', { count: 'exact', head: true })
       .eq('gym_id', gymId)
       .gte('created_at', sevenDaysAgo.toISOString()),
+    admin
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('gym_id', gymId)
+      .gte('created_at', oneDayAgo.toISOString()),
+    admin
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('gym_id', gymId)
+      .eq('status', 'new')
+      .lt('created_at', twoDaysAgo.toISOString()),
     admin
       .from('members')
       .select('*', { count: 'exact', head: true })
@@ -51,17 +74,26 @@ export async function computeGymMetrics(gymId: string): Promise<BusinessMetrics>
   ]);
 
   let inactiveMembers14d = 0;
+  let inactiveMembers30d = 0;
   const memberIds = (activeMembers ?? []).map((m) => m.id);
 
   if (memberIds.length > 0) {
-    const { data: recentAttendance } = await admin
+    const { data: recentAttendance14 } = await admin
       .from('attendance')
       .select('member_id')
       .eq('gym_id', gymId)
       .gte('checked_in_at', fourteenDaysAgo.toISOString());
 
-    const checkedIn = new Set((recentAttendance ?? []).map((a) => a.member_id));
-    inactiveMembers14d = memberIds.filter((id) => !checkedIn.has(id)).length;
+    const { data: recentAttendance30 } = await admin
+      .from('attendance')
+      .select('member_id')
+      .eq('gym_id', gymId)
+      .gte('checked_in_at', thirtyDaysAgo.toISOString());
+
+    const checkedIn14 = new Set((recentAttendance14 ?? []).map((a) => a.member_id));
+    const checkedIn30 = new Set((recentAttendance30 ?? []).map((a) => a.member_id));
+    inactiveMembers14d = memberIds.filter((id) => !checkedIn14.has(id)).length;
+    inactiveMembers30d = memberIds.filter((id) => !checkedIn30.has(id)).length;
   }
 
   const { data: promotions } = await admin
@@ -119,8 +151,11 @@ export async function computeGymMetrics(gymId: string): Promise<BusinessMetrics>
 
   return {
     newLeads7d: newLeads7d ?? 0,
+    newLeads24h: newLeads24h ?? 0,
+    leadsNotContacted48h: leadsNotContacted48h ?? 0,
     pastDueMembers: pastDueMembers ?? 0,
     inactiveMembers14d,
+    inactiveMembers30d,
     failedPayments: failedPayments ?? 0,
     readyForPromotion,
     lowAttendanceClasses,
@@ -146,6 +181,24 @@ export function metricsToRecommendations(metrics: BusinessMetrics): BusinessReco
       priority: 'P1',
       title: `${metrics.inactiveMembers14d} inactive member(s)`,
       description: 'No check-in in 14+ days. Consider a win-back email or call.',
+      actionHref: '/members',
+    });
+  }
+
+  if (metrics.leadsNotContacted48h > 0) {
+    recs.push({
+      priority: 'P1',
+      title: `${metrics.leadsNotContacted48h} lead(s) not contacted in 48h+`,
+      description: 'New leads waiting for first outreach.',
+      actionHref: '/leads',
+    });
+  }
+
+  if (metrics.inactiveMembers30d > metrics.inactiveMembers14d) {
+    recs.push({
+      priority: 'P2',
+      title: `${metrics.inactiveMembers30d} inactive 30+ days`,
+      description: 'Long-term absent members may need a win-back campaign.',
       actionHref: '/members',
     });
   }
@@ -233,4 +286,31 @@ export async function getLatestSnapshot(gymId: string) {
     recommendations: metricsToRecommendations(metrics),
     snapshot_date: new Date().toISOString().split('T')[0],
   };
+}
+
+export async function listDigestHistory(
+  gymId: string,
+  limit = 30
+): Promise<
+  {
+    snapshot_date: string;
+    metrics: BusinessMetrics;
+    recommendations: BusinessRecommendation[];
+  }[]
+> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from('business_snapshots')
+    .select('snapshot_date, metrics, recommendations')
+    .eq('gym_id', gymId)
+    .order('snapshot_date', { ascending: false })
+    .limit(limit);
+
+  if (error) throw new ServiceError(500, error.message);
+
+  return (data ?? []).map((row) => ({
+    snapshot_date: row.snapshot_date as string,
+    metrics: row.metrics as BusinessMetrics,
+    recommendations: (row.recommendations ?? []) as BusinessRecommendation[],
+  }));
 }

@@ -101,6 +101,18 @@ async function handleToolCall(
         .eq('id', lead.id)
         .eq('gym_id', gymId);
     }
+
+    try {
+      const { createCrmNote } = await import('@/services/crm-notes');
+      await createCrmNote({
+        gymId,
+        leadId: lead.id,
+        noteType: 'system',
+        body: `AI chat ${toolCall.name === 'book_trial' ? 'booked a trial' : 'captured contact info'} (${firstName} ${lastName}${email ? `, ${email}` : ''}).`,
+      });
+    } catch {
+      // CRM note must not block chat flow
+    }
   }
 }
 

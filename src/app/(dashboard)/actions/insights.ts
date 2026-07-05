@@ -24,7 +24,7 @@ import { requireStaffSession } from '@/lib/auth/staff';
 
 
 
-import { getLatestSnapshot, saveDailySnapshot } from '@/services/business-assistant';
+import { getLatestSnapshot, saveDailySnapshot, listDigestHistory } from '@/services/business-assistant';
 
 
 
@@ -62,6 +62,16 @@ export async function refreshBusinessSnapshotAction(): Promise<ActionResult> {
     revalidatePath('/insights');
     revalidatePath('/dashboard');
     return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+
+export async function listDigestHistoryAction() {
+  try {
+    const auth = await requireStaffSession({ capability: 'reports.read' });
+    return { ok: true as const, data: await listDigestHistory(auth.gymId) };
   } catch (error) {
     return toActionError(error);
   }

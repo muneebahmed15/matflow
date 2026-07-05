@@ -7,6 +7,7 @@ import { getBeltProgress } from '@/lib/belt-progress';
 import { usePortalMember } from '@/lib/portal-member-context';
 import { ListSkeleton } from '@/components/LoadingSkeleton';
 import PortalEmptyState from '@/components/portal/PortalEmptyState';
+import { MemberRankCardSection } from '@/components/portal/MemberRankQr';
 import { Award } from 'lucide-react';
 
 type Promotion = {
@@ -78,6 +79,8 @@ export default function PortalBeltPage() {
           )}
         </div>
       </div>
+
+      <MemberRankCardSection />
 
       <div>
         <h2 className="font-semibold text-white mb-3">Promotion History</h2>

@@ -45,7 +45,7 @@ export async function listLeadNotes(gymId: string, leadId: string): Promise<CrmN
 
 export type CreateCrmNoteInput = {
   gymId: string;
-  authorId: string;
+  authorId?: string | null;
   body: string;
   noteType?: CrmNoteType;
   memberId?: string;
@@ -66,7 +66,7 @@ export async function createCrmNote(input: CreateCrmNoteInput): Promise<CrmNote>
       gym_id: input.gymId,
       member_id: input.memberId ?? null,
       lead_id: input.leadId ?? null,
-      author_id: input.authorId,
+      author_id: input.authorId ?? null,
       note_type: input.noteType ?? 'general',
       body,
     })

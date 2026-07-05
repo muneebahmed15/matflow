@@ -1,6 +1,6 @@
 # MatsFlow — Master Implementation Plan
 
-> **Status:** Wave 2 complete · Wave 4 merchandise complete (bundles, QuickBooks, coach inventory)  
+> **Status:** Wave 2 & 4 complete · Wave 3 AI partially shipped (front desk + business assistant core)  
 > **Scoring:** `[ ]` Not started · `[~]` Partial · `[x]` Done  
 > **Rule:** Each module has **50+** granular, testable todos. No item ships without schema + service + auth + UI (where applicable).
 
@@ -12,7 +12,7 @@
 |------|-------|--------|
 | **Wave 1** | Foundation schema, CRM notes/contacts, gym branding, public site shell, waiver expiry, class waitlists | East Coast MMA pilot-ready core |
 | **Wave 2** | Payments polish, belt stripes/requirements, migration CSV, marketing email, CRM completion | Revenue + onboarding — **complete** |
-| **Wave 3** | AI chat front desk, business assistant summaries | Differentiation |
+| **Wave 3** | AI chat front desk, business assistant summaries | Differentiation — **core shipped** |
 | **Wave 4** | Merch store, multi-location, white-label | Scale — **merchandise module complete** |
 
 ---
@@ -87,6 +87,13 @@ These items are being implemented in the current sprint:
 - [x] Google Sheets public URL import (`/api/migration/fetch-google-sheet`)
 - [x] Upload validation: size limits, allowed types, PDF magic-byte check
 - [~] Background queue (batched imports exist; full async worker deferred)
+
+### Wave 3 — AI core (existing services + new belt/migration polish)
+
+- [x] AI Front Desk: web chat widget, knowledge base, lead capture tools, CRM notes
+- [x] Business Assistant: daily digest cron, snapshots, dashboard widget, insights history
+- [x] Belt order public API + member rank QR verification card
+- Deferred: telephony, social DMs, LLM digest prose, Stripe Connect, Printful
 
 ---
 
