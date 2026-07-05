@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useClientMount } from '@/hooks/use-async-mount';
+import GiSizingChart from '@/components/gym-public/GiSizingChart';
+import { sanitizeBasicHtml } from '@/lib/html-sanitize';
 
 type Product = {
   id: string;
@@ -12,6 +14,7 @@ type Product = {
   inventory_count: number;
   image_url: string | null;
   gallery_urls: string[];
+  category: string;
 };
 
 type Props = {
@@ -72,8 +75,12 @@ export default function ProductDetailClient({ gymSlug, accent, product }: Props)
           ${(product.price_cents / 100).toFixed(2)}
         </p>
         {product.description && (
-          <p className="text-white/50 text-sm mb-6 whitespace-pre-wrap">{product.description}</p>
+          <div
+            className="text-white/50 text-sm mb-6 prose prose-invert prose-sm max-w-none"
+            dangerouslySetInnerHTML={{ __html: sanitizeBasicHtml(product.description) }}
+          />
         )}
+        {product.category === 'gis' && <GiSizingChart accent={accent} />}
         {product.inventory_count > 0 ? (
           <div className="space-y-3">
             <button

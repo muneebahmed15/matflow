@@ -10,6 +10,7 @@ import {
   attendanceImportRowSchema,
   beltHistoryImportRowSchema,
   classImportRowSchema,
+  stripeCustomerMappingRowSchema,
   validateImportRows,
 } from '@/lib/import-schemas';
 import {
@@ -22,6 +23,7 @@ import {
   completeImportJob,
   importMembersBatch,
   importLeadsBatch,
+  importStripeCustomerMappings,
   IMPORT_BATCH_SIZE,
   type ImportJob,
   type DuplicateEmailStrategy,
@@ -327,6 +329,40 @@ export async function finalizeImportJobAction(input: {
     });
     revalidatePath('/migration');
     return { ok: true };
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function importSubscriptionsCsvAction(input: {
+  rows: Record<string, string>[];
+  fileName?: string;
+  dryRun?: boolean;
+}): Promise<ActionResult<{ jobId: string; success: number; errors: { row: number; message: string }[] }>> {
+  try {
+    const auth = await requireStaffSession({ adminOnly: true });
+    const limit = await checkRateLimit(`import:${auth.gymId}`, 5, 60 * 60 * 1000);
+    if (!limit.allowed) {
+      return { ok: false, error: 'Import rate limit exceeded. Try again in an hour.' };
+    }
+
+    const { rows: validatedRows, errors: schemaErrors } = validateImportRows(
+      stripeCustomerMappingRowSchema,
+      input.rows
+    );
+    if (schemaErrors.length > 0 && validatedRows.length === 0) {
+      return { ok: true, data: { jobId: '', success: 0, errors: schemaErrors } };
+    }
+
+    const result = await importStripeCustomerMappings(auth.gymId, validatedRows, {
+      dryRun: input.dryRun,
+    });
+    revalidatePath('/migration');
+    revalidatePath('/subscriptions');
+    return {
+      ok: true,
+      data: { jobId: '', ...result, errors: [...schemaErrors, ...result.errors] },
+    };
   } catch (error) {
     return toActionError(error);
   }

@@ -52,14 +52,19 @@ import { listPrograms } from '@/services/gym-content';
 import { type ActionResult, toActionError } from './_shared';
 
 export async function getStaffContextAction(): Promise<
-  ActionResult<{ gymId: string; role: StaffRole; timezone: string }>
+  ActionResult<{ gymId: string; role: StaffRole; timezone: string; coachesStripesOnly: boolean }>
 > {
   try {
     const auth = await requireStaffSession();
     const settings = await getGymSettings(auth.gymId);
     return {
       ok: true,
-      data: { gymId: auth.gymId, role: auth.role, timezone: settings.timezone },
+      data: {
+        gymId: auth.gymId,
+        role: auth.role,
+        timezone: settings.timezone,
+        coachesStripesOnly: settings.coaches_stripes_only,
+      },
     };
   } catch (error) {
     return toActionError(error);
@@ -132,6 +137,9 @@ export async function updateGymSettingsAction(input: {
   seoKeywords?: string[] | null;
   publicTranslations?: Record<string, unknown> | null;
   locale?: string;
+  shopMemberDiscountPercent?: number;
+  shopFlatTaxCents?: number;
+  coachesStripesOnly?: boolean;
 }): Promise<ActionResult<GymSettings>> {
   try {
     const auth = await requireStaffSession({ adminOnly: true });

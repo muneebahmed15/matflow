@@ -66,11 +66,11 @@
 
 ## Memberships / Billing
 
-- [ ] 8.22 Import active subscriptions metadata
+- [x] 8.22 Import active subscriptions metadata (subscriptions CSV import)
 
-- [ ] 8.23 Stripe customer ID mapping
+- [x] 8.23 Stripe customer ID mapping (`importStripeCustomerMappings`)
 
-- [ ] 8.24 Warn: cannot import card data (PCI)
+- [x] 8.24 Warn: cannot import card data (PCI banner on migration page)
 
 
 
@@ -145,7 +145,7 @@
 
 ## East Coast MMA
 
-- [ ] 8.44 Document ECMMA-specific field mapping
+- [x] 8.44 Document ECMMA-specific field mapping — [ECMMA_FIELD_MAPPING.md](../ECMMA_FIELD_MAPPING.md)
 
 - [ ] 8.45 Pilot import with real data (staging)
 

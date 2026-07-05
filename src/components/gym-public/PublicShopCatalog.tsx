@@ -35,6 +35,13 @@ const CATEGORY_LABELS: Record<string, string> = {
 export default function PublicShopCatalog({ gymId, gymSlug, accent, products }: Props) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [email, setEmail] = useState('');
+  const [fulfillmentType, setFulfillmentType] = useState<'pickup' | 'ship'>('pickup');
+  const [shipName, setShipName] = useState('');
+  const [shipLine1, setShipLine1] = useState('');
+  const [shipLine2, setShipLine2] = useState('');
+  const [shipCity, setShipCity] = useState('');
+  const [shipState, setShipState] = useState('');
+  const [shipPostal, setShipPostal] = useState('');
   const [checkingOut, setCheckingOut] = useState(false);
   const [message, setMessage] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -106,6 +113,13 @@ export default function PublicShopCatalog({ gymId, gymSlug, accent, products }: 
 
   const checkout = async () => {
     if (!email.trim() || cart.length === 0) return;
+    if (
+      fulfillmentType === 'ship' &&
+      (!shipLine1.trim() || !shipCity.trim() || !shipState.trim() || !shipPostal.trim())
+    ) {
+      setMessage('Please complete the shipping address.');
+      return;
+    }
     setCheckingOut(true);
     const res = await fetch('/api/public/shop/checkout', {
       method: 'POST',
@@ -114,6 +128,18 @@ export default function PublicShopCatalog({ gymId, gymSlug, accent, products }: 
         gym_id: gymId,
         gym_slug: gymSlug,
         customer_email: email.trim(),
+        fulfillment_type: fulfillmentType,
+        shipping_address:
+          fulfillmentType === 'ship'
+            ? {
+                name: shipName.trim() || undefined,
+                line1: shipLine1.trim(),
+                line2: shipLine2.trim() || undefined,
+                city: shipCity.trim(),
+                state: shipState.trim(),
+                postal_code: shipPostal.trim(),
+              }
+            : undefined,
         items: cart.map((c) => ({ product_id: c.product.id, quantity: c.quantity })),
       }),
     });
@@ -155,6 +181,72 @@ export default function PublicShopCatalog({ gymId, gymSlug, accent, products }: 
             ))}
           </div>
           <p className="text-white font-semibold mb-3">Total: ${(totalCents / 100).toFixed(2)}</p>
+          <div className="flex gap-2 mb-3">
+            <button
+              type="button"
+              onClick={() => setFulfillmentType('pickup')}
+              className={`flex-1 text-xs py-2 rounded-lg border ${
+                fulfillmentType === 'pickup'
+                  ? 'border-white/30 text-white bg-white/10'
+                  : 'border-white/10 text-white/40'
+              }`}
+            >
+              Pick up at gym
+            </button>
+            <button
+              type="button"
+              onClick={() => setFulfillmentType('ship')}
+              className={`flex-1 text-xs py-2 rounded-lg border ${
+                fulfillmentType === 'ship'
+                  ? 'border-white/30 text-white bg-white/10'
+                  : 'border-white/10 text-white/40'
+              }`}
+            >
+              Ship to me
+            </button>
+          </div>
+          {fulfillmentType === 'ship' && (
+            <div className="space-y-2 mb-3">
+              <input
+                value={shipName}
+                onChange={(e) => setShipName(e.target.value)}
+                placeholder="Full name"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                value={shipLine1}
+                onChange={(e) => setShipLine1(e.target.value)}
+                placeholder="Address line 1"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                value={shipLine2}
+                onChange={(e) => setShipLine2(e.target.value)}
+                placeholder="Address line 2 (optional)"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <div className="grid grid-cols-3 gap-2">
+                <input
+                  value={shipCity}
+                  onChange={(e) => setShipCity(e.target.value)}
+                  placeholder="City"
+                  className="col-span-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  value={shipState}
+                  onChange={(e) => setShipState(e.target.value)}
+                  placeholder="State"
+                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <input
+                value={shipPostal}
+                onChange={(e) => setShipPostal(e.target.value)}
+                placeholder="ZIP / postal code"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          )}
           <input
             type="email"
             value={email}

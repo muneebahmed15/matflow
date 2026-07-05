@@ -106,7 +106,10 @@ export default function BeltsPage() {
       if (!context.ok || !context.data) return
       setGymId(context.data.gymId)
       setIsAdmin(context.data.role === 'admin')
-      setCanPromote(hasCapability(context.data.role, 'belts.promote'))
+      const basePromote = hasCapability(context.data.role, 'belts.promote')
+      const coachStripesOnly =
+        context.data.coachesStripesOnly && context.data.role === 'coach'
+      setCanPromote(basePromote && !coachStripesOnly)
 
       const systemResult = await getGymBeltSystemAction()
       if (systemResult.ok && systemResult.data) {

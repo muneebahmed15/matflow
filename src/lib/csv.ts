@@ -71,8 +71,11 @@ export function csvRowsToObjects(
   return { objects, headers };
 }
 
-export const MEMBER_IMPORT_TEMPLATE = `first_name,last_name,email,phone,belt_rank,status,external_id
-John,Doe,john@example.com,555-0100,white,active,EXT001`;
+export const SUBSCRIPTIONS_IMPORT_TEMPLATE = `email,stripe_customer_id
+john@example.com,cus_abc123`;
+
+export const MEMBER_IMPORT_TEMPLATE = `first_name,last_name,email,phone,belt_rank,status,external_id,stripe_customer_id
+John,Doe,john@example.com,555-0100,white,active,EXT001,cus_abc123`;
 
 export const LEAD_IMPORT_TEMPLATE = `first_name,last_name,email,phone,source,notes
 Jane,Doe,jane@example.com,555-0100,referral,Interested in BJJ`;

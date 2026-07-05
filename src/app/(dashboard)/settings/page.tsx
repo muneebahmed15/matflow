@@ -95,6 +95,9 @@ export default function SettingsPage() {
       seoKeywords: settings.seo_keywords,
       publicTranslations: settings.public_translations,
       locale: settings.locale,
+      shopMemberDiscountPercent: settings.shop_member_discount_percent,
+      shopFlatTaxCents: settings.shop_flat_tax_cents,
+      coachesStripesOnly: settings.coaches_stripes_only,
     })
     setSaving(false)
     if (!result.ok) {
@@ -229,6 +232,18 @@ export default function SettingsPage() {
             </div>
             <p className="text-white/20 text-xs mt-1">Overrides badge colors on member lists and the portal.</p>
           </div>
+          <label className="flex items-center justify-between gap-4 py-3 border-b border-white/10">
+            <div>
+              <span className="text-gray-300 text-sm">Coaches: stripes only</span>
+              <p className="text-white/30 text-xs">Coaches can add stripes but not promote belts</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.coaches_stripes_only}
+              onChange={(e) => update({ coaches_stripes_only: e.target.checked })}
+              className="h-4 w-4 rounded accent-blue-500"
+            />
+          </label>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Booking cancellation window (hours)</label>
             <input
@@ -655,6 +670,36 @@ export default function SettingsPage() {
               className="h-4 w-4 rounded accent-blue-500"
             />
           </label>
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Member shop discount (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={settings.shop_member_discount_percent ?? 0}
+                onChange={(e) =>
+                  update({ shop_member_discount_percent: parseInt(e.target.value, 10) || 0 })
+                }
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Flat tax per order ($)</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={((settings.shop_flat_tax_cents ?? 0) / 100).toFixed(2)}
+                onChange={(e) =>
+                  update({
+                    shop_flat_tax_cents: Math.round(parseFloat(e.target.value || '0') * 100),
+                  })
+                }
+                className={inputClass}
+              />
+            </div>
+          </div>
           <label className="flex items-center justify-between gap-4 py-3 border-b border-white/10">
             <div>
               <span className="text-gray-300 text-sm">AI front desk chat</span>

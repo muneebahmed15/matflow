@@ -49,7 +49,7 @@
 
 ## Permissions
 - [x] 4.34 Promotion gated by `belts.promote` capability (admin/supervisor)
-- [ ] 4.35 Configurable: coach can only add stripes not belts
+- [x] 4.35 Configurable: coach can only add stripes not belts (`coaches_stripes_only`)
 - [x] 4.36 Audit log on rank changes
 
 ## Data Integrity

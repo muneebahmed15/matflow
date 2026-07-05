@@ -15,6 +15,19 @@ describe('prepareShopOrder', () => {
 
   it('creates pending order without decrementing inventory', async () => {
     mockFrom.mockImplementation((table: string) => {
+      if (table === 'gyms') {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: () =>
+                Promise.resolve({
+                  data: { shop_member_discount_percent: 0, shop_flat_tax_cents: 0 },
+                  error: null,
+                }),
+            }),
+          }),
+        };
+      }
       if (table === 'products') {
         return {
           select: () => ({

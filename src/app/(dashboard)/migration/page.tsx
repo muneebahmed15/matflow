@@ -13,6 +13,7 @@ import {
   importLeadsCsvAction,
   importMembersBatchAction,
   importMembersCsvAction,
+  importSubscriptionsCsvAction,
   IMPORT_BATCH_SIZE,
   listImportJobsAction,
   rollbackImportJobAction,
@@ -27,6 +28,7 @@ import {
   ATTENDANCE_IMPORT_TEMPLATE,
   BELT_HISTORY_IMPORT_TEMPLATE,
   CLASS_IMPORT_TEMPLATE,
+  SUBSCRIPTIONS_IMPORT_TEMPLATE,
 } from '@/lib/csv';
 import {
   guessColumnMap,
@@ -43,6 +45,7 @@ const TEMPLATES: Record<ImportType, string> = {
   attendance: ATTENDANCE_IMPORT_TEMPLATE,
   belt_history: BELT_HISTORY_IMPORT_TEMPLATE,
   classes: CLASS_IMPORT_TEMPLATE,
+  subscriptions: SUBSCRIPTIONS_IMPORT_TEMPLATE,
 };
 
 export default function MigrationPage() {
@@ -108,7 +111,9 @@ export default function MigrationPage() {
             ? importAttendanceCsvAction({ rows: typedRows, fileName: name, dryRun: true })
             : importType === 'classes'
               ? importClassesCsvAction({ rows: typedRows, fileName: name, dryRun: true })
-              : importBeltHistoryCsvAction({ rows: typedRows, fileName: name, dryRun: true });
+              : importType === 'subscriptions'
+                ? importSubscriptionsCsvAction({ rows: typedRows, fileName: name, dryRun: true })
+                : importBeltHistoryCsvAction({ rows: typedRows, fileName: name, dryRun: true });
 
     const res = await action;
     setImporting(false);
@@ -221,7 +226,9 @@ export default function MigrationPage() {
           ? importAttendanceCsvAction({ rows: parsedRows, fileName, dryRun: false })
           : importType === 'classes'
             ? importClassesCsvAction({ rows: parsedRows, fileName, dryRun: false })
-            : importBeltHistoryCsvAction({ rows: parsedRows, fileName, dryRun: false });
+            : importType === 'subscriptions'
+              ? importSubscriptionsCsvAction({ rows: parsedRows, fileName, dryRun: false })
+              : importBeltHistoryCsvAction({ rows: parsedRows, fileName, dryRun: false });
       setProgress(60);
       const res = await action;
       if (!res.ok) {
@@ -311,7 +318,7 @@ export default function MigrationPage() {
       <MigrationStepper steps={steps} />
 
       <div className="flex gap-2 mb-6 flex-wrap">
-        {(['members', 'leads', 'classes', 'attendance', 'belt_history'] as ImportType[]).map((t) => (
+        {(['members', 'leads', 'classes', 'attendance', 'belt_history', 'subscriptions'] as ImportType[]).map((t) => (
           <button
             key={t}
             onClick={() => {
@@ -326,6 +333,17 @@ export default function MigrationPage() {
           </button>
         ))}
       </div>
+
+      {(importType === 'subscriptions' ||
+        (importType === 'members' && columnMapping.stripe_customer_id)) && (
+        <div className="mb-6 flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3 text-sm text-amber-200">
+          <FileWarning size={18} className="shrink-0 mt-0.5" />
+          <p>
+            Card data cannot be imported. Only Stripe customer IDs can be mapped — members must
+            update payment methods in the portal or via Stripe Billing Portal.
+          </p>
+        </div>
+      )}
 
       <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-6 space-y-4">
         <button

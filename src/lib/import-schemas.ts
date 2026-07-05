@@ -10,6 +10,7 @@ export const memberImportRowSchema = z.object({
   belt_rank: optionalString,
   status: optionalString,
   external_id: optionalString,
+  stripe_customer_id: optionalString,
 });
 
 export const leadImportRowSchema = z.object({
@@ -49,7 +50,12 @@ export const classImportRowSchema = z.object({
   description: optionalString,
 });
 
-export type ValidatedMemberImportRow = z.infer<typeof memberImportRowSchema>;
+export const stripeCustomerMappingRowSchema = z.object({
+  email: z.string().trim().min(1, 'email is required'),
+  stripe_customer_id: z.string().trim().min(1, 'stripe_customer_id is required'),
+});
+
+export type ValidatedStripeCustomerMappingRow = z.infer<typeof stripeCustomerMappingRowSchema>;
 export type ValidatedLeadImportRow = z.infer<typeof leadImportRowSchema>;
 
 export function validateImportRow<T>(

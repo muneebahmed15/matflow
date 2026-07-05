@@ -25,6 +25,62 @@ async function findMemberIdByEmail(
   return data?.id ?? null;
 }
 
+async function applyStripeCustomerMapping(
+  gymId: string,
+  memberId: string,
+  email: string | undefined,
+  stripeCustomerId: string
+): Promise<void> {
+  const admin = getAdminClient();
+  const customerId = stripeCustomerId.trim();
+  if (!customerId.startsWith('cus_')) return;
+
+  const { data: subscription } = await admin
+    .from('subscriptions')
+    .select('id')
+    .eq('gym_id', gymId)
+    .eq('member_id', memberId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (subscription) {
+    await admin.from('subscriptions').update({ stripe_customer_id: customerId }).eq('id', subscription.id);
+    return;
+  }
+
+  const { data: member } = await admin
+    .from('members')
+    .select('family_id')
+    .eq('id', memberId)
+    .maybeSingle();
+
+  if (member?.family_id) {
+    await admin
+      .from('families')
+      .update({ stripe_customer_id: customerId })
+      .eq('id', member.family_id)
+      .eq('gym_id', gymId);
+    return;
+  }
+
+  if (email) {
+    const { data: family } = await admin
+      .from('families')
+      .select('id')
+      .eq('gym_id', gymId)
+      .ilike('primary_email', email.trim().toLowerCase())
+      .maybeSingle();
+    if (family) {
+      await admin
+        .from('families')
+        .update({ stripe_customer_id: customerId })
+        .eq('id', family.id)
+        .eq('gym_id', gymId);
+    }
+  }
+}
+
 async function upsertImportedMember(
   gymId: string,
   jobId: string,
@@ -65,6 +121,9 @@ async function upsertImportedMember(
           import_job_id: jobId,
         })
         .eq('id', existingId);
+      if (row.stripe_customer_id) {
+        await applyStripeCustomerMapping(gymId, existingId, row.email, row.stripe_customer_id);
+      }
       return 'updated';
     }
     throw new ServiceError(409, 'A member with this email already exists.');
@@ -88,6 +147,10 @@ async function upsertImportedMember(
       .eq('id', member.id);
   } else {
     await admin.from('members').update({ import_job_id: jobId }).eq('id', member.id);
+  }
+
+  if (row.stripe_customer_id) {
+    await applyStripeCustomerMapping(gymId, member.id, row.email, row.stripe_customer_id);
   }
 
   return 'created';
@@ -156,6 +219,7 @@ export type MemberImportRow = {
   belt_rank?: string;
   status?: string;
   external_id?: string;
+  stripe_customer_id?: string;
 };
 
 export async function importMembersFromRows(
@@ -1111,4 +1175,102 @@ export async function rollbackImportJob(gymId: string, jobId: string): Promise<{
     .eq('id', jobId);
 
   return { removed };
+}
+
+export type StripeCustomerMappingRow = {
+  email: string;
+  stripe_customer_id: string;
+};
+
+export async function importStripeCustomerMappings(
+  gymId: string,
+  rows: StripeCustomerMappingRow[],
+  options?: { dryRun?: boolean }
+): Promise<{ success: number; errors: { row: number; message: string }[] }> {
+  if (rows.length > MAX_IMPORT_ROWS) {
+    throw new ServiceError(400, `Maximum ${MAX_IMPORT_ROWS} rows per import.`);
+  }
+
+  const admin = getAdminClient();
+  let success = 0;
+  const errors: { row: number; message: string }[] = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const rowNum = i + 2;
+    const email = rows[i].email?.trim().toLowerCase();
+    const customerId = rows[i].stripe_customer_id?.trim();
+
+    if (!email) {
+      errors.push({ row: rowNum, message: 'email is required' });
+      continue;
+    }
+    if (!customerId || !customerId.startsWith('cus_')) {
+      errors.push({ row: rowNum, message: 'stripe_customer_id must start with cus_' });
+      continue;
+    }
+
+    const memberId = await findMemberIdByEmail(gymId, email);
+    if (!memberId) {
+      const { data: family } = await admin
+        .from('families')
+        .select('id')
+        .eq('gym_id', gymId)
+        .ilike('primary_email', email)
+        .maybeSingle();
+
+      if (!family) {
+        errors.push({ row: rowNum, message: `No member or family found for ${email}` });
+        continue;
+      }
+
+      if (!options?.dryRun) {
+        await admin
+          .from('families')
+          .update({ stripe_customer_id: customerId })
+          .eq('id', family.id)
+          .eq('gym_id', gymId);
+      }
+      success++;
+      continue;
+    }
+
+    if (!options?.dryRun) {
+      const { data: subscription } = await admin
+        .from('subscriptions')
+        .select('id')
+        .eq('gym_id', gymId)
+        .eq('member_id', memberId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (subscription) {
+        await admin
+          .from('subscriptions')
+          .update({ stripe_customer_id: customerId })
+          .eq('id', subscription.id);
+      } else {
+        const { data: member } = await admin
+          .from('members')
+          .select('family_id')
+          .eq('id', memberId)
+          .maybeSingle();
+
+        if (member?.family_id) {
+          await admin
+            .from('families')
+            .update({ stripe_customer_id: customerId })
+            .eq('id', member.family_id)
+            .eq('gym_id', gymId);
+        } else {
+          errors.push({ row: rowNum, message: `No subscription or family billing record for ${email}` });
+          continue;
+        }
+      }
+    }
+
+    success++;
+  }
+
+  return { success, errors };
 }

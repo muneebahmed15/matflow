@@ -12,7 +12,7 @@
 - [x] 13.7 Low stock alerts
 - [x] 13.8 Stock adjustment log
 - [~] 13.9 Reserve stock on checkout (decrement on payment)
-- [ ] 13.10 Release on payment timeout
+- [x] 13.10 Release on payment timeout (cancel stale pending orders cron)
 
 ## Storefront
 - [x] 13.11 Public store `/g/[slug]/shop`
@@ -23,9 +23,9 @@
 
 ## Checkout
 - [x] 13.16 Stripe Checkout for one-time products
-- [ ] 13.17 Shipping address collection
+- [x] 13.17 Shipping address collection
 - [x] 13.18 Pick up at gym option
-- [ ] 13.19 Tax/shipping calculation
+- [x] 13.19 Tax/shipping calculation (flat tax + member discount)
 - [x] 13.20 Order confirmation email
 
 ## Orders
@@ -39,11 +39,11 @@
 - [x] 13.26 Mark order fulfilled
 - [x] 13.27 Tracking number field
 - [x] 13.28 Fulfillment notification email
-- [ ] 13.29 Print packing slip
+- [x] 13.29 Print packing slip (PDF download)
 
 ## Discounts
-- [ ] 13.30 Member discount auto-apply
-- [ ] 13.31 Promo codes for shop
+- [x] 13.30 Member discount auto-apply
+- [x] 13.31 Promo codes for shop (Stripe allow_promotion_codes)
 - [ ] 13.32 Bundle deals (gi + belt)
 
 ## Integrations
@@ -53,8 +53,8 @@
 
 ## Reporting
 - [x] 13.36 Revenue by product report
-- [ ] 13.37 Best sellers widget
-- [ ] 13.38 Inventory valuation
+- [x] 13.37 Best sellers widget
+- [x] 13.38 Inventory valuation
 
 ## Permissions
 - [x] 13.39 Admin-only product management
@@ -73,7 +73,7 @@
 - [ ] 13.46 E2E: add to cart → checkout (test mode)
 
 ## Pilot
-- [ ] 13.47 East Coast MMA product seed data
-- [ ] 13.48 Gi sizing chart component
-- [ ] 13.49 In-gym POS mode (staff sells at desk)
-- [ ] 13.50 Feature flag: merchandise module off by default
+- [x] 13.47 East Coast MMA product seed data
+- [x] 13.48 Gi sizing chart component
+- [x] 13.49 In-gym POS mode (staff sells at desk)
+- [x] 13.50 Feature flag: merchandise module off by default

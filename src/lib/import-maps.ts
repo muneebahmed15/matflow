@@ -1,7 +1,7 @@
-export type ImportType = 'members' | 'leads' | 'attendance' | 'belt_history' | 'classes';
+export type ImportType = 'members' | 'leads' | 'attendance' | 'belt_history' | 'classes' | 'subscriptions';
 
 export const IMPORT_TARGET_FIELDS: Record<ImportType, string[]> = {
-  members: ['first_name', 'last_name', 'email', 'phone', 'belt_rank', 'status', 'external_id'],
+  members: ['first_name', 'last_name', 'email', 'phone', 'belt_rank', 'status', 'external_id', 'stripe_customer_id'],
   leads: ['first_name', 'last_name', 'email', 'phone', 'source', 'notes'],
   attendance: ['email', 'external_id', 'checked_in_at', 'notes'],
   belt_history: ['email', 'external_id', 'from_belt', 'to_belt', 'promoted_at', 'notes'],
@@ -16,6 +16,7 @@ export const IMPORT_TARGET_FIELDS: Record<ImportType, string[]> = {
     'color',
     'description',
   ],
+  subscriptions: ['email', 'stripe_customer_id'],
 };
 
 const FIELD_ALIASES: Record<string, string[]> = {
@@ -26,6 +27,7 @@ const FIELD_ALIASES: Record<string, string[]> = {
   belt_rank: ['belt', 'belt_rank', 'rank', 'belt rank', 'current belt'],
   status: ['status', 'member status', 'active'],
   external_id: ['external_id', 'external id', 'legacy id', 'member id', 'id'],
+  stripe_customer_id: ['stripe_customer_id', 'stripe customer id', 'customer id', 'stripe id', 'cus_id'],
   source: ['source', 'lead source', 'referral source'],
   notes: ['notes', 'note', 'comments', 'comment'],
   checked_in_at: ['checked_in_at', 'check in', 'check-in', 'date', 'attendance date', 'checked in'],

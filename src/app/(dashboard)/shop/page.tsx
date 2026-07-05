@@ -12,6 +12,10 @@ import {
   listProductVariantsAction,
   createProductVariantAction,
   adjustStockAction,
+  getInventoryValuationAction,
+  createPosOrderAction,
+  downloadPackingSlipAction,
+  listMembersAction,
 } from '@/app/(dashboard)/actions';
 
 const CATEGORIES = [
@@ -45,12 +49,24 @@ type RevenueRow = {
   revenueCents: number;
 };
 
+type MemberOption = { id: string; first_name: string; last_name: string; email: string | null };
+
+type Tab = 'products' | 'pos' | 'orders';
+
 export default function ShopAdminPage() {
+  const [tab, setTab] = useState<Tab>('products');
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<
     { id: string; status: string; total_cents: number; customer_email: string | null; created_at: string }[]
   >([]);
   const [revenue, setRevenue] = useState<RevenueRow[]>([]);
+  const [inventoryValue, setInventoryValue] = useState<{ totalCents: number; skuCount: number } | null>(
+    null
+  );
+  const [members, setMembers] = useState<MemberOption[]>([]);
+  const [posMemberId, setPosMemberId] = useState('');
+  const [posCart, setPosCart] = useState<{ productId: string; quantity: number }[]>([]);
+  const [posSubmitting, setPosSubmitting] = useState(false);
   const [variantsByProduct, setVariantsByProduct] = useState<Record<string, Variant[]>>({});
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
@@ -61,10 +77,12 @@ export default function ShopAdminPage() {
   const [variantForms, setVariantForms] = useState<Record<string, { label: string; sku: string; stock: string }>>({});
 
   const load = async () => {
-    const [prodRes, ordRes, revRes] = await Promise.all([
+    const [prodRes, ordRes, revRes, valRes, memRes] = await Promise.all([
       listProductsAction(),
       listOrdersAction(),
       getShopRevenueAction(),
+      getInventoryValuationAction(),
+      listMembersAction(),
     ]);
     if (prodRes.ok && prodRes.data) {
       const prods = prodRes.data as Product[];
@@ -80,6 +98,8 @@ export default function ShopAdminPage() {
     }
     if (ordRes.ok && ordRes.data) setOrders(ordRes.data as typeof orders);
     if (revRes.ok && revRes.data) setRevenue(revRes.data);
+    if (valRes.ok && valRes.data) setInventoryValue(valRes.data);
+    if (memRes.ok && memRes.data) setMembers(memRes.data as MemberOption[]);
     setLoading(false);
   };
 
@@ -119,14 +139,98 @@ export default function ShopAdminPage() {
     void load();
   };
 
+  const downloadPackingSlip = async (orderId: string) => {
+    const result = await downloadPackingSlipAction(orderId);
+    if (!result.ok || !result.data) return;
+    const bytes = Uint8Array.from(atob(result.data.base64), (c) => c.charCodeAt(0));
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = result.data.filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const addToPosCart = (productId: string) => {
+    setPosCart((prev) => {
+      const existing = prev.find((item) => item.productId === productId);
+      if (existing) {
+        return prev.map((item) =>
+          item.productId === productId ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      }
+      return [...prev, { productId, quantity: 1 }];
+    });
+  };
+
+  const submitPosOrder = async () => {
+    if (posCart.length === 0) return;
+    setPosSubmitting(true);
+    const member = members.find((m) => m.id === posMemberId);
+    const result = await createPosOrderAction({
+      memberId: posMemberId || undefined,
+      customerEmail: member?.email ?? undefined,
+      items: posCart,
+    });
+    setPosSubmitting(false);
+    if (result.ok) {
+      setPosCart([]);
+      setPosMemberId('');
+      void load();
+    }
+  };
+
+  const bestSellers = revenue.slice(0, 3);
+
   const inputClass =
     'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 
   return (
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
       <h1 className="text-3xl font-extrabold mb-2">Shop</h1>
-      <p className="text-white/40 text-sm mb-8">Manage merchandise. Enable the store in Settings.</p>
+      <p className="text-white/40 text-sm mb-6">Manage merchandise. Enable the store in Settings.</p>
 
+      <div className="flex gap-2 mb-6">
+        {(['products', 'pos', 'orders'] as Tab[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium capitalize ${
+              tab === t ? 'bg-blue-600 text-white' : 'bg-white/5 text-white/50'
+            }`}
+          >
+            {t === 'pos' ? 'POS' : t}
+          </button>
+        ))}
+      </div>
+
+      {inventoryValue && (
+        <div className="grid sm:grid-cols-2 gap-4 mb-8">
+          <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+            <p className="text-white/40 text-xs uppercase tracking-wide">Inventory valuation</p>
+            <p className="text-white font-bold text-lg">
+              ${(inventoryValue.totalCents / 100).toFixed(2)}
+            </p>
+            <p className="text-white/30 text-xs">{inventoryValue.skuCount} SKUs in stock</p>
+          </div>
+          {bestSellers.length > 0 && (
+            <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+              <p className="text-white/40 text-xs uppercase tracking-wide mb-2">Best sellers</p>
+              <div className="space-y-1">
+                {bestSellers.map((row, i) => (
+                  <p key={row.productId} className="text-white/70 text-sm">
+                    {i + 1}. {row.name} · {row.unitsSold} sold
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'products' && (
+        <>
       <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8 space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Product name" className={inputClass} />
@@ -242,8 +346,63 @@ export default function ShopAdminPage() {
           ))}
         </div>
       )}
+        </>
+      )}
 
-      <h2 className="font-semibold text-white mb-3 mt-10">Revenue by Product</h2>
+      {tab === 'pos' && (
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6 mb-8 space-y-4">
+          <h2 className="font-semibold text-white">In-gym POS</h2>
+          <p className="text-white/40 text-sm">Sell at the front desk — order is marked paid immediately (cash/card at desk).</p>
+          <select
+            value={posMemberId}
+            onChange={(e) => setPosMemberId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="" className="bg-gray-900">Walk-in (no member)</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id} className="bg-gray-900">
+                {m.first_name} {m.last_name}
+              </option>
+            ))}
+          </select>
+          <div className="space-y-2">
+            {products.filter((p) => p.is_active && p.inventory_count > 0).map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => addToPosCart(p.id)}
+                className="w-full flex justify-between items-center bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white hover:bg-white/10"
+              >
+                <span>{p.name}</span>
+                <span className="text-white/40">${(p.price_cents / 100).toFixed(2)}</span>
+              </button>
+            ))}
+          </div>
+          {posCart.length > 0 && (
+            <div className="border-t border-white/10 pt-4 space-y-2">
+              {posCart.map((item) => {
+                const product = products.find((p) => p.id === item.productId);
+                return (
+                  <p key={item.productId} className="text-sm text-white/70">
+                    {product?.name} × {item.quantity}
+                  </p>
+                );
+              })}
+              <button
+                onClick={() => void submitPosOrder()}
+                disabled={posSubmitting}
+                className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm"
+              >
+                {posSubmitting ? 'Processing…' : 'Complete sale'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'orders' && (
+        <>
+      <h2 className="font-semibold text-white mb-3">Revenue by Product</h2>
       {revenue.length === 0 ? (
         <p className="text-white/30 text-sm">No paid orders yet.</p>
       ) : (
@@ -273,20 +432,30 @@ export default function ShopAdminPage() {
                 </span>
               </div>
               {o.status === 'paid' && (
-                <button
-                  onClick={async () => {
-                    const tracking = window.prompt('Tracking number (optional):') ?? undefined;
-                    await fulfillOrderAction(o.id, tracking || undefined);
-                    void load();
-                  }}
-                  className="text-xs text-green-400 hover:underline"
-                >
-                  Mark fulfilled
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => void downloadPackingSlip(o.id)}
+                    className="text-xs text-blue-400 hover:underline"
+                  >
+                    Packing slip
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const tracking = window.prompt('Tracking number (optional):') ?? undefined;
+                      await fulfillOrderAction(o.id, tracking || undefined);
+                      void load();
+                    }}
+                    className="text-xs text-green-400 hover:underline"
+                  >
+                    Mark fulfilled
+                  </button>
+                </div>
               )}
             </div>
           ))}
         </div>
+      )}
+        </>
       )}
     </div>
   );

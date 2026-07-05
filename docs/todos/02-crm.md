@@ -48,7 +48,7 @@
 ## Coaches (CRM context)
 - [x] 2.38 Staff roles table (done)
 - [x] 2.39 Staff invite via email (done)
-- [ ] 2.40 Coach profile page (bio, photo)
+- [x] 2.40 Coach profile page (bio, photo via website-content / gym_coaches)
 - [x] 2.41 Link coach to classes as instructor FK (`classes.instructor_staff_id`)
 - [ ] 2.42 Coach availability calendar
 

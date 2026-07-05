@@ -5,6 +5,7 @@ import { listAllPlans } from '@/services/plans'
 import { getAdminClient } from '@/lib/supabase/admin'
 import NewPlanForm from '@/components/plans/NewPlanForm'
 import PlanToggleButton from '@/components/plans/PlanToggleButton'
+import { sanitizeBasicHtml, htmlToPlainPreview } from '@/lib/html-sanitize'
 
 export default async function PlansPage() {
   const auth = await requireStaffSessionForPage({ adminOnly: true })
@@ -56,7 +57,9 @@ export default async function PlansPage() {
                   <div className="min-w-0">
                     <p className="font-semibold text-white truncate">{plan.name}</p>
                     {plan.description && (
-                      <p className="text-xs text-white/30 truncate">{plan.description}</p>
+                      <p className="text-xs text-white/30 truncate" title={htmlToPlainPreview(plan.description)}>
+                        {htmlToPlainPreview(plan.description, 80)}
+                      </p>
                     )}
                     <p className="text-xs text-white/20 mt-1 flex items-center gap-1">
                       <Users size={12} />
@@ -81,6 +84,12 @@ export default async function PlansPage() {
                     </span>
                     <PlanToggleButton planId={plan.id} isActive={plan.is_active} />
                   </div>
+                  {plan.description && (
+                    <div
+                      className="text-xs text-white/40 max-w-xs text-right prose prose-invert prose-sm"
+                      dangerouslySetInnerHTML={{ __html: sanitizeBasicHtml(plan.description) }}
+                    />
+                  )}
                 </div>
               </div>
             )

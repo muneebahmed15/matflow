@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
+import BlogRichTextEditor from '@/components/marketing/BlogRichTextEditor'
 
 type Props = {
   gymId: string
@@ -64,7 +65,12 @@ export default function NewPlanForm({ gymId }: Props) {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
-            <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Unlimited classes, no contract" className={inputClass} />
+            <BlogRichTextEditor
+              value={description}
+              onChange={setDescription}
+              rows={6}
+              placeholder="e.g. Unlimited classes, no contract"
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

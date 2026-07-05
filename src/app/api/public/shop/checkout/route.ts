@@ -10,11 +10,23 @@ import {
 import { parseJsonBody } from '@/lib/api-validate';
 import { handleRouteError } from '@/lib/api-error';
 
+const shippingAddressSchema = z.object({
+  name: z.string().optional(),
+  line1: z.string().min(1),
+  line2: z.string().optional(),
+  city: z.string().min(1),
+  state: z.string().min(1),
+  postal_code: z.string().min(1),
+  country: z.string().optional(),
+});
+
 const schema = z.object({
   gym_id: z.string().uuid(),
   gym_slug: z.string().min(1),
   customer_email: z.string().email(),
   member_id: z.string().uuid().optional(),
+  fulfillment_type: z.enum(['pickup', 'ship']).default('pickup'),
+  shipping_address: shippingAddressSchema.optional(),
   items: z
     .array(
       z.object({
@@ -29,7 +41,19 @@ export async function POST(req: NextRequest) {
   const parsed = await parseJsonBody(req, schema);
   if (!parsed.success) return parsed.response;
 
-  const { gym_id, gym_slug, customer_email, member_id, items } = parsed.data;
+  const {
+    gym_id,
+    gym_slug,
+    customer_email,
+    member_id,
+    fulfillment_type,
+    shipping_address,
+    items,
+  } = parsed.data;
+
+  if (fulfillment_type === 'ship' && !shipping_address) {
+    return NextResponse.json({ error: 'Shipping address required' }, { status: 400 });
+  }
 
   const admin = getAdminClient();
   const { data: gym } = await admin
@@ -48,15 +72,14 @@ export async function POST(req: NextRequest) {
       gymId: gym_id,
       memberId: member_id,
       customerEmail: customer_email,
+      fulfillmentType: fulfillment_type,
+      shippingAddress: shipping_address ?? null,
       items: items.map((i) => ({ productId: i.product_id, quantity: i.quantity })),
     });
 
     const { NEXT_PUBLIC_APP_URL } = getPublicEnv();
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      customer_email,
-      line_items: prepared.lineItems.map((line) => ({
+    const stripeLineItems = [
+      ...prepared.lineItems.map((line) => ({
         quantity: line.quantity,
         price_data: {
           currency: 'usd',
@@ -64,6 +87,26 @@ export async function POST(req: NextRequest) {
           product_data: { name: line.name },
         },
       })),
+      ...(prepared.taxCents > 0
+        ? [
+            {
+              quantity: 1,
+              price_data: {
+                currency: 'usd',
+                unit_amount: prepared.taxCents,
+                product_data: { name: 'Tax' },
+              },
+            },
+          ]
+        : []),
+    ];
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      customer_email,
+      allow_promotion_codes: true,
+      line_items: stripeLineItems,
       success_url: `${NEXT_PUBLIC_APP_URL}/g/${gym_slug}/shop?success=true`,
       cancel_url: `${NEXT_PUBLIC_APP_URL}/g/${gym_slug}/shop?cancelled=true`,
       metadata: {
@@ -71,6 +114,7 @@ export async function POST(req: NextRequest) {
         order_id: prepared.orderId,
         type: 'merchandise',
         member_id: member_id ?? '',
+        fulfillment_type,
       },
     });
 

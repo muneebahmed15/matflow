@@ -1,6 +1,6 @@
 # MatsFlow — Master Implementation Plan
 
-> **Status:** Wave 2 complete · Wave 4 in progress  
+> **Status:** Wave 2 complete · Wave 4 merchandise largely complete  
 > **Scoring:** `[ ]` Not started · `[~]` Partial · `[x]` Done  
 > **Rule:** Each module has **50+** granular, testable todos. No item ships without schema + service + auth + UI (where applicable).
 
@@ -13,7 +13,7 @@
 | **Wave 1** | Foundation schema, CRM notes/contacts, gym branding, public site shell, waiver expiry, class waitlists | East Coast MMA pilot-ready core |
 | **Wave 2** | Payments polish, belt stripes/requirements, migration CSV, marketing email, CRM completion | Revenue + onboarding — **complete** |
 | **Wave 3** | AI chat front desk, business assistant summaries | Differentiation |
-| **Wave 4** | Merch store, multi-location, white-label | Scale — **in progress** |
+| **Wave 4** | Merch store, multi-location, white-label | Scale — **merchandise module complete** |
 
 ---
 
@@ -57,7 +57,15 @@ These items are being implemented in the current sprint:
 - [x] Apply migration to Supabase (`npm run db:start` + `npm run db:reset` locally, or `npm run db:push` remote)
 - [x] RLS integration tests for family portal waiver access (requires `SUPABASE_TEST_*`)
 - [x] E2E: waiver blocks check-in until signed (`npm run test:e2e:waiver`)
-- [ ] Remaining 600+ todos across Waves 2–4
+- [ ] Remaining todos across Waves 3–4 (multi-location polish, AI modules)
+
+### Wave 4 — Merchandise (20250704300000_wave2_wave4_options.sql)
+
+- [x] Shop settings: member discount %, flat tax, coaches stripes-only
+- [x] Checkout: pickup/ship, shipping address, Stripe promo codes
+- [x] Stale pending order cron (`/api/cron/shop-orders`)
+- [x] Packing slip PDF, POS mode, inventory valuation, best sellers widget
+- [x] Gi sizing chart, ECMMA seed script, store off by default for new gyms
 
 ---
 

@@ -1865,6 +1865,9 @@ export type Database = {
           member_required_fields: Json
           public_translations: Json
           seo_keywords: string[] | null
+          shop_flat_tax_cents: number
+          shop_member_discount_percent: number
+          coaches_stripes_only: boolean
         }
         Insert: {
           about_text?: string | null
@@ -1899,6 +1902,9 @@ export type Database = {
           signature_webhook_url?: string | null
           slug: string
           store_enabled?: boolean
+          shop_flat_tax_cents?: number
+          shop_member_discount_percent?: number
+          coaches_stripes_only?: boolean
           store_return_policy?: string | null
           tagline?: string | null
           timezone?: string
@@ -1939,6 +1945,9 @@ export type Database = {
           signature_webhook_url?: string | null
           slug?: string
           store_enabled?: boolean
+          shop_flat_tax_cents?: number
+          shop_member_discount_percent?: number
+          coaches_stripes_only?: boolean
           store_return_policy?: string | null
           tagline?: string | null
           timezone?: string
@@ -2478,9 +2487,11 @@ export type Database = {
           created_at: string
           customer_email: string | null
           fulfilled_at: string | null
+          fulfillment_type: string
           gym_id: string
           id: string
           member_id: string | null
+          shipping_address: Json | null
           status: string
           stripe_checkout_session_id: string | null
           stripe_payment_intent_id: string | null
@@ -2491,9 +2502,11 @@ export type Database = {
           created_at?: string
           customer_email?: string | null
           fulfilled_at?: string | null
+          fulfillment_type?: string
           gym_id: string
           id?: string
           member_id?: string | null
+          shipping_address?: Json | null
           status?: string
           stripe_checkout_session_id?: string | null
           stripe_payment_intent_id?: string | null
@@ -2504,9 +2517,11 @@ export type Database = {
           created_at?: string
           customer_email?: string | null
           fulfilled_at?: string | null
+          fulfillment_type?: string
           gym_id?: string
           id?: string
           member_id?: string | null
+          shipping_address?: Json | null
           status?: string
           stripe_checkout_session_id?: string | null
           stripe_payment_intent_id?: string | null
